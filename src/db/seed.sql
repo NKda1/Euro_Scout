@@ -1,0 +1,2 @@
+-- SQL seed data placeholder.
+-- Source-of-truth seed data for the MVP lives in /src/data until Supabase is connected.
