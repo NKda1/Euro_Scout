@@ -1,6 +1,8 @@
 import type { Team } from "@/types";
 
-const teams: Team[] = [
+type TeamSeed = Omit<Team, "countryFlag" | "marketTier">;
+
+const teams: TeamSeed[] = [
   {
     id: "afle-alpine-rams-biel",
     slug: "afle-alpine-rams-biel",

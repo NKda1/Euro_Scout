@@ -5,6 +5,7 @@ export interface League {
   countryScope: string;
   regionIds: string[];
   tier: "continental" | "national" | "premier";
+  marketTier: "gold" | "silver" | "bronze";
   status: "active" | "inactive" | "coming-soon";
   teamCount: number;
   description: string;

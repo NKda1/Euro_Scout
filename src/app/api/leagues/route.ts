@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import leagues from "@/data/leagues.seed";
+import { leagues } from "@/lib/data";
 
 export async function GET() {
   return NextResponse.json(leagues);

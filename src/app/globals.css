@@ -10,7 +10,7 @@
     --card-foreground: 222.2 47.4% 11.2%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 47.4% 11.2%;
-    --primary: 217.2 91.2% 59.8%;
+    --primary: 0 84.2% 60.2%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -22,8 +22,30 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 217.2 91.2% 59.8%;
-    --radius: 0.5rem;
+    --ring: 0 84.2% 60.2%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 222 39% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 39% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 0 84.2% 60.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 70%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 0 84.2% 60.2%;
   }
 
   * {
@@ -31,6 +53,203 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(239, 68, 68, 0.14), transparent 30rem),
+      radial-gradient(circle at 86% 18%, rgba(15, 23, 42, 0.08), transparent 26rem),
+      linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
+    font-family: "SF Pro Text", "SF Pro Display", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-size: 16px;
+    letter-spacing: 0;
+    line-height: 1.5;
+    min-height: 100vh;
+    text-rendering: optimizeLegibility;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(239, 68, 68, 0.24), transparent 28rem),
+      radial-gradient(circle at 80% 4%, rgba(148, 163, 184, 0.1), transparent 24rem),
+      linear-gradient(180deg, hsl(var(--background)), #060914);
+  }
+
+  ::selection {
+    @apply bg-red-600 text-white;
+  }
+}
+
+@layer components {
+  .app-surface {
+    @apply bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-white;
+  }
+
+  .glass-card {
+    @apply border border-white/70 bg-white/75 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur-2xl dark:border-white/10 dark:bg-slate-900/70 dark:shadow-[0_24px_90px_rgba(0,0,0,0.34)];
+  }
+
+  .muted-copy {
+    @apply text-slate-600 dark:text-slate-300;
+  }
+
+  .eyebrow-red {
+    @apply text-xs font-semibold uppercase text-red-600 dark:text-red-400;
+  }
+
+  .hero-cinematic-frame {
+    @apply absolute inset-0 bg-cover;
+    animation-duration: 40s;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+    transform: scale(1.03);
+    will-change: opacity, transform;
+  }
+
+  .hero-cinematic-frame-1 {
+    background-image: url("/images/euroscout-hero-line.jpeg");
+    background-position: center 42%;
+    animation-name: heroCinematic1;
+  }
+
+  .hero-cinematic-frame-2 {
+    background-image: url("/images/euroscout-hero-tackle.jpeg");
+    background-position: center 46%;
+    animation-name: heroCinematic2;
+  }
+
+  .hero-cinematic-frame-3 {
+    background-image: url("/images/E_S1.png");
+    background-position: center 28%;
+    animation-name: heroCinematic3;
+  }
+
+  .hero-cinematic-frame-4 {
+    background-image: url("/images/E_S2.png");
+    background-position: center 40%;
+    animation-name: heroCinematic4;
+  }
+
+  .hero-cinematic-frame-5 {
+    background-image: url("/images/E_S3.png");
+    background-position: center 40%;
+    animation-name: heroCinematic5;
+  }
+
+  .hero-cinematic-frame-6 {
+    background-image: url("/images/E_S4.png");
+    background-position: center 40%;
+    animation-name: heroCinematic6;
+  }
+
+  .region-scroll {
+    scrollbar-color: rgba(248, 113, 113, 0.75) rgba(15, 23, 42, 0.62);
+  }
+
+  .region-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .region-scroll::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.38);
+  }
+
+  .region-scroll::-webkit-scrollbar-thumb {
+    border: 2px solid rgba(15, 23, 42, 0.62);
+    border-radius: 999px;
+    background: rgba(248, 113, 113, 0.82);
+  }
+}
+
+@layer utilities {
+  .font-black {
+    font-weight: 680;
+  }
+
+  .font-bold {
+    font-weight: 620;
+  }
+
+  .font-semibold {
+    font-weight: 560;
+  }
+
+  .tracking-tight,
+  .tracking-wide,
+  .tracking-wider,
+  .tracking-widest,
+  [class*="tracking-\\["] {
+    letter-spacing: 0;
+  }
+}
+
+/* 6-image cinematic slideshow — 60s cycle, each image visible ~10s with crossfade */
+@keyframes heroCinematic1 {
+  0%   { opacity: 1; transform: scale(1.03); }
+  14%  { opacity: 1; transform: scale(1.05); }
+  17%  { opacity: 0; transform: scale(1.08); }
+  97%  { opacity: 0; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1.03); }
+}
+
+@keyframes heroCinematic2 {
+  0%   { opacity: 0; transform: scale(1.08); }
+  14%  { opacity: 0; transform: scale(1.08); }
+  17%  { opacity: 1; transform: scale(1.03); }
+  30%  { opacity: 1; transform: scale(1.05); }
+  33%  { opacity: 0; transform: scale(1.08); }
+  100% { opacity: 0; transform: scale(1.08); }
+}
+
+@keyframes heroCinematic3 {
+  0%   { opacity: 0; transform: scale(1.08); }
+  30%  { opacity: 0; transform: scale(1.08); }
+  33%  { opacity: 1; transform: scale(1.03); }
+  47%  { opacity: 1; transform: scale(1.05); }
+  50%  { opacity: 0; transform: scale(1.08); }
+  100% { opacity: 0; transform: scale(1.08); }
+}
+
+@keyframes heroCinematic4 {
+  0%   { opacity: 0; transform: scale(1.08); }
+  47%  { opacity: 0; transform: scale(1.08); }
+  50%  { opacity: 1; transform: scale(1.03); }
+  64%  { opacity: 1; transform: scale(1.05); }
+  67%  { opacity: 0; transform: scale(1.08); }
+  100% { opacity: 0; transform: scale(1.08); }
+}
+
+@keyframes heroCinematic5 {
+  0%   { opacity: 0; transform: scale(1.08); }
+  64%  { opacity: 0; transform: scale(1.08); }
+  67%  { opacity: 1; transform: scale(1.03); }
+  80%  { opacity: 1; transform: scale(1.05); }
+  83%  { opacity: 0; transform: scale(1.08); }
+  100% { opacity: 0; transform: scale(1.08); }
+}
+
+@keyframes heroCinematic6 {
+  0%   { opacity: 0; transform: scale(1.08); }
+  80%  { opacity: 0; transform: scale(1.08); }
+  83%  { opacity: 1; transform: scale(1.03); }
+  97%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-cinematic-frame {
+    animation: none;
+  }
+
+  .hero-cinematic-frame-1 {
+    opacity: 1;
+  }
+
+  .hero-cinematic-frame-2,
+  .hero-cinematic-frame-3,
+  .hero-cinematic-frame-4,
+  .hero-cinematic-frame-5,
+  .hero-cinematic-frame-6 {
+    opacity: 0;
   }
 }

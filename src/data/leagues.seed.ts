@@ -1,6 +1,8 @@
 import type { League } from "@/types";
 
-const leagues: League[] = [
+type LeagueSeed = Omit<League, "marketTier">;
+
+const leagues: LeagueSeed[] = [
   {
     id: "afle",
     slug: "afle",

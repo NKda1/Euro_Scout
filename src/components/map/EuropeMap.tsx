@@ -13,6 +13,7 @@ interface EuropeMapProps {
 export default function EuropeMap({ regions, selectedRegionId, onRegionSelect }: EuropeMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgMarkup, setSvgMarkup] = useState("");
+  const [error, setError] = useState("");
 
   const regionByPathId = useMemo(() => {
     return new Map(regions.map((region) => [region.mapPathId, region]));
@@ -24,10 +25,21 @@ export default function EuropeMap({ regions, selectedRegionId, onRegionSelect }:
     let mounted = true;
 
     fetch("/europe.svg")
-      .then((response) => response.text())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Unable to load the Europe map.");
+        }
+
+        return response.text();
+      })
       .then((markup) => {
         if (mounted) {
           setSvgMarkup(markup);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setError("Map unavailable. Try refreshing the page.");
         }
       });
 
@@ -79,8 +91,8 @@ export default function EuropeMap({ regions, selectedRegionId, onRegionSelect }:
 
   if (!svgMarkup) {
     return (
-      <div ref={containerRef} className="europe-map grid min-h-[360px] place-items-center overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-inner">
-        <span className="text-sm font-semibold text-slate-500">Loading map...</span>
+      <div ref={containerRef} className="europe-map grid min-h-[360px] place-items-center overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-inner backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
+        <span className="px-6 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">{error || "Loading map..."}</span>
       </div>
     );
   }
@@ -88,7 +100,7 @@ export default function EuropeMap({ regions, selectedRegionId, onRegionSelect }:
   return (
     <div
       ref={containerRef}
-      className={cn("europe-map min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-inner")}
+      className={cn("europe-map min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-inner backdrop-blur-xl dark:border-white/10 dark:bg-white/10")}
       dangerouslySetInnerHTML={{ __html: svgMarkup }}
     />
   );

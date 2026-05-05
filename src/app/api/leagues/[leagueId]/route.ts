@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import leagues from "@/data/leagues.seed";
+import { getLeagueByIdOrSlug } from "@/lib/data";
 
 interface RouteContext {
   params: Promise<{
@@ -9,7 +9,7 @@ interface RouteContext {
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { leagueId } = await params;
-  const league = leagues.find((item) => item.id === leagueId || item.slug === leagueId);
+  const league = getLeagueByIdOrSlug(leagueId);
 
   if (!league) {
     return NextResponse.json({ error: "League not found" }, { status: 404 });

@@ -1,5 +1,25 @@
-// Placeholder for future browser Supabase client integration.
-// Keep Supabase disconnected during the MVP seed-data phase.
+import { createBrowserClient } from "@supabase/ssr";
+
+function requirePublicEnv(name: string) {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value;
+}
+
+function requireSupabasePublicKey() {
+  const value = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!value) {
+    throw new Error("Missing required environment variable: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+  }
+
+  return value;
+}
+
 export function createSupabaseBrowserClient() {
-  throw new Error("Supabase is not connected yet.");
+  return createBrowserClient(requirePublicEnv("NEXT_PUBLIC_SUPABASE_URL"), requireSupabasePublicKey());
 }
