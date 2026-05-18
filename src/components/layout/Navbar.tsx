@@ -3,63 +3,68 @@ import { routes } from "@/constants/routes";
 import { isReservedAdminEmail } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import MobileMenu from "@/components/layout/MobileMenu";
+import NavLinks from "@/components/layout/NavLinks";
 
 export default async function Navbar() {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  const { data: profile } = user ? await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role: string }>() : { data: null };
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role: string }>()
+    : { data: null };
+  const isAdmin = Boolean(profile?.role === "admin" && isReservedAdminEmail(user?.email));
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white/88 shadow-sm shadow-slate-950/5 backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/92 dark:shadow-black/20">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href={routes.home} className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600 text-sm font-black text-white shadow-lg shadow-red-600/25">ES</span>
-          <span>
-            <span className="block text-sm font-black uppercase tracking-[0.16em] text-slate-950 dark:text-white">EuroScout</span>
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.2em] text-red-600">Pro</span>
+    <nav className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/85 shadow-sm shadow-slate-950/[0.04] backdrop-blur-2xl dark:border-white/[0.08] dark:bg-[#060914]/90 dark:shadow-black/20">
+      <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+
+        {/* Logo */}
+        <Link
+          href={routes.home}
+          className="flex shrink-0 items-center gap-2.5 transition-opacity duration-150 hover:opacity-80"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-red-500 to-red-700 text-[12px] font-black text-white shadow-lg shadow-red-600/30">
+            ES
+          </span>
+          <span className="hidden sm:block">
+            <span className="block text-[13px] font-black uppercase tracking-[0.16em] text-slate-950 dark:text-white">
+              EuroScout
+            </span>
+            <span className="block text-[10px] font-bold uppercase tracking-[0.25em] text-red-500">Pro</span>
           </span>
         </Link>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Link href={routes.home} className="rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300 sm:px-4">
-            Home
-          </Link>
-          <Link href={routes.leagues} className="rounded-xl px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-            Leagues
-          </Link>
-          <Link href={routes.teams} className="rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300 sm:px-4">
-            Teams
-          </Link>
-          <Link href={routes.players} className="rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300 sm:px-4">
-            Players
-          </Link>
-          <Link href={routes.scouts} className="hidden rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300 md:inline-flex sm:px-4">
-            Scouts
-          </Link>
+
+        {/* Pill nav — centered, desktop only (lg+) */}
+        <div className="absolute left-1/2 hidden -translate-x-1/2 lg:block">
+          <NavLinks isSignedIn={Boolean(user)} isAdmin={isAdmin} />
+        </div>
+
+        {/* Right: CTA + divider + theme + mobile menu */}
+        <div className="flex shrink-0 items-center gap-2">
           {user ? (
-            <>
-              <Link href={routes.profiles} className="hidden rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300 sm:inline-flex sm:px-4">
-                Profiles
-              </Link>
-              <Link href={routes.messages} className="hidden rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300 sm:inline-flex sm:px-4">
-                Messages
-              </Link>
-              {profile?.role === "admin" && isReservedAdminEmail(user.email) ? (
-                <Link href={routes.admin} className="hidden rounded-xl px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300 lg:inline-flex sm:px-4">
-                  Admin
-                </Link>
-              ) : null}
-              <Link href={routes.dashboard} className="rounded-xl bg-red-600 px-3 py-2 text-sm font-black text-white transition hover:bg-red-700 sm:px-4">
-                Dashboard
-              </Link>
-            </>
+            <Link
+              href={routes.dashboard}
+              className="hidden items-center gap-1.5 rounded-full bg-red-600 px-4 py-2 text-[13px] font-black text-white shadow-md shadow-red-600/25 transition duration-150 hover:bg-red-700 hover:shadow-lg hover:shadow-red-600/30 active:scale-[0.97] lg:flex"
+            >
+              Dashboard
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </Link>
           ) : (
-            <Link href={routes.signIn} className="rounded-xl bg-red-600 px-3 py-2 text-sm font-black text-white transition hover:bg-red-700 sm:px-4">
+            <Link
+              href={routes.signIn}
+              className="hidden rounded-full bg-red-600 px-4 py-2 text-[13px] font-black text-white shadow-md shadow-red-600/25 transition duration-150 hover:bg-red-700 active:scale-[0.97] lg:flex"
+            >
               Sign In
             </Link>
           )}
+
+          <div className="hidden h-5 w-px bg-slate-200 lg:block dark:bg-white/10" />
           <ThemeToggle />
+          <MobileMenu isSignedIn={Boolean(user)} isAdmin={isAdmin} />
         </div>
       </div>
     </nav>

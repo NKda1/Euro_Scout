@@ -49,6 +49,30 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)"
+      },
+      keyframes: {
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" }
+        },
+        pageEnter: {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" }
+        },
+        slideDown: {
+          "0%": { opacity: "0", transform: "translateY(-8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" }
+        },
+        revealUp: {
+          "0%": { opacity: "0", transform: "translateY(22px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" }
+        }
+      },
+      animation: {
+        marquee: "marquee 28s linear infinite",
+        "page-enter": "pageEnter 0.45s cubic-bezier(0.16,1,0.3,1) both",
+        "slide-down": "slideDown 0.22s cubic-bezier(0.16,1,0.3,1) both",
+        "reveal-up": "revealUp 0.65s cubic-bezier(0.16,1,0.3,1) both"
       }
     }
   },

@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthenticatedProfile } from "@/lib/auth";
 
+// ─── Input constraints ────────────────────────────────────────────────────────
+const MAX_SUBJECT_LENGTH = 200;
+const MAX_BODY_LENGTH = 5_000;
+
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
@@ -17,7 +21,8 @@ export async function startConversationAction(formData: FormData) {
 
   let targetProfileId = text(formData, "target_profile_id");
   const teamId = text(formData, "team_id");
-  const subject = text(formData, "subject") || "EuroScout conversation";
+  const rawSubject = text(formData, "subject") || "EuroScout conversation";
+  const subject = rawSubject.slice(0, MAX_SUBJECT_LENGTH);
 
   if (!targetProfileId && teamId) {
     const { data: teamAdmin } = await supabase
@@ -62,7 +67,7 @@ export async function startConversationAction(formData: FormData) {
     }
   ]);
 
-  const initialMessage = text(formData, "body");
+  const initialMessage = text(formData, "body").slice(0, MAX_BODY_LENGTH);
 
   if (initialMessage) {
     await supabase.from("messages").insert({
@@ -84,7 +89,7 @@ export async function sendMessageAction(formData: FormData) {
   }
 
   const conversationId = text(formData, "conversation_id");
-  const body = text(formData, "body");
+  const body = text(formData, "body").slice(0, MAX_BODY_LENGTH);
 
   if (!conversationId || !body) {
     redirect(`/messages/${conversationId}?error=Write a message before sending.`);

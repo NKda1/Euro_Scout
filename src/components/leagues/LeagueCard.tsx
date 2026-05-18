@@ -23,9 +23,9 @@ export default function LeagueCard({ league, compact = false, teams = [], expand
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-600">{league.shortName}</p>
           <h3 className="mt-2 text-lg font-bold text-slate-950 dark:text-white">{league.name}</h3>
         </div>
-        <div className="rounded-xl bg-slate-950 px-3 py-2 text-center text-white dark:bg-white dark:text-slate-950 dark:text-white">
+        <div className="rounded-xl bg-slate-950 px-3 py-2 text-center text-white dark:bg-white dark:text-slate-950">
           <p className="text-lg font-black leading-none">{league.teamCount}</p>
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 dark:text-slate-500 dark:text-slate-400">Teams</p>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 dark:text-slate-500">Teams</p>
         </div>
       </div>
 

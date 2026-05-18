@@ -151,9 +151,9 @@ export default function ProfileSummary({
             </div>
           </div>
 
-          <div className="mt-14 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div className="mt-8 grid gap-8 sm:mt-14 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
             <div className="flex flex-col gap-7 sm:flex-row sm:items-end">
-              <div className="relative flex h-44 w-44 shrink-0 items-center justify-center overflow-hidden rounded-[2rem] bg-slate-950 text-6xl font-black tracking-tight text-white shadow-2xl shadow-red-100 ring-4 ring-red-500 dark:shadow-red-950/40">
+              <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] bg-slate-950 text-4xl font-black tracking-tight text-white shadow-2xl shadow-red-100 ring-4 ring-red-500 dark:shadow-red-950/40 sm:h-44 sm:w-44 sm:rounded-[2rem] sm:text-6xl">
                 <span className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(239,68,68,.35),transparent_48%)]" />
                 <span className="relative">{initials(profile.display_name)}</span>
               </div>
@@ -163,7 +163,7 @@ export default function ProfileSummary({
                   <span className="rounded-full border border-red-200 bg-white/80 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-red-700 shadow-sm backdrop-blur-xl dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">{primaryTag}</span>
                   <span className="rounded-full border border-slate-200 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-slate-800 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10 dark:text-slate-100">{secondaryTag}</span>
                 </div>
-                <h1 className="mt-5 max-w-4xl text-5xl font-black tracking-tight text-slate-950 dark:text-white sm:text-7xl">{profile.display_name}</h1>
+                <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:mt-5 sm:text-5xl lg:text-7xl">{profile.display_name}</h1>
                 <p className="mt-5 max-w-3xl text-lg font-semibold leading-8 text-slate-600 dark:text-slate-300">
                   {location}
                   {currentTeam ? ` · ${currentTeam.name}` : ""}

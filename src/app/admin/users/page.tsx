@@ -20,6 +20,8 @@ export default async function AdminUsersPage() {
         {error ? <p className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">{error.message}</p> : null}
 
         <div className="overflow-hidden rounded-3xl glass-card">
+          <div className="overflow-x-auto">
+          <div className="min-w-[520px]">
           <div className="grid grid-cols-[1.25fr_0.7fr_0.7fr_0.7fr] gap-4 border-b border-slate-200/80 px-5 py-4 text-xs font-black uppercase tracking-[0.16em] text-slate-500 dark:border-white/10 dark:text-slate-400">
             <span>User</span>
             <span>Role</span>
@@ -38,6 +40,8 @@ export default async function AdminUsersPage() {
                 <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{new Date(profile.updated_at).toLocaleDateString()}</span>
               </Link>
             ))}
+          </div>
+          </div>
           </div>
         </div>
       </section>

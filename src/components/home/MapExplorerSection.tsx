@@ -5,7 +5,6 @@ import type { League, Region, Team } from "@/types";
 import EuropeMap from "@/components/map/EuropeMap";
 import MapLegend from "@/components/map/MapLegend";
 import RegionLeagueModal from "@/components/map/RegionLeagueModal";
-import FootballNewsCarousel from "@/components/news/FootballNewsCarousel";
 import { cn } from "@/lib/utils";
 
 interface MapExplorerSectionProps {
@@ -50,7 +49,7 @@ export default function MapExplorerSection({ regions, leagues, teams }: MapExplo
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="eyebrow-red dark:text-red-300">Interactive Market Map</p>
-            <h2 className="mt-3 max-w-4xl text-4xl font-black tracking-tight text-slate-950 dark:text-slate-50 sm:text-5xl">
+            <h2 className="mt-3 max-w-4xl text-xl font-black tracking-tight text-slate-950 dark:text-slate-50 sm:text-3xl lg:text-4xl">
               Click a country and open its leagues, teams and regional footprint.
             </h2>
           </div>
@@ -60,7 +59,7 @@ export default function MapExplorerSection({ regions, leagues, teams }: MapExplo
               { label: "Leagues", value: totalLeagues },
               { label: "Teams", value: totalTeams }
             ].map((item) => (
-              <div key={item.label} className="rounded-2xl border border-white/70 bg-white/75 p-4 text-center shadow-sm backdrop-blur-xl dark:border-white/15 dark:bg-slate-900/88 dark:shadow-lg dark:shadow-black/30">
+              <div key={item.label} className="rounded-2xl border border-white/70 bg-white/75 p-4 text-center shadow-sm backdrop-blur-xl dark:border-white/15 dark:bg-slate-900/90 dark:shadow-lg dark:shadow-black/30">
                 <p className="text-2xl font-black text-slate-950 dark:text-white">{item.value}</p>
                 <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-300">{item.label}</p>
               </div>
@@ -69,8 +68,8 @@ export default function MapExplorerSection({ regions, leagues, teams }: MapExplo
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="rounded-[2rem] border border-white/70 bg-white/68 p-3 shadow-[0_30px_100px_rgba(15,23,42,0.14)] backdrop-blur-2xl dark:border-white/15 dark:bg-slate-900/82 dark:shadow-black/40">
-            <div className="overflow-hidden rounded-[1.5rem]">
+          <div className="flex flex-col rounded-[2rem] border border-white/70 bg-white/70 p-3 shadow-[0_30px_100px_rgba(15,23,42,0.14)] backdrop-blur-2xl dark:border-white/15 dark:bg-slate-900/80 dark:shadow-black/40">
+            <div className="flex-1 overflow-hidden rounded-[1.5rem]">
               <EuropeMap regions={regions} selectedRegionId={selectedRegion?.id} onRegionSelect={setSelectedRegion} />
             </div>
             <div className="mt-3">
@@ -78,13 +77,13 @@ export default function MapExplorerSection({ regions, leagues, teams }: MapExplo
             </div>
           </div>
 
-          <aside className="space-y-4">
-            <div className="rounded-[1.75rem] border border-white/70 bg-white/78 p-5 shadow-xl shadow-slate-950/10 backdrop-blur-2xl dark:border-white/15 dark:bg-slate-900/92 dark:shadow-2xl dark:shadow-black/40">
+          <aside className="flex flex-col">
+            <div className="flex flex-1 flex-col rounded-[1.75rem] border border-white/70 bg-white/80 p-5 shadow-xl shadow-slate-950/10 backdrop-blur-2xl dark:border-white/15 dark:bg-slate-900/90 dark:shadow-2xl dark:shadow-black/40">
               <p className="eyebrow-red dark:text-red-300">Region Explorer</p>
               <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-200">
                 Countries with seed data are highlighted. Select one to open the league and team overlay.
               </p>
-              <div className="region-scroll mt-5 max-h-[25rem] space-y-2 overflow-y-auto pr-1">
+              <div className="region-scroll mt-5 flex-1 space-y-2 overflow-y-auto pr-1">
                 {availableRegions.map((region) => (
                   <button
                     key={region.id}
@@ -93,8 +92,8 @@ export default function MapExplorerSection({ regions, leagues, teams }: MapExplo
                     className={cn(
                       "flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left shadow-sm transition",
                       selectedRegion?.id === region.id
-                        ? "border-red-200 bg-red-50 text-red-700 dark:border-red-300/50 dark:bg-red-500/18 dark:text-red-100"
-                        : "border-slate-200 bg-white/80 text-slate-950 hover:border-red-200 hover:bg-red-50 dark:border-white/12 dark:bg-white/[0.07] dark:text-slate-100 dark:hover:border-red-300/40 dark:hover:bg-red-500/12"
+                        ? "border-red-200 bg-red-50 text-red-700 dark:border-red-300/50 dark:bg-red-500/20 dark:text-red-100"
+                        : "border-slate-200 bg-white/80 text-slate-950 hover:border-red-200 hover:bg-red-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:border-red-300/40 dark:hover:bg-red-500/10"
                     )}
                   >
                     <span className="min-w-0">
@@ -108,8 +107,6 @@ export default function MapExplorerSection({ regions, leagues, teams }: MapExplo
                 ))}
               </div>
             </div>
-
-            <FootballNewsCarousel />
           </aside>
         </div>
       </div>

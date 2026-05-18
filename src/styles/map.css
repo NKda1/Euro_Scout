@@ -1,8 +1,13 @@
 /* CSS for Europe SVG map and related UI */
 /* Interactive styling for the static Europe SVG served from /public. */
+.europe-map {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .europe-map svg {
   display: block;
-  height: auto;
+  height: 100%;
   width: 100%;
 }
 

@@ -91,7 +91,7 @@ export default function EuropeMap({ regions, selectedRegionId, onRegionSelect }:
 
   if (!svgMarkup) {
     return (
-      <div ref={containerRef} className="europe-map grid min-h-[360px] place-items-center overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-inner backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
+      <div ref={containerRef} className="europe-map grid h-full min-h-[360px] place-items-center overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-inner backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
         <span className="px-6 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">{error || "Loading map..."}</span>
       </div>
     );
@@ -100,7 +100,7 @@ export default function EuropeMap({ regions, selectedRegionId, onRegionSelect }:
   return (
     <div
       ref={containerRef}
-      className={cn("europe-map min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-inner backdrop-blur-xl dark:border-white/10 dark:bg-white/10")}
+      className={cn("europe-map h-full min-h-[360px] overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-inner backdrop-blur-xl dark:border-white/10 dark:bg-white/10")}
       dangerouslySetInnerHTML={{ __html: svgMarkup }}
     />
   );
