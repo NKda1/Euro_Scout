@@ -29,7 +29,7 @@ async function fetchWPNews(
   // Step 1: fetch posts
   const postsRes = await fetch(
     `${base}/wp-json/wp/v2/posts?per_page=${limit}&_fields=id,title,link,date,featured_media`,
-    { next: { revalidate: 3600 }, headers: { "User-Agent": "EuroScout/1.0" } }
+    { next: { revalidate: 3600 }, headers: { "User-Agent": "EuroScout/1.0" }, signal: AbortSignal.timeout(8000) }
   );
   if (!postsRes.ok) return [];
   const posts = (await postsRes.json()) as WPPost[];
@@ -41,7 +41,7 @@ async function fetchWPNews(
     try {
       const mediaRes = await fetch(
         `${base}/wp-json/wp/v2/media?include=${mediaIds.join(",")}&_fields=id,source_url`,
-        { next: { revalidate: 3600 }, headers: { "User-Agent": "EuroScout/1.0" } }
+        { next: { revalidate: 3600 }, headers: { "User-Agent": "EuroScout/1.0" }, signal: AbortSignal.timeout(8000) }
       );
       if (mediaRes.ok) {
         const media = (await mediaRes.json()) as WPMedia[];

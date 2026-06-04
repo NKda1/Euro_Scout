@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthenticatedUser, isReservedAdminEmail, isUserRole, splitName, type UserRole } from "@/lib/auth";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 function text(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -28,101 +29,58 @@ function boolValue(formData: FormData, key: string) {
   return formData.get(key) === "on";
 }
 
-function roleSpecificTable(role: UserRole) {
-  if (role === "player") {
-    return "player_profiles";
-  }
-
-  if (role === "team_admin") {
-    return "team_admin_profiles";
-  }
-
-  if (role === "scout" || role === "coach" || role === "analyst" || role === "journalist") {
-    return "scout_profiles";
-  }
-
-  return null;
-}
-
 function requireAllowedRole(role: UserRole, email?: string | null, redirectPath = "/onboarding") {
   if (role === "admin" && !isReservedAdminEmail(email)) {
     redirect(`${redirectPath}?error=The admin role is reserved for the EuroScout owner account.`);
   }
 }
 
-async function upsertRoleProfile(supabase: Awaited<ReturnType<typeof getAuthenticatedUser>>["supabase"], userId: string, role: UserRole, formData: FormData) {
-  const table = roleSpecificTable(role);
+async function upsertPlayerProfile(supabase: Awaited<ReturnType<typeof getAuthenticatedUser>>["supabase"], userId: string, formData: FormData) {
+  const displayName = requiredText(formData, "display_name");
+  const name = splitName(displayName);
 
-  if (!table) {
-    return;
-  }
-
-  if (table === "player_profiles") {
-    const displayName = requiredText(formData, "display_name");
-    const name = splitName(displayName);
-
-    await supabase.from(table).upsert(
-      {
-        profile_id: userId,
-        first_name: text(formData, "first_name") ?? name.firstName,
-        last_name: text(formData, "last_name") ?? name.lastName,
-        dob: text(formData, "dob") || null,
-        nationality: text(formData, "nationality"),
-        languages: text(formData, "languages")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [],
-        passport_ready: text(formData, "passport_ready") === "on" ? true : text(formData, "passport_ready") === "" && formData.has("passport_ready") ? false : null,
-        position: text(formData, "position"),
-        height_cm: numberOrNull(formData, "height_cm"),
-        weight_kg: numberOrNull(formData, "weight_kg"),
-        current_team_id: text(formData, "current_team_id"),
-        pipeline_type: text(formData, "pipeline_type"),
-        available_for_transfer: boolValue(formData, "available_for_transfer"),
-        photo_urls: text(formData, "photo_urls")?.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 5) ?? [],
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "profile_id" }
-    );
-  }
-
-  if (table === "scout_profiles") {
-    await supabase.from(table).upsert(
-      {
-        profile_id: userId,
-        organization: text(formData, "organization"),
-        focus_regions: text(formData, "focus_regions")?.split(",").map((item) => item.trim()).filter(Boolean) ?? [],
-        focus_positions: text(formData, "focus_positions")?.split(",").map((item) => item.trim()).filter(Boolean) ?? [],
-        years_experience: numberOrNull(formData, "years_experience"),
-        contact_email: text(formData, "contact_email"),
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "profile_id" }
-    );
-  }
-
-  if (table === "team_admin_profiles") {
-    await supabase.from(table).upsert(
-      {
-        profile_id: userId,
-        team_id: text(formData, "team_id"),
-        organization_name: text(formData, "organization_name"),
-        title: text(formData, "title"),
-        recruiting_needs: text(formData, "recruiting_needs"),
-        contact_email: text(formData, "contact_email"),
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "profile_id" }
-    );
-  }
+  await supabase.from("player_profiles").upsert(
+    {
+      profile_id: userId,
+      first_name: text(formData, "first_name") ?? name.firstName,
+      last_name: text(formData, "last_name") ?? name.lastName,
+      dob: text(formData, "dob") || null,
+      nationality: text(formData, "nationality"),
+      languages: text(formData, "languages")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [],
+      passport_ready: text(formData, "passport_ready") === "on" ? true : text(formData, "passport_ready") === "" && formData.has("passport_ready") ? false : null,
+      position: text(formData, "position"),
+      height_cm: numberOrNull(formData, "height_cm"),
+      weight_kg: numberOrNull(formData, "weight_kg"),
+      current_team_id: text(formData, "current_team_id"),
+      pipeline_type: text(formData, "pipeline_type"),
+      available_for_transfer: boolValue(formData, "available_for_transfer"),
+      photo_urls: text(formData, "photo_urls")?.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 5) ?? [],
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "profile_id" }
+  );
 }
 
 export async function completeOnboardingAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUser();
-  const roleValue = requiredText(formData, "role");
 
-  if (!isUserRole(roleValue)) {
+  // Never strip admin role — admins may preview any role in the wizard
+  const { data: currentProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const isCurrentlyAdmin = currentProfile?.role === "admin";
+  const roleValue = isCurrentlyAdmin ? "admin" : requiredText(formData, "role");
+
+  if (!isCurrentlyAdmin && !isUserRole(roleValue)) {
     redirect("/onboarding?error=Choose a valid role.");
   }
 
-  requireAllowedRole(roleValue, user.email, "/onboarding");
+  if (!isCurrentlyAdmin) {
+    requireAllowedRole(roleValue as UserRole, user.email, "/onboarding");
+  }
 
   const displayName = requiredText(formData, "display_name");
 
@@ -145,7 +103,54 @@ export async function completeOnboardingAction(formData: FormData) {
     redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
   }
 
-  await upsertRoleProfile(supabase, user.id, roleValue, formData);
+  if (roleValue === "player") {
+    await upsertPlayerProfile(supabase, user.id, formData);
+  }
+
+  if (roleValue === "club") {
+    const teamId = text(formData, "team_id");
+    const clubAction = text(formData, "club_action");
+    const teamNameRequest = text(formData, "team_name_request");
+
+    if (teamId && clubAction === "claim") {
+      const now = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+      await supabase
+        .from("teams")
+        .update({
+          claim_status: "pending",
+          claimed_at: now,
+          claim_expires_at: expiresAt,
+          claimed_by: user.id
+        })
+        .eq("id", teamId)
+        .in("claim_status", ["unclaimed", null]);
+
+      await supabase.from("club_members").insert({
+        team_id: teamId,
+        profile_id: user.id,
+        club_role: "owner",
+        joined_at: now
+      });
+    } else if (teamId && clubAction === "join") {
+      await supabase.from("club_members").insert({
+        team_id: teamId,
+        profile_id: user.id,
+        club_role: "recruiter",
+        joined_at: new Date().toISOString()
+      });
+    } else if (teamNameRequest) {
+      // Record team addition request as a dispute for admin review
+      await supabase.from("club_disputes").insert({
+        team_id: "pending-review",
+        raised_by: user.id,
+        reason: `New team addition request: ${teamNameRequest}`,
+        status: "open"
+      });
+    }
+  }
+
   revalidatePath("/account");
   revalidatePath("/dashboard");
   redirect("/dashboard");
@@ -153,13 +158,24 @@ export async function completeOnboardingAction(formData: FormData) {
 
 export async function updateAccountAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUser();
-  const roleValue = requiredText(formData, "role");
 
-  if (!isUserRole(roleValue)) {
+  // Never strip admin role via the account edit form
+  const { data: currentProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const isCurrentlyAdmin = currentProfile?.role === "admin";
+  const roleValue = isCurrentlyAdmin ? "admin" : requiredText(formData, "role");
+
+  if (!isCurrentlyAdmin && !isUserRole(roleValue)) {
     redirect("/account/edit?error=Choose a valid role.");
   }
 
-  requireAllowedRole(roleValue, user.email, "/account/edit");
+  if (!isCurrentlyAdmin) {
+    requireAllowedRole(roleValue as UserRole, user.email, "/account/edit");
+  }
 
   const { error } = await supabase
     .from("profiles")
@@ -179,10 +195,32 @@ export async function updateAccountAction(formData: FormData) {
     redirect(`/account/edit?error=${encodeURIComponent(error.message)}`);
   }
 
-  await upsertRoleProfile(supabase, user.id, roleValue, formData);
+  if (roleValue === "player") {
+    await upsertPlayerProfile(supabase, user.id, formData);
+  }
+
   revalidatePath("/account");
   revalidatePath("/profiles");
   revalidatePath("/players");
-  revalidatePath("/scouts");
   redirect("/account");
 }
+
+export async function restoreAdminRoleAction() {
+  const { user } = await getAuthenticatedUser();
+
+  if (!isReservedAdminEmail(user.email)) {
+    redirect("/dashboard?error=Only the designated super admin account can restore the admin role.");
+  }
+
+  // Use service role client to guarantee the update bypasses any RLS restrictions
+  const serviceClient = createSupabaseServiceRoleClient();
+  await serviceClient
+    .from("profiles")
+    .update({ role: "admin", onboarding_complete: true, updated_at: new Date().toISOString() })
+    .eq("id", user.id);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/admin");
+  redirect("/dashboard");
+}
+

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useTransition, useState, useMemo } from "react";
 import type { ReactNode } from "react";
 import { teams, regions } from "@/lib/data";
 import { countries } from "@/constants/countries";
@@ -51,16 +51,13 @@ const LANGUAGES = [
 
 const ROLE_CONFIG: Record<string, { label: string; description: string; icon: string; hasRoleStep: boolean }> = {
   player:     { label: "Player",     description: "I play American football in Europe",   icon: "🏈", hasRoleStep: true },
-  scout:      { label: "Scout",      description: "I scout and evaluate players",         icon: "🔍", hasRoleStep: true },
-  coach:      { label: "Coach",      description: "I coach a team or program",            icon: "📋", hasRoleStep: true },
-  team_admin: { label: "Team Admin", description: "I manage a club or organisation",      icon: "🏟", hasRoleStep: true },
-  analyst:    { label: "Analyst",    description: "I analyse film and performance",       icon: "📊", hasRoleStep: true },
-  journalist: { label: "Journalist", description: "I cover European football",            icon: "✍️", hasRoleStep: true },
+  club:       { label: "Club",       description: "I manage or represent a club",         icon: "🏟", hasRoleStep: true },
+  journalist: { label: "Journalist", description: "I cover European football",            icon: "✍️", hasRoleStep: false },
   fan:        { label: "Fan",        description: "I follow the sport",                   icon: "👀", hasRoleStep: false },
   admin:      { label: "Admin",      description: "EuroScout platform admin",             icon: "⚙️", hasRoleStep: false },
 };
 
-const PUBLIC_ROLES: UserRole[] = ["player","scout","coach","team_admin","analyst","journalist","fan"];
+const PUBLIC_ROLES: UserRole[] = ["player", "club", "journalist", "fan"];
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -248,15 +245,8 @@ function RoleStep({ value, onChange, allowAdmin }: { value: UserRole; onChange: 
                 <span className={cn("block text-sm font-black", selected ? "text-red-700 dark:text-red-300" : "text-slate-950 dark:text-white")}>
                   {config.label}
                 </span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400">{config.description}</span>
+                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{config.description}</span>
               </span>
-              {selected && (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-white">
-                  <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3">
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-              )}
             </button>
           );
         })}
@@ -267,136 +257,112 @@ function RoleStep({ value, onChange, allowAdmin }: { value: UserRole; onChange: 
 
 // ─── Step 2: Identity ─────────────────────────────────────────────────────────
 
-function IdentityStep({
-  displayName, setDisplayName, location, setLocation, headline, setHeadline,
-}: {
+function IdentityStep(props: {
   displayName: string; setDisplayName: (v: string) => void;
-  location: string;    setLocation:    (v: string) => void;
-  headline: string;    setHeadline:    (v: string) => void;
+  location:    string; setLocation:    (v: string) => void;
+  headline:    string; setHeadline:    (v: string) => void;
 }) {
   return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Your identity</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">How other users find and recognise you on the platform.</p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Your identity.</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">This is how you appear on EuroScout. Make it recognisable.</p>
       </div>
-      <div className="space-y-4">
-        <label className="block">
-          <FieldLabel required>Display name</FieldLabel>
-          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="e.g. Marcus Webb" className={inputClass} />
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <FieldLabel>Current location</FieldLabel>
-            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Munich, Germany" className={inputClass} />
-          </label>
-          <label className="block">
-            <FieldLabel>One-line headline</FieldLabel>
-            <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="QB · GFL · Open to offers" className={inputClass} />
-          </label>
-        </div>
-      </div>
+      <label className="block">
+        <FieldLabel required>Display name</FieldLabel>
+        <input value={props.displayName} onChange={(e) => props.setDisplayName(e.target.value)} placeholder="e.g. Jonas Weber" className={inputClass} />
+      </label>
+      <label className="block">
+        <FieldLabel>Location</FieldLabel>
+        <input value={props.location} onChange={(e) => props.setLocation(e.target.value)} placeholder="e.g. Berlin, Germany" className={inputClass} />
+      </label>
+      <label className="block">
+        <FieldLabel>Headline</FieldLabel>
+        <input value={props.headline} onChange={(e) => props.setHeadline(e.target.value)} placeholder="e.g. Starting QB at Berlin Rebels" className={inputClass} />
+      </label>
     </div>
   );
 }
 
 // ─── Step 3a: Player ──────────────────────────────────────────────────────────
 
-function YesNoToggle({ value, onChange }: { value: boolean | null; onChange: (v: boolean) => void }) {
-  return (
-    <div className="flex gap-2">
-      {([{ v: true, label: "Yes" }, { v: false, label: "No" }] as const).map(({ v, label }) => (
-        <button key={label} type="button" onClick={() => onChange(v)} className={cn(
-          "h-10 rounded-xl border px-5 text-sm font-bold transition",
-          value === v
-            ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-300"
-            : "border-slate-200 bg-white/80 text-slate-600 hover:border-red-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
-        )}>
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function PlayerStep(props: {
-  firstName: string; setFirstName: (v: string) => void;
-  lastName:  string; setLastName:  (v: string) => void;
-  dob:       string; setDob:       (v: string) => void;
-  nationality: string; setNationality: (v: string) => void;
-  languages: string[]; toggleLanguage: (l: string) => void;
-  passportReady: boolean | null; setPassportReady: (v: boolean) => void;
-  position:      string; setPosition:      (v: string) => void;
-  heightFt:      string; setHeightFt:      (v: string) => void;
-  heightIn:      string; setHeightIn:      (v: string) => void;
-  weightKg:      string; setWeightKg:      (v: string) => void;
-  currentTeamId: string; setCurrentTeamId: (v: string) => void;
-  pipelineType:  string; setPipelineType:  (v: string) => void;
+  firstName:            string; setFirstName:            (v: string) => void;
+  lastName:             string; setLastName:             (v: string) => void;
+  dob:                  string; setDob:                  (v: string) => void;
+  nationality:          string; setNationality:          (v: string) => void;
+  languages:           string[]; toggleLanguage:           (l: string) => void;
+  passportReady:        boolean | null; setPassportReady: (v: boolean | null) => void;
+  position:             string; setPosition:             (v: string) => void;
+  heightFt:             string; setHeightFt:             (v: string) => void;
+  heightIn:             string; setHeightIn:             (v: string) => void;
+  weightKg:             string; setWeightKg:             (v: string) => void;
+  currentTeamId:        string; setCurrentTeamId:        (v: string) => void;
+  pipelineType:         string; setPipelineType:         (v: string) => void;
   availableForTransfer: boolean; setAvailableForTransfer: (v: boolean) => void;
 }) {
-  const heightCm = feetInchesToCm(Number(props.heightFt) || 0, Number(props.heightIn) || 0);
   const age = calcAge(props.dob);
+  const heightCm = feetInchesToCm(Number(props.heightFt) || 0, Number(props.heightIn) || 0);
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Player details</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Help scouts and clubs find the right fit for you.</p>
+        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Player details.</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Help scouts and clubs find and evaluate you.</p>
       </div>
 
-      {/* Personal */}
       <div>
-        <SectionHeading>Personal information</SectionHeading>
+        <SectionHeading>Personal</SectionHeading>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <FieldLabel>First name</FieldLabel>
-            <input value={props.firstName} onChange={(e) => props.setFirstName(e.target.value)} placeholder="First name" className={inputClass} />
+            <input value={props.firstName} onChange={(e) => props.setFirstName(e.target.value)} placeholder="Jonas" className={inputClass} />
           </label>
           <label className="block">
             <FieldLabel>Last name</FieldLabel>
-            <input value={props.lastName} onChange={(e) => props.setLastName(e.target.value)} placeholder="Last name" className={inputClass} />
+            <input value={props.lastName} onChange={(e) => props.setLastName(e.target.value)} placeholder="Weber" className={inputClass} />
           </label>
           <label className="block">
-            <FieldLabel>Date of birth</FieldLabel>
-            <input
-              type="date" value={props.dob} onChange={(e) => props.setDob(e.target.value)}
-              max={new Date(Date.now() - 14 * 365.25 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}
-              className={inputClass}
-            />
-            {age !== null && <span className="mt-1 block text-xs text-slate-400">{age} years old</span>}
+            <FieldLabel>Date of birth{age !== null ? ` (age ${age})` : ""}</FieldLabel>
+            <input type="date" value={props.dob} onChange={(e) => props.setDob(e.target.value)} className={inputClass} />
           </label>
           <label className="block">
             <FieldLabel>Nationality</FieldLabel>
             <select value={props.nationality} onChange={(e) => props.setNationality(e.target.value)} className={selectClass}>
-              <option value="">Select nationality</option>
-              {countries.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
-              <option value="American">American</option>
-              <option value="Canadian">Canadian</option>
-              <option value="Other">Other</option>
+              <option value="">Select country</option>
+              {countries.map((c) => <option key={c.code} value={c.name}>{c.flag} {c.name}</option>)}
             </select>
           </label>
         </div>
 
         <div className="mt-4">
-          <FieldLabel>Languages spoken</FieldLabel>
-          <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {LANGUAGES.map((lang) => (
-              <CheckboxCard key={lang} label={lang} checked={props.languages.includes(lang)} onToggle={() => props.toggleLanguage(lang)} />
+          <FieldLabel>Languages</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            {LANGUAGES.map((l) => (
+              <ToggleChip key={l} label={l} selected={props.languages.includes(l)} onToggle={() => props.toggleLanguage(l)} />
             ))}
           </div>
         </div>
 
         <div className="mt-4">
-          <FieldLabel>Passport ready?</FieldLabel>
-          <div className="mt-1">
-            <YesNoToggle value={props.passportReady} onChange={props.setPassportReady} />
+          <FieldLabel>Passport eligible</FieldLabel>
+          <div className="flex gap-3">
+            {([{ val: true, label: "Yes" }, { val: false, label: "No" }, { val: null, label: "Not sure" }] as const).map(({ val, label }) => (
+              <button key={label} type="button" onClick={() => props.setPassportReady(val)}
+                className={cn("rounded-xl border px-4 py-2 text-sm font-bold transition",
+                  props.passportReady === val
+                    ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-300"
+                    : "border-slate-200 bg-white/70 text-slate-600 hover:border-red-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-400"
+                )}>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Football */}
       <div>
-        <SectionHeading>Football profile</SectionHeading>
+        <SectionHeading>On the field</SectionHeading>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <FieldLabel>Primary position</FieldLabel>
@@ -413,39 +379,25 @@ function PlayerStep(props: {
             </select>
           </label>
 
-          {/* Height ft/in → cm */}
           <div>
             <FieldLabel>Height</FieldLabel>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <input
-                  type="number" min="4" max="8" placeholder="6"
-                  value={props.heightFt} onChange={(e) => props.setHeightFt(e.target.value)}
-                  className={inputClass + " pr-9"}
-                />
+                <input type="number" min="4" max="8" placeholder="6" value={props.heightFt} onChange={(e) => props.setHeightFt(e.target.value)} className={inputClass + " pr-9"} />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">ft</span>
               </div>
               <div className="relative flex-1">
-                <input
-                  type="number" min="0" max="11" placeholder="2"
-                  value={props.heightIn} onChange={(e) => props.setHeightIn(e.target.value)}
-                  className={inputClass + " pr-9"}
-                />
+                <input type="number" min="0" max="11" placeholder="2" value={props.heightIn} onChange={(e) => props.setHeightIn(e.target.value)} className={inputClass + " pr-9"} />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">in</span>
               </div>
             </div>
             {heightCm > 0 && <span className="mt-1 block text-xs text-slate-400">{heightCm} cm</span>}
           </div>
 
-          {/* Weight */}
           <div>
             <FieldLabel>Weight</FieldLabel>
             <div className="relative">
-              <input
-                type="number" placeholder="95"
-                value={props.weightKg} onChange={(e) => props.setWeightKg(e.target.value)}
-                className={inputClass + " pr-9"}
-              />
+              <input type="number" placeholder="95" value={props.weightKg} onChange={(e) => props.setWeightKg(e.target.value)} className={inputClass + " pr-9"} />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">kg</span>
             </div>
             {props.weightKg && !isNaN(Number(props.weightKg)) && Number(props.weightKg) > 0 && (
@@ -480,127 +432,148 @@ function PlayerStep(props: {
   );
 }
 
-// ─── Step 3b: Scout / Coach / Analyst / Journalist ────────────────────────────
+// ─── Step 3b: Club / Team search ──────────────────────────────────────────────
 
-function ScoutStep(props: {
-  organization:     string; setOrganization:     (v: string) => void;
-  contactEmail:     string; setContactEmail:     (v: string) => void;
-  yearsExperience:  string; setYearsExperience:  (v: string) => void;
-  focusRegions:    string[]; toggleFocusRegion:    (r: string) => void;
-  focusPositions:  string[]; toggleFocusPosition:  (p: string) => void;
-  role: UserRole;
+type ClubAction = "claim" | "join" | "new" | "";
+
+function ClubStep(props: {
+  teamSearch:      string; setTeamSearch:      (v: string) => void;
+  selectedTeamId:  string; setSelectedTeamId:  (v: string) => void;
+  clubAction:      ClubAction; setClubAction:  (v: ClubAction) => void;
+  newTeamName:     string; setNewTeamName:     (v: string) => void;
 }) {
-  const titles:   Record<string, string> = { scout: "Scouting details", coach: "Coaching details", analyst: "Analyst details", journalist: "Media details" };
-  const orgHints: Record<string, string> = { scout: "e.g. GFL Scouting Network", coach: "e.g. Berlin Rebels", analyst: "e.g. EFA Analytics", journalist: "e.g. European Football Weekly" };
+  const filtered = useMemo(() => {
+    const q = props.teamSearch.toLowerCase().trim();
+    if (!q) return [];
+    return teams.filter((t) =>
+      t.name.toLowerCase().includes(q) ||
+      (t.city ?? "").toLowerCase().includes(q) ||
+      (t.country ?? "").toLowerCase().includes(q)
+    ).slice(0, 8);
+  }, [props.teamSearch]);
+
+  const selectedTeam = teams.find((t) => t.id === props.selectedTeamId);
+  const noResults = props.teamSearch.trim().length >= 2 && filtered.length === 0;
+
+  function selectTeam(id: string) {
+    props.setSelectedTeamId(id);
+    props.setTeamSearch("");
+    props.setClubAction("");
+    props.setNewTeamName("");
+  }
+
+  function clearSelection() {
+    props.setSelectedTeamId("");
+    props.setClubAction("");
+    props.setTeamSearch("");
+    props.setNewTeamName("");
+  }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">{titles[props.role] ?? "Your details"}</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Help players and clubs understand your background.</p>
+        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Find your club.</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Search for your team. You can claim it, join it, or request it be added.</p>
       </div>
 
-      <div>
-        <SectionHeading>Background</SectionHeading>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block sm:col-span-2">
-            <FieldLabel>Organisation</FieldLabel>
-            <input value={props.organization} onChange={(e) => props.setOrganization(e.target.value)} placeholder={orgHints[props.role] ?? "Organisation"} className={inputClass} />
-          </label>
-          <label className="block">
-            <FieldLabel>Contact email</FieldLabel>
-            <input type="email" value={props.contactEmail} onChange={(e) => props.setContactEmail(e.target.value)} placeholder="contact@example.com" className={inputClass} />
-          </label>
-          <label className="block">
-            <FieldLabel>Years of experience</FieldLabel>
-            <input type="number" min="0" value={props.yearsExperience} onChange={(e) => props.setYearsExperience(e.target.value)} placeholder="e.g. 5" className={inputClass} />
-          </label>
+      {!selectedTeam && (
+        <div className="relative">
+          <FieldLabel>Search teams by name, city or country</FieldLabel>
+          <input
+            value={props.teamSearch}
+            onChange={(e) => props.setTeamSearch(e.target.value)}
+            placeholder="e.g. Berlin Rebels, Frankfurt, Germany…"
+            className={inputClass}
+          />
+          {filtered.length > 0 && (
+            <ul className="absolute z-10 mt-1.5 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-slate-900">
+              {filtered.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => selectTeam(t.id)}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-red-50 dark:hover:bg-red-500/10"
+                  >
+                    <span className="font-bold text-slate-900 dark:text-white">{t.name}</span>
+                    <span className="text-slate-500 dark:text-slate-400">{t.city}, {t.country}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-      </div>
+      )}
 
-      <div>
-        <SectionHeading>Focus regions</SectionHeading>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {regions.map((r) => (
-            <CheckboxCard key={r.id} label={r.name} checked={props.focusRegions.includes(r.name)} onToggle={() => props.toggleFocusRegion(r.name)} />
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <SectionHeading>Focus positions</SectionHeading>
-        <div className="space-y-4">
-          {POSITION_GROUPS.map((group) => (
-            <div key={group.label}>
-              <p className="mb-2 text-xs font-bold text-slate-400 dark:text-slate-500">{group.label}</p>
-              <div className="flex flex-wrap gap-2">
-                {group.codes.map((code) => {
-                  const pos = POSITIONS.find((p) => p.code === code);
-                  return (
-                    <ToggleChip
-                      key={code}
-                      label={`${code}${pos ? ` · ${pos.label}` : ""}`}
-                      selected={props.focusPositions.includes(code)}
-                      onToggle={() => props.toggleFocusPosition(code)}
-                    />
-                  );
-                })}
-              </div>
+      {selectedTeam && (
+        <div className="rounded-2xl border border-red-200 bg-red-50/60 p-4 dark:border-red-500/30 dark:bg-red-500/10">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Selected club</p>
+              <p className="mt-1 text-base font-black text-slate-950 dark:text-white">{selectedTeam.name}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{selectedTeam.city}, {selectedTeam.country}</p>
             </div>
-          ))}
+            <button type="button" onClick={clearSelection} className="rounded-xl border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:text-red-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:border-red-500/30">
+              Change
+            </button>
+          </div>
+          <div className="mt-4">
+            <SectionHeading>What would you like to do?</SectionHeading>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => props.setClubAction("claim")}
+                className={cn(
+                  "rounded-2xl border p-3 text-left transition",
+                  props.clubAction === "claim"
+                    ? "border-red-300 bg-red-50 dark:border-red-500/50 dark:bg-red-500/15"
+                    : "border-slate-200 bg-white/80 hover:border-red-200 dark:border-white/10 dark:bg-white/5"
+                )}
+              >
+                <p className="text-sm font-black text-slate-900 dark:text-white">Claim this club</p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Become the verified owner. Subject to admin approval.</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => props.setClubAction("join")}
+                className={cn(
+                  "rounded-2xl border p-3 text-left transition",
+                  props.clubAction === "join"
+                    ? "border-red-300 bg-red-50 dark:border-red-500/50 dark:bg-red-500/15"
+                    : "border-slate-200 bg-white/80 hover:border-red-200 dark:border-white/10 dark:bg-white/5"
+                )}
+              >
+                <p className="text-sm font-black text-slate-900 dark:text-white">Request to join</p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Join as a recruiter. The owner can manage your access.</p>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      )}
 
-// ─── Step 3c: Team admin ──────────────────────────────────────────────────────
-
-function TeamAdminStep(props: {
-  teamId:           string; setTeamId:           (v: string) => void;
-  organizationName: string; setOrganizationName: (v: string) => void;
-  title:            string; setTitle:            (v: string) => void;
-  recruitingNeeds:  string; setRecruitingNeeds:  (v: string) => void;
-  contactEmail:     string; setContactEmail:     (v: string) => void;
-}) {
-  return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Club details</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Help players and scouts understand your club's needs.</p>
-      </div>
-      <div>
-        <SectionHeading>Club & role</SectionHeading>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block sm:col-span-2">
-            <FieldLabel>Your club</FieldLabel>
-            <select value={props.teamId} onChange={(e) => props.setTeamId(e.target.value)} className={selectClass}>
-              <option value="">Select club</option>
-              {teams.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.country})</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <FieldLabel>Organisation name</FieldLabel>
-            <input value={props.organizationName} onChange={(e) => props.setOrganizationName(e.target.value)} placeholder="e.g. Berlin Rebels e.V." className={inputClass} />
-          </label>
-          <label className="block">
-            <FieldLabel>Your title</FieldLabel>
-            <input value={props.title} onChange={(e) => props.setTitle(e.target.value)} placeholder="e.g. General Manager" className={inputClass} />
-          </label>
-          <label className="block sm:col-span-2">
-            <FieldLabel>Contact email</FieldLabel>
-            <input type="email" value={props.contactEmail} onChange={(e) => props.setContactEmail(e.target.value)} placeholder="recruiting@yourclub.de" className={inputClass} />
-          </label>
-          <label className="block sm:col-span-2">
-            <FieldLabel>Current recruiting needs</FieldLabel>
-            <textarea
-              value={props.recruitingNeeds} onChange={(e) => props.setRecruitingNeeds(e.target.value)}
-              placeholder="e.g. Looking for a starting QB and 2 experienced O-linemen for the 2026 season…"
-              className={textareaClass}
+      {noResults && (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-5 dark:border-white/15 dark:bg-white/5">
+          <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+            No teams matched &ldquo;{props.teamSearch}&rdquo;
+          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Request this team be added. Our team will review and add it.</p>
+          <label className="mt-3 block">
+            <FieldLabel>Team name to add</FieldLabel>
+            <input
+              value={props.newTeamName}
+              onChange={(e) => {
+                props.setNewTeamName(e.target.value);
+                props.setClubAction("new");
+              }}
+              placeholder="Full official team name"
+              className={inputClass}
             />
           </label>
         </div>
-      </div>
+      )}
+
+      <p className="text-xs text-slate-400 dark:text-slate-500">
+        You can skip this and connect to a club later from your dashboard.
+      </p>
     </div>
   );
 }
@@ -615,7 +588,7 @@ function ConfirmStep({ role, displayName, subtitle, isPublic, setIsPublic }: {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">You're almost in.</h2>
+        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">You&apos;re almost in.</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Review your summary and choose your visibility setting.</p>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 dark:border-white/10 dark:bg-white/5">
@@ -682,26 +655,17 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
   const [pipelineType,         setPipelineType]         = useState("");
   const [availableForTransfer, setAvailableForTransfer] = useState(false);
 
-  // Step 3 – scout / coach / analyst / journalist
-  const [organization,    setOrganization]    = useState("");
-  const [contactEmail,    setContactEmail]    = useState("");
-  const [focusRegions,    setFocusRegions]    = useState<string[]>([]);
-  const [focusPositions,  setFocusPositions]  = useState<string[]>([]);
-  const [yearsExperience, setYearsExperience] = useState("");
-
-  // Step 3 – team admin
-  const [teamId,           setTeamId]           = useState("");
-  const [organizationName, setOrganizationName] = useState("");
-  const [adminTitle,       setAdminTitle]       = useState("");
-  const [recruitingNeeds,  setRecruitingNeeds]  = useState("");
+  // Step 3 – club
+  const [teamSearch,     setTeamSearch]     = useState("");
+  const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [clubAction,     setClubAction]     = useState<ClubAction>("");
+  const [newTeamName,    setNewTeamName]    = useState("");
 
   // Final
   const [isPublic, setIsPublic] = useState(true);
 
   // Toggles
-  const toggleLanguage      = (l: string) => setLanguages((p)      => p.includes(l) ? p.filter((x) => x !== l) : [...p, l]);
-  const toggleFocusRegion   = (r: string) => setFocusRegions((p)   => p.includes(r) ? p.filter((x) => x !== r) : [...p, r]);
-  const toggleFocusPosition = (pos: string) => setFocusPositions((p) => p.includes(pos) ? p.filter((x) => x !== pos) : [...p, pos]);
+  const toggleLanguage = (l: string) => setLanguages((p) => p.includes(l) ? p.filter((x) => x !== l) : [...p, l]);
 
   // Derived
   const hasRoleStep    = ROLE_CONFIG[role]?.hasRoleStep ?? false;
@@ -709,8 +673,8 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
   const roleStepNum    = hasRoleStep ? 3 : null;
   const confirmStepNum = hasRoleStep ? 4 : 3;
 
-  const roleStepLabels: Record<string, string>       = { player: "Player details", scout: "Scouting details", coach: "Coaching details", team_admin: "Club details", analyst: "Analyst details", journalist: "Media details" };
-  const roleStepDescriptions: Record<string, string> = { player: "Position, stats & availability", scout: "Organisation & focus areas", coach: "Organisation & focus areas", team_admin: "Club & recruiting needs", analyst: "Organisation & focus areas", journalist: "Publication & focus areas" };
+  const roleStepLabels: Record<string, string>       = { player: "Player details", club: "Your club" };
+  const roleStepDescriptions: Record<string, string> = { player: "Position, stats & availability", club: "Find and connect to your team" };
 
   const stepConfig: StepMeta[] = [
     { label: "Your role", description: "How you use EuroScout" },
@@ -731,7 +695,7 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     fd.append("headline",     headline.trim());
     fd.append("is_public",    isPublic ? "on" : "");
 
-    // Player
+    // Player fields
     fd.append("first_name",        firstName.trim());
     fd.append("last_name",         lastName.trim());
     fd.append("dob",               dob);
@@ -745,18 +709,10 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     fd.append("pipeline_type",     pipelineType);
     if (availableForTransfer) fd.append("available_for_transfer", "on");
 
-    // Scout / coach / analyst / journalist
-    fd.append("organization",     organization.trim());
-    fd.append("contact_email",    contactEmail.trim());
-    fd.append("focus_regions",    focusRegions.join(","));
-    fd.append("focus_positions",  focusPositions.join(","));
-    fd.append("years_experience", yearsExperience);
-
-    // Team admin
-    fd.append("team_id",           teamId);
-    fd.append("organization_name", organizationName.trim());
-    fd.append("title",             adminTitle.trim());
-    fd.append("recruiting_needs",  recruitingNeeds.trim());
+    // Club fields
+    fd.append("team_id",           selectedTeamId);
+    fd.append("club_action",       clubAction);
+    fd.append("team_name_request", newTeamName.trim());
 
     setSubmitError(null);
     startTransition(async () => {
@@ -772,7 +728,9 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
   // Confirm step subtitle
   const confirmSubtitle = role === "player"
     ? [position, pipelineType].filter(Boolean).join(" · ")
-    : [organization, organizationName].filter(Boolean)[0] ?? "";
+    : role === "club" && selectedTeamId
+      ? teams.find((t) => t.id === selectedTeamId)?.name ?? ""
+      : "";
 
   const currentError = submitError ?? error;
 
@@ -823,23 +781,12 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
               availableForTransfer={availableForTransfer} setAvailableForTransfer={setAvailableForTransfer}
             />
           )}
-          {step === roleStepNum && (role === "scout" || role === "coach" || role === "analyst" || role === "journalist") && (
-            <ScoutStep
-              organization={organization}       setOrganization={setOrganization}
-              contactEmail={contactEmail}       setContactEmail={setContactEmail}
-              yearsExperience={yearsExperience} setYearsExperience={setYearsExperience}
-              focusRegions={focusRegions}       toggleFocusRegion={toggleFocusRegion}
-              focusPositions={focusPositions}   toggleFocusPosition={toggleFocusPosition}
-              role={role}
-            />
-          )}
-          {step === roleStepNum && role === "team_admin" && (
-            <TeamAdminStep
-              teamId={teamId}                     setTeamId={setTeamId}
-              organizationName={organizationName} setOrganizationName={setOrganizationName}
-              title={adminTitle}                  setTitle={setAdminTitle}
-              recruitingNeeds={recruitingNeeds}   setRecruitingNeeds={setRecruitingNeeds}
-              contactEmail={contactEmail}         setContactEmail={setContactEmail}
+          {step === roleStepNum && role === "club" && (
+            <ClubStep
+              teamSearch={teamSearch}         setTeamSearch={setTeamSearch}
+              selectedTeamId={selectedTeamId} setSelectedTeamId={setSelectedTeamId}
+              clubAction={clubAction}         setClubAction={setClubAction}
+              newTeamName={newTeamName}       setNewTeamName={setNewTeamName}
             />
           )}
           {step === confirmStepNum && (
@@ -882,4 +829,3 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     </div>
   );
 }
-

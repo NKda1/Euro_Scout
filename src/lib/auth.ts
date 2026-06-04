@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
-export const userRoles = ["player", "scout", "coach", "team_admin", "analyst", "journalist", "fan", "admin"] as const;
+export const userRoles = ["player", "club", "journalist", "fan", "admin"] as const;
 export const publicUserRoles = userRoles.filter((role) => role !== "admin");
 
 export type UserRole = (typeof userRoles)[number];
@@ -25,7 +25,9 @@ export function isUserRole(value: string): value is UserRole {
 }
 
 export function isReservedAdminEmail(email?: string | null) {
-  const allowedEmails = (process.env.EUROSCOUT_SUPER_ADMIN_EMAILS ?? "")
+  // Support both singular and plural env var names
+  const raw = process.env.EUROSCOUT_SUPER_ADMIN_EMAILS ?? process.env.EUROSCOUT_SUPER_ADMIN_EMAIL ?? "";
+  const allowedEmails = raw
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
@@ -52,7 +54,9 @@ export async function getAuthenticatedProfile() {
 
   if (isReservedAdminEmail(user.email) && (!profile || profile.role !== "admin" || !profile.onboarding_complete)) {
     const displayName = String(user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "EuroScout Admin");
-    const { data: adminProfile, error } = await supabase
+    // Use service role client to bypass RLS — admin restore must never be blocked by profile policies
+    const serviceClient = createSupabaseServiceRoleClient();
+    const { data: adminProfile, error } = await serviceClient
       .from("profiles")
       .upsert(
         {
@@ -103,10 +107,7 @@ export async function requireAdminProfile() {
 export function roleLabel(role: UserRole) {
   const labels: Record<UserRole, string> = {
     player: "Player",
-    scout: "Scout",
-    coach: "Coach",
-    team_admin: "Team Admin",
-    analyst: "Analyst",
+    club: "Club",
     journalist: "Journalist",
     admin: "Admin",
     fan: "Fan"

@@ -32,14 +32,22 @@ function NewsCard({ article }: { article: NewsArticle }) {
             src={article.image}
             alt={article.title}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={(e) => {
+              const target = e.currentTarget;
+              target.style.display = "none";
+              const fallback = target.nextElementSibling as HTMLElement | null;
+              if (fallback) fallback.style.display = "flex";
+            }}
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <span className={`rounded-xl px-3 py-1 text-xs font-black ${style.bg} ${style.text}`}>
-              {style.label}
-            </span>
-          </div>
-        )}
+        ) : null}
+        <div
+          className="flex h-full w-full items-center justify-center"
+          style={{ display: article.image ? "none" : "flex" }}
+        >
+          <span className={`rounded-xl px-3 py-1 text-xs font-black ${style.bg} ${style.text}`}>
+            {style.label}
+          </span>
+        </div>
         <span className={`absolute left-3 top-3 rounded-lg px-2 py-0.5 text-[10px] font-black uppercase tracking-wider shadow ${style.bg} ${style.text}`}>
           {style.label}
         </span>

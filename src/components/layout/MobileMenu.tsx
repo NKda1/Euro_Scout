@@ -49,13 +49,10 @@ export default function MobileMenu({ isSignedIn, isAdmin }: MobileMenuProps) {
               Players
             </Link>
             <Link href={routes.scouts} onClick={close} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-              Scouts
+              Clubs
             </Link>
             {isSignedIn && (
               <>
-                <Link href={routes.profiles} onClick={close} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-                  Profiles
-                </Link>
                 <Link href={routes.messages} onClick={close} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
                   Messages
                 </Link>

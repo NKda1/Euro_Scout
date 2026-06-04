@@ -90,11 +90,11 @@ export default function ProfileSummary({
   const secondaryTag =
     profile.role === "player"
       ? formatPipeline(roleProfile?.pipeline_type)
-      : profile.role === "team_admin"
-        ? stringValue(roleProfile?.title) || "Club operations"
+      : profile.role === "club"
+        ? "Club representative"
         : profile.role === "fan"
           ? "Supporter"
-          : stringValue(roleProfile?.organization) || "Talent network";
+          : roleLabel(profile.role);
   const availability = profile.role === "player" && roleProfile?.available_for_transfer ? "Available for transfer" : "Open to connect";
   const location = profile.location ?? currentTeam?.country ?? "Europe";
 
@@ -106,18 +106,11 @@ export default function ProfileSummary({
           ["Pipeline", roleProfile?.pipeline_type],
           ["Transfer", roleProfile?.available_for_transfer ? "Available" : "Not listed"]
         ]
-      : profile.role === "team_admin"
-        ? [
-            ["Organization", roleProfile?.organization_name],
-            ["Title", roleProfile?.title],
-            ["Recruiting", roleProfile?.recruiting_needs]
-          ]
+      : profile.role === "club"
+        ? [["Location", profile.location]]
         : profile.role === "fan"
           ? [["Interest", profile.headline]]
           : [
-              ["Organization", roleProfile?.organization],
-              ["Regions", roleProfile?.focus_regions],
-              ["Positions", roleProfile?.focus_positions],
               ["Experience", roleProfile?.years_experience ? `${roleProfile.years_experience} years` : null]
             ];
 

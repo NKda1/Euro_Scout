@@ -89,7 +89,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     }
 
     if (profile.role !== "player") {
-      redirect(`/profiles/${profile.id}`);
+      redirect(`/players`);
     }
 
     return (

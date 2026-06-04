@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { signOutAction } from "@/app/actions/auth";
-import { requireOnboardedProfile, roleLabel } from "@/lib/auth";
+import { restoreAdminRoleAction } from "@/app/actions/profile";
+import { requireOnboardedProfile, roleLabel, isReservedAdminEmail } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Dashboard | EuroScout Pro",
@@ -22,8 +23,9 @@ interface DashboardPageProps {
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const { profile } = await requireOnboardedProfile();
+  const { profile, user } = await requireOnboardedProfile();
   const { error } = await searchParams;
+  const adminRoleDrifted = isReservedAdminEmail(user.email) && profile.role !== "admin";
   const dashboardActions =
     profile.role === "admin"
       ? [
@@ -48,6 +50,21 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <button className="h-11 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 px-5 text-sm font-black text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:border-red-400/40 dark:hover:bg-red-500/10 dark:hover:text-red-300">Sign out</button>
             </form>
           </div>
+
+          {adminRoleDrifted ? (
+            <form action={restoreAdminRoleAction} className="mt-6">
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 dark:border-amber-400/40 dark:bg-amber-500/10">
+                <div>
+                  <p className="text-sm font-black text-amber-900 dark:text-amber-200">Admin role overwritten during QA testing.</p>
+                  <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">Your account was detected as a super admin but is currently set to <span className="uppercase">{profile.role}</span>.</p>
+                </div>
+                <button type="submit" className="shrink-0 rounded-2xl bg-amber-600 px-5 py-2.5 text-sm font-black text-white transition hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400">
+                  Restore admin role
+                </button>
+              </div>
+            </form>
+          ) : null}
+
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             {dashboardActions.map((item) => (
               <Link key={item.href} href={item.href} className="rounded-3xl border border-white/70 bg-white/75 p-5 shadow-sm backdrop-blur-xl transition hover:border-red-200 hover:shadow-md dark:border-white/10 dark:bg-white/10 dark:hover:border-red-400/40">

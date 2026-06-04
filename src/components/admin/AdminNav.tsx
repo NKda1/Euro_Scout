@@ -5,7 +5,8 @@ const adminLinks = [
   { href: "/admin/users", label: "Users" },
   { href: "/admin/profiles", label: "Profiles" },
   { href: "/admin/players", label: "Players" },
-  { href: "/admin/messages", label: "Messages" }
+  { href: "/admin/messages", label: "Messages" },
+  { href: "/admin/disputes", label: "Disputes" }
 ];
 
 export default function AdminNav() {

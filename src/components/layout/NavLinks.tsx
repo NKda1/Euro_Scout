@@ -33,10 +33,9 @@ export default function NavLinks({ isSignedIn, isAdmin }: NavLinksProps) {
       <Link href={routes.leagues} className={linkCls(routes.leagues)}>Leagues</Link>
       <Link href={routes.teams} className={linkCls(routes.teams)}>Teams</Link>
       <Link href={routes.players} className={linkCls(routes.players)}>Players</Link>
-      <Link href={routes.scouts} className={linkCls(routes.scouts)}>Scouts</Link>
+      <Link href={routes.scouts} className={linkCls(routes.scouts)}>Clubs</Link>
       {isSignedIn && (
         <>
-          <Link href={routes.profiles} className={linkCls(routes.profiles)}>Profiles</Link>
           <Link href={routes.messages} className={linkCls(routes.messages, "hidden xl:inline-flex")}>
             Messages
           </Link>

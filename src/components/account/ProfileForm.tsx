@@ -12,15 +12,6 @@ interface RoleProfileData {
   pipeline_type?: string | null;
   available_for_transfer?: boolean | null;
   photo_urls?: string[] | null;
-  organization?: string | null;
-  focus_regions?: string[] | null;
-  focus_positions?: string[] | null;
-  years_experience?: number | null;
-  contact_email?: string | null;
-  team_id?: string | null;
-  organization_name?: string | null;
-  title?: string | null;
-  recruiting_needs?: string | null;
 }
 
 interface ProfileFormProps {
@@ -103,34 +94,6 @@ export default function ProfileForm({ action, profile, roleProfile, submitLabel,
             Available for transfer
           </label>
           <textarea name="photo_urls" placeholder="Profile photo URLs, one per line (max 5)" defaultValue={roleProfile?.photo_urls?.join("\n") ?? ""} className={`${textareaClass} md:col-span-2`} />
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-white/70 bg-white/70 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
-        <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Scout / coach fields</p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <input name="organization" placeholder="Organization" defaultValue={roleProfile?.organization ?? ""} className={inputClass} />
-          <input name="contact_email" type="email" placeholder="Contact email" defaultValue={roleProfile?.contact_email ?? ""} className={inputClass} />
-          <input name="focus_regions" placeholder="Focus regions, comma separated" defaultValue={roleProfile?.focus_regions?.join(", ") ?? ""} className={inputClass} />
-          <input name="focus_positions" placeholder="Focus positions, comma separated" defaultValue={roleProfile?.focus_positions?.join(", ") ?? ""} className={inputClass} />
-          <input name="years_experience" type="number" placeholder="Years experience" defaultValue={roleProfile?.years_experience ?? ""} className={inputClass} />
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-white/70 bg-white/70 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
-        <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Team admin fields</p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <select name="team_id" defaultValue={roleProfile?.team_id ?? ""} className={inputClass}>
-            <option value="">Team</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
-          <input name="organization_name" placeholder="Organization name" defaultValue={roleProfile?.organization_name ?? ""} className={inputClass} />
-          <input name="title" placeholder="Title" defaultValue={roleProfile?.title ?? ""} className={inputClass} />
-          <textarea name="recruiting_needs" placeholder="Recruiting needs" defaultValue={roleProfile?.recruiting_needs ?? ""} className={textareaClass} />
         </div>
       </div>
 

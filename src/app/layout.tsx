@@ -5,6 +5,7 @@ import { ReactNode } from "react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import PageTransition from "@/components/layout/PageTransition";
+import NavHistoryButtons from "@/components/layout/NavHistoryButtons";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://euroscout.pro"),
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <Navbar />
+        <NavHistoryButtons />
         <PageTransition>{children}</PageTransition>
         <Footer />
       </body>
