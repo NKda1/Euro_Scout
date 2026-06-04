@@ -45,10 +45,10 @@ export default async function Navbar() {
         <div className="flex shrink-0 items-center gap-2">
           {user ? (
             <Link
-              href={routes.dashboard}
+              href={routes.account}
               className="hidden items-center gap-1.5 rounded-full bg-red-600 px-4 py-2 text-[13px] font-black text-white shadow-md shadow-red-600/25 transition duration-150 hover:bg-red-700 hover:shadow-lg hover:shadow-red-600/30 active:scale-[0.97] lg:flex"
             >
-              Dashboard
+              Account
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>

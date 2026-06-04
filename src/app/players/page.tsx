@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import PlayerDirectory, { type PlayerDirectoryItem } from "@/components/players/PlayerDirectory";
 import PlayerFilters from "@/components/players/PlayerFilters";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getAuthenticatedProfile } from "@/lib/auth";
 
 export const metadata: Metadata = {
@@ -56,7 +56,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
   }
 
   const [{ data: players, error }, { data: nationalities }] = await Promise.all([
-    query.order("updated_at", { ascending: false }).returns<PlayerDirectoryItem[]>(),
+    query.order("updated_at", { ascending: false }),
     supabase.from("player_profiles").select("nationality").not("nationality", "is", null).returns<{ nationality: string }[]>()
   ]);
 
@@ -68,13 +68,29 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
   try {
     const { profile } = await getAuthenticatedProfile();
     if (profile?.role === "club" || profile?.role === "admin") {
-      userRole = profile.role;
-      const { data: wls } = await supabase
+      const serviceClient = createSupabaseServiceRoleClient();
+      const { data: membership } = profile.role === "club"
+        ? await serviceClient
+            .from("club_members")
+            .select("team_id")
+            .eq("profile_id", profile.id)
+            .limit(1)
+            .maybeSingle<{ team_id: string }>()
+        : { data: null };
+
+      userRole = profile.role === "admin" || membership?.team_id ? profile.role : undefined;
+
+      const watchlistQuery = serviceClient
         .from("watchlists")
         .select("id, name")
-        .eq("user_id", profile.id)
-        .order("created_at", { ascending: false })
-        .returns<{ id: string; name: string }[]>();
+        .order("created_at", { ascending: false });
+
+      const { data: wls } = profile.role === "admin"
+        ? await watchlistQuery.returns<{ id: string; name: string }[]>()
+        : membership?.team_id
+          ? await watchlistQuery.eq("team_id", membership.team_id).returns<{ id: string; name: string }[]>()
+          : { data: [] as { id: string; name: string }[] };
+
       watchlists = wls ?? [];
     }
   } catch {
@@ -101,7 +117,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
             {error.message}
           </div>
         ) : (
-          <PlayerDirectory players={players ?? []} watchlists={watchlists} userRole={userRole} />
+          <PlayerDirectory players={(players ?? []) as PlayerDirectoryItem[]} watchlists={watchlists} userRole={userRole} />
         )}
       </section>
     </main>

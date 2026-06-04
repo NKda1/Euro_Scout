@@ -27,22 +27,32 @@ export default function ClubProfileHealthCard({
   ];
 
   return (
-    <section className="rounded-[1.75rem] border border-white/70 bg-white/78 p-6 shadow-xl shadow-slate-950/10 backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
-      <p className="eyebrow-red">Profile Health</p>
-      <div className="mt-5 space-y-4">
+    <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+      <p className="text-sm font-black uppercase text-red-500">Profile Health</p>
+      <div className="mt-5">
+        <div className="mb-4 flex items-center justify-between text-sm">
+          <span className="font-bold text-white/55">Completeness</span>
+          <span className="font-black text-white">{completeness}%</span>
+        </div>
+        <div className="mb-5 h-2 overflow-hidden rounded-full bg-white/10">
+          <div className="h-full rounded-full bg-red-500" style={{ width: `${completeness}%` }} />
+        </div>
+      </div>
+      <div className="space-y-3">
         {rows.map(([label, value, status]) => (
+          label === "Completeness" ? null :
           <div
             key={label}
-            className="flex items-center justify-between border-b border-slate-200 pb-3 text-sm last:border-b-0 last:pb-0 dark:border-white/10"
+            className="flex items-center justify-between text-sm"
           >
-            <span className="font-bold text-slate-500 dark:text-slate-400">{label}</span>
+            <span className="font-bold text-white/55">{label}</span>
             <span
               className={`font-black ${
                 status === "good"
-                  ? "text-emerald-600 dark:text-emerald-400"
+                  ? "text-emerald-400"
                   : status === "bad"
-                    ? "text-slate-400"
-                    : "text-slate-950 dark:text-white"
+                    ? "text-white/30"
+                    : "text-white"
               }`}
             >
               {value}

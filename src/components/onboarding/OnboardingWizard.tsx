@@ -2,7 +2,7 @@
 
 import { useTransition, useState, useMemo } from "react";
 import type { ReactNode } from "react";
-import { teams, regions } from "@/lib/data";
+import { teams } from "@/lib/data";
 import { countries } from "@/constants/countries";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/auth";
@@ -27,13 +27,6 @@ const POSITIONS = [
   { code: "K",   label: "Kicker" },
   { code: "P",   label: "Punter" },
   { code: "LS",  label: "Long Snapper" },
-] as const;
-
-const POSITION_GROUPS = [
-  { label: "Offense",       codes: ["QB","RB","WR","TE","OT","OG","C"] },
-  { label: "Defense",       codes: ["DE","DT","MLB","OLB","CB","S"] },
-  { label: "Special Teams", codes: ["K","P","LS"] },
-  { label: "Versatile",     codes: ["ATH"] },
 ] as const;
 
 const PIPELINES = [
@@ -87,9 +80,6 @@ const inputClass =
 const selectClass =
   "h-12 w-full rounded-2xl border border-slate-200 bg-white/85 px-4 text-sm font-semibold text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:focus:ring-red-500/20";
 
-const textareaClass =
-  "min-h-24 w-full rounded-2xl border border-slate-200 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-slate-500 dark:focus:ring-red-500/20";
-
 function FieldLabel({ required, children }: { required?: boolean; children: ReactNode }) {
   return (
     <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
@@ -111,26 +101,6 @@ function CheckIcon() {
     <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5 text-white">
       <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-function CheckboxCard({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
-  return (
-    <label className={cn(
-      "flex cursor-pointer select-none items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm font-semibold transition",
-      checked
-        ? "border-red-200 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-300"
-        : "border-slate-200 bg-white/70 text-slate-700 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-white/20"
-    )}>
-      <span className={cn(
-        "flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition",
-        checked ? "border-red-600 bg-red-600" : "border-slate-300 dark:border-white/30"
-      )}>
-        {checked && <CheckIcon />}
-      </span>
-      <input type="checkbox" checked={checked} onChange={onToggle} className="sr-only" />
-      {label}
-    </label>
   );
 }
 
@@ -330,7 +300,7 @@ function PlayerStep(props: {
             <FieldLabel>Nationality</FieldLabel>
             <select value={props.nationality} onChange={(e) => props.setNationality(e.target.value)} className={selectClass}>
               <option value="">Select country</option>
-              {countries.map((c) => <option key={c.code} value={c.name}>{c.flag} {c.name}</option>)}
+              {countries.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
             </select>
           </label>
         </div>

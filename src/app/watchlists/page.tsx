@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireOnboardedProfile } from "@/lib/auth";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { createWatchlistAction, deleteWatchlistAction } from "@/app/actions/watchlist";
 
 export const metadata: Metadata = {
@@ -26,24 +27,40 @@ interface WatchlistWithCount extends WatchlistRow {
 }
 
 export default async function WatchlistsPage({ searchParams }: WatchlistsPageProps) {
-  const { supabase, profile } = await requireOnboardedProfile();
+  const { profile } = await requireOnboardedProfile();
   const { error } = await searchParams;
 
   if (profile.role !== "club" && profile.role !== "admin") {
     redirect("/dashboard?error=Only club accounts can access watchlists.");
   }
 
-  const { data: rawWatchlists } = await supabase
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { data: membership } = profile.role === "club"
+    ? await serviceClient
+        .from("club_members")
+        .select("team_id")
+        .eq("profile_id", profile.id)
+        .limit(1)
+        .maybeSingle<{ team_id: string }>()
+    : { data: null };
+
+  if (profile.role === "club" && !membership?.team_id) {
+    redirect("/account?error=Claim or create a club before using watchlists.");
+  }
+
+  const watchlistQuery = serviceClient
     .from("watchlists")
     .select("id, name, is_shared, team_id, created_at")
-    .eq("user_id", profile.id)
-    .order("created_at", { ascending: false })
-    .returns<WatchlistRow[]>();
+    .order("created_at", { ascending: false });
+
+  const { data: rawWatchlists } = profile.role === "admin"
+    ? await watchlistQuery.returns<WatchlistRow[]>()
+    : await watchlistQuery.eq("team_id", membership?.team_id ?? "").returns<WatchlistRow[]>();
 
   // Get item counts per watchlist
   const watchlistIds = rawWatchlists?.map((wl) => wl.id) ?? [];
   const { data: itemCounts } = watchlistIds.length
-    ? await supabase
+      ? await serviceClient
         .from("watchlist_items")
         .select("watchlist_id")
         .in("watchlist_id", watchlistIds)

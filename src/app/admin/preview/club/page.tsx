@@ -8,8 +8,6 @@ export const metadata: Metadata = {
   title: "Mock Club Profile Preview | Admin"
 };
 
-// ── Mock data — no DB required ────────────────────────────────────────────────
-
 const MOCK_SCOUT_ID = "mock-preview";
 const MOCK_TEAM_ID = "mock-team-preview";
 
@@ -17,6 +15,11 @@ const MOCK_TEAM = {
   name: "Berlin Eagles AFC",
   city: "Berlin",
   country: "Germany",
+  league: "GFL",
+  tier: 1,
+  type: "Premier",
+  market: "Gold",
+  stadium: "Olympiastadion Berlin",
   claim_status: "verified",
   recruiting_active: true,
   open_roster_spots: 3,
@@ -32,6 +35,15 @@ const MOCK_PROFILE = {
 };
 
 const MOCK_MEDIA: ClubMediaRow[] = [
+  {
+    id: "mock-video-1",
+    team_id: MOCK_TEAM_ID,
+    media_type: "video",
+    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    provider: "youtube",
+    label: "Berlin Eagles - 2025 Season Highlights",
+    display_order: 0
+  },
   {
     id: "mock-photo-1",
     team_id: MOCK_TEAM_ID,
@@ -52,6 +64,12 @@ const MOCK_MEDIA: ClubMediaRow[] = [
   }
 ];
 
+const MOCK_STAFF = [
+  { initials: "MK", name: "Mara Keller", role: "owner", title: "General Manager" },
+  { initials: "JS", name: "Jonas Stein", role: "coach", title: "Head Coach" },
+  { initials: "AL", name: "Amir Lewis", role: "recruiter", title: "International Recruiting" }
+];
+
 function initials(name: string) {
   return name
     .trim()
@@ -68,195 +86,218 @@ export default function MockClubProfilePreviewPage() {
   const video = MOCK_MEDIA.find((m) => m.media_type === "video") ?? null;
 
   return (
-    <main className="app-surface">
-
-      {/* Mock banner */}
-      <div className="sticky top-0 z-50 border-b border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-500/40 dark:bg-amber-500/15">
+    <main className="min-h-screen bg-[#090909] text-white">
+      <div className="sticky top-0 z-50 border-b border-amber-400/30 bg-[#171105] px-4 py-3">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-amber-950">
+            <span className="rounded bg-amber-400 px-3 py-1 text-[11px] font-black uppercase text-amber-950">
               Admin Preview
             </span>
-            <p className="text-sm font-black text-amber-900 dark:text-amber-200">
-              Mock club profile — no real data or DB calls. For QA purposes only.
+            <p className="text-sm font-black text-amber-200/85">
+              Mock club profile - no real data or DB calls. For QA purposes only.
             </p>
           </div>
           <Link
             href="/admin"
-            className="rounded-xl border border-amber-300 bg-white/80 px-4 py-2 text-xs font-black text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+            className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-200 transition hover:bg-amber-400/15"
           >
             ← Back to admin
           </Link>
         </div>
       </div>
 
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <article className="overflow-hidden rounded-[2rem] border border-red-100 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-slate-950 dark:shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
+      <section className="border-b border-white/10 bg-[#101010]">
+        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+          <Link
+            href="/scouts"
+            className="inline-flex h-11 items-center rounded-lg border border-white/10 bg-white/[0.02] px-4 text-sm font-semibold text-white/30 transition hover:border-red-500/50 hover:text-white"
+          >
+            ← Back to clubs
+          </Link>
+        </div>
+      </section>
 
-          {/* Header */}
-          <header className="relative overflow-hidden bg-[radial-gradient(circle_at_8%_10%,rgba(239,68,68,.16),transparent_26rem),linear-gradient(135deg,#ffffff_0%,#fff7f7_42%,#fee2e2_100%)] px-5 py-6 dark:bg-[radial-gradient(circle_at_8%_10%,rgba(239,68,68,.28),transparent_26rem),linear-gradient(135deg,#020617_0%,#0f172a_48%,#2a0f14_100%)] sm:px-8 lg:px-10">
-            <div className="absolute inset-0 opacity-45 [background-image:linear-gradient(135deg,rgba(220,38,38,.08)_1px,transparent_1px)] [background-size:30px_30px] dark:opacity-30" />
-            <div className="relative">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <Link
-                  href="/scouts"
-                  className="inline-flex w-fit items-center rounded-full border border-red-100 bg-white/80 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-red-700 shadow-sm backdrop-blur-xl transition hover:bg-red-50 dark:border-white/10 dark:bg-white/10 dark:text-red-200 dark:hover:bg-red-500/10"
-                >
-                  Back to clubs
-                </Link>
-                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-red-600/20">
-                  <span className="h-2 w-2 rounded-full bg-white" />
-                  {isVerified ? "Verified Club" : "Club"}
-                </div>
-              </div>
-
-              <div className="mt-8 grid gap-8 sm:mt-14 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
-                <div className="flex flex-col gap-7 sm:flex-row sm:items-end">
-                  <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] bg-slate-950 text-4xl font-black tracking-tight text-white shadow-2xl shadow-red-100 ring-4 ring-red-500 dark:shadow-red-950/40 sm:h-44 sm:w-44 sm:rounded-[2rem] sm:text-6xl">
-                    <span className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(239,68,68,.35),transparent_48%)]" />
-                    <span className="relative">{initials(MOCK_PROFILE.display_name)}</span>
+      <article>
+        <header className="border-b border-white/10 bg-[#120807]">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+              <div>
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                  <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] text-5xl font-black text-white">
+                    {initials(MOCK_TEAM.name)}
                   </div>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap gap-3">
-                      <span className="rounded-full border border-red-200 bg-white/80 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-red-700 shadow-sm backdrop-blur-xl dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded border border-indigo-400/60 bg-indigo-500/15 px-3 py-1 text-xs font-bold uppercase text-indigo-200">
                         Club
                       </span>
-                      <span className="rounded-full border border-slate-200 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-slate-800 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
-                        {MOCK_TEAM.city}, {MOCK_TEAM.country}
+                      <span className="rounded border border-green-500/50 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase text-green-400">
+                        <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-green-400 align-middle" />
+                        {isVerified ? "Verified" : "Pending"}
+                      </span>
+                      <span className="rounded border border-blue-500/60 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase text-blue-300">
+                        {MOCK_TEAM.league} - Tier {MOCK_TEAM.tier}
                       </span>
                     </div>
-                    <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:mt-5 sm:text-5xl lg:text-7xl">
-                      {MOCK_TEAM.name}
-                    </h1>
-                    <p className="mt-5 max-w-3xl text-lg font-semibold leading-8 text-slate-600 dark:text-slate-300">
-                      {MOCK_PROFILE.headline}
+                    <h1 className="mt-4 text-5xl font-black leading-none text-white sm:text-6xl">{MOCK_TEAM.name}</h1>
+                    <p className="mt-3 text-lg font-bold text-white/45">
+                      {MOCK_TEAM.city}, {MOCK_TEAM.country}
                     </p>
                   </div>
                 </div>
 
-                <div className="rounded-[1.75rem] border border-white/70 bg-white/72 p-4 shadow-xl backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
-                  <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-slate-200/70 dark:bg-white/10">
-                    {([
-                      ["Status", isVerified ? "Verified" : "Unverified"],
-                      ["Location", `${MOCK_TEAM.city}, ${MOCK_TEAM.country}`],
-                      ["Recruiting", MOCK_TEAM.recruiting_active ? "Active" : "Inactive"],
-                      ["Open Spots", String(MOCK_TEAM.open_roster_spots)]
-                    ] as [string, string][]).map(([label, val]) => (
-                      <div key={label} className="bg-white/88 p-4 dark:bg-slate-950/70">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
-                        <p className="mt-2 text-xl font-black text-slate-950 dark:text-white">{val}</p>
-                      </div>
-                    ))}
+                <div className="mt-9 flex flex-wrap gap-3">
+                  {[
+                    ["Region", MOCK_TEAM.country],
+                    ["Type", MOCK_TEAM.type],
+                    ["Market", MOCK_TEAM.market],
+                    ["Pipeline", MOCK_TEAM.pipeline_names_public ? "Public" : "Open"]
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-h-9 rounded border border-white/20 bg-black/20 px-4 py-2 text-sm">
+                      <span className="mr-1.5 uppercase text-white/35">{label}</span>
+                      <span className="font-bold text-white/75">{value}</span>
+                    </div>
+                  ))}
+                  <span className="min-h-9 px-2 py-2 text-sm font-black uppercase text-red-500">Public Profile</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/15 bg-[#1a1a1a]">
+                {[
+                  ["League", MOCK_TEAM.league],
+                  ["Founded", "2008"],
+                  ["Open Spots", String(MOCK_TEAM.open_roster_spots)],
+                  ["Staff", String(MOCK_STAFF.length)]
+                ].map(([label, value], index) => (
+                  <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-white/10" : ""} ${index < 2 ? "border-b border-white/10" : ""}`}>
+                    <p className="text-xs font-bold uppercase text-white/35">{label}</p>
+                    <p className={`mt-2 text-2xl font-black ${label === "Open Spots" ? "text-green-400" : "text-white"}`}>{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-8">
+          <div className="space-y-8 lg:border-r lg:border-white/10 lg:pr-10">
+            <ClubMediaSection scoutId={MOCK_SCOUT_ID} teamId={MOCK_TEAM_ID} media={MOCK_MEDIA} isMember={false} />
+
+            <ClubPipelineSection
+              teamId={MOCK_TEAM_ID}
+              isOwner={false}
+              pipelineNamesPublic={MOCK_TEAM.pipeline_names_public}
+            />
+
+            <section>
+              <p className="text-sm font-black uppercase text-red-500">Club Profile</p>
+              <div className="mt-5 flex gap-8 border-b border-white/10 text-sm font-black uppercase">
+                {["About", "Roster", "History", "News"].map((tab, index) => (
+                  <span key={tab} className={`pb-4 ${index === 0 ? "border-b-2 border-red-500 text-red-500" : "text-white/35"}`}>
+                    {tab}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-6 rounded-lg border border-white/15 bg-[#1a1a1a] p-7">
+                <p className="text-lg font-semibold leading-8 text-white/65">{MOCK_PROFILE.bio}</p>
+                <div className="mt-7 border-t border-white/10 text-sm">
+                  <div className="flex items-center justify-between border-b border-white/10 py-3">
+                    <span className="text-white/35">Stadium</span>
+                    <span className="font-bold text-white">{MOCK_TEAM.stadium}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/10 py-3">
+                    <span className="text-white/35">Website</span>
+                    <a href={MOCK_TEAM.website} className="font-bold text-blue-400 hover:text-blue-300">
+                      {MOCK_TEAM.website.replace(/^https?:\/\//, "")}
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-white/35">Contact</span>
+                    <a href={`mailto:${MOCK_TEAM.contact_email}`} className="font-bold text-blue-400 hover:text-blue-300">
+                      {MOCK_TEAM.contact_email}
+                    </a>
                   </div>
                 </div>
               </div>
-            </div>
-          </header>
+            </section>
 
-          {/* Status strip */}
-          <div className="border-y border-red-100 bg-white/70 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 sm:px-8 lg:px-10">
-            <div className="flex flex-wrap gap-2">
-              {MOCK_TEAM.recruiting_active && (
-                <span className="rounded-full bg-green-50 px-3 py-1.5 text-xs font-black text-green-700 dark:bg-green-500/15 dark:text-green-300">
-                  Actively recruiting
-                </span>
-              )}
-              {MOCK_TEAM.open_roster_spots > 0 && (
-                <span className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-black text-red-700 dark:bg-red-500/15 dark:text-red-300">
-                  {MOCK_TEAM.open_roster_spots} open spots
-                </span>
-              )}
-              <a
-                href={MOCK_TEAM.website}
-                className="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+          </div>
+
+          <aside className="space-y-6">
+            <section className="rounded-lg border border-red-500/25 bg-[#1a1a1a] p-7">
+              <p className="mb-5 text-sm font-black uppercase text-red-500">Contact Club</p>
+              <button
+                disabled
+                className="inline-flex h-16 w-full cursor-not-allowed items-center justify-center rounded-lg border border-white/10 bg-black/20 px-5 text-sm font-black text-white/25"
               >
-                Website ↗
-              </a>
-              {isVerified && (
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                  ✓ Verified
-                </span>
-              )}
-            </div>
-          </div>
+                Message {MOCK_TEAM.name}
+              </button>
+              <p className="mt-3 text-center text-xs font-semibold text-white/30">
+                Live page shows the real CTA based on auth state.
+              </p>
+            </section>
 
-          {/* Body */}
-          <div className="grid gap-8 bg-slate-50/80 p-5 dark:bg-slate-950/70 sm:p-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:p-10">
+            <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+              <p className="text-sm font-black uppercase text-red-500">Recruiting Status</p>
+              <div className="mt-5 flex items-center gap-3 text-lg font-black text-white">
+                <span className="h-3 w-3 rounded-full bg-emerald-500" />
+                Actively recruiting
+              </div>
+            </section>
 
-            {/* Main column */}
-            <div className="space-y-10">
+            <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+              <p className="text-sm font-black uppercase text-red-500">Open Roster Spots</p>
+              <div className="mt-5 space-y-3">
+                {["Wide Receiver", "Defensive Back", "Offensive Line"].map((spot) => (
+                  <div key={spot} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-b-0 last:pb-0">
+                    <span className="font-bold text-white">{spot}</span>
+                    <span className="rounded border border-green-500/60 px-3 py-1 text-xs font-bold text-green-400">Open</span>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-              {/* Bio */}
-              <section className="border-l-4 border-red-600 pl-6">
-                <p className="eyebrow-red">About</p>
-                <p className="mt-5 max-w-4xl text-2xl font-black leading-snug tracking-tight text-slate-950 dark:text-white">
-                  {MOCK_PROFILE.bio}
-                </p>
-              </section>
+            <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+              <p className="text-sm font-black uppercase text-red-500">Staff Directory</p>
+              <div className="mt-5 divide-y divide-white/10">
+                {MOCK_STAFF.map((staffMember) => (
+                  <div key={staffMember.name} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-black text-white/50">
+                        {staffMember.initials}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-black text-white">{staffMember.name}</p>
+                        <p className="text-sm text-white/35">{staffMember.title}</p>
+                      </div>
+                    </div>
+                    <span className="rounded border border-white/20 px-3 py-1 text-xs font-bold uppercase text-white/45">
+                      {staffMember.role}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-              <ClubMediaSection
-                scoutId={MOCK_SCOUT_ID}
-                teamId={MOCK_TEAM_ID}
-                media={MOCK_MEDIA}
-                isMember={false}
-              />
+            <ClubProfileHealthCard
+              hasBio={true}
+              hasWebsite={true}
+              photoCount={photos.length}
+              hasVideo={Boolean(video)}
+              isVerified={isVerified}
+            />
 
-              <ClubPipelineSection
-                teamId={MOCK_TEAM_ID}
-                isOwner={false}
-                pipelineNamesPublic={MOCK_TEAM.pipeline_names_public}
-              />
-            </div>
-
-            {/* Sidebar */}
-            <aside className="space-y-5">
-
-              {/* Contact CTA — preview shows sign-in state */}
-              <section className="rounded-[1.75rem] border border-white/70 bg-white/78 p-6 shadow-xl shadow-slate-950/10 backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
-                <p className="eyebrow-red mb-4">Contact</p>
-                <button
-                  disabled
-                  className="inline-flex h-16 w-full cursor-not-allowed items-center justify-center rounded-2xl bg-red-600 px-5 text-sm font-black uppercase tracking-[0.16em] text-white opacity-80 shadow-lg shadow-red-600/25"
-                >
-                  Message {MOCK_TEAM.name}
-                </button>
-                <p className="mt-3 text-center text-xs font-semibold text-slate-400">
-                  (Live page shows real CTA based on auth state)
-                </p>
-              </section>
-
-              {/* Recruiting Status */}
-              <section className="rounded-[1.75rem] border border-white/70 bg-white/78 p-6 shadow-xl shadow-slate-950/10 backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
-                <p className="eyebrow-red">Recruiting</p>
-                <div className="mt-5 flex items-center gap-3 text-lg font-black text-slate-950 dark:text-white">
-                  <span className="h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_0_6px_rgba(16,185,129,0.12)]" />
-                  Actively recruiting
-                </div>
-                <div className="mt-4 border-t border-slate-200 pt-4 dark:border-white/10">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Open spots</p>
-                  <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{MOCK_TEAM.open_roster_spots}</p>
-                </div>
-                <div className="mt-4 border-t border-slate-200 pt-4 dark:border-white/10">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Contact email</p>
-                  <p className="mt-2 text-sm font-bold text-red-600 dark:text-red-400">
-                    {MOCK_TEAM.contact_email}
-                  </p>
-                </div>
-              </section>
-
-              {/* Profile Health */}
-              <ClubProfileHealthCard
-                hasBio={true}
-                hasWebsite={true}
-                photoCount={photos.length}
-                hasVideo={Boolean(video)}
-                isVerified={isVerified}
-              />
-
-            </aside>
-          </div>
-        </article>
-      </section>
+            <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+              <p className="text-sm font-black uppercase text-red-500">Verification</p>
+              <div className="mt-5 flex items-center gap-3 text-base font-black text-white">
+                <span className="h-3 w-3 rounded-full bg-emerald-500" />
+                Community verified
+              </div>
+              <p className="mt-3 text-sm font-semibold text-white/35">Claimed 14 May 2026 · No disputes raised</p>
+            </section>
+          </aside>
+        </div>
+      </article>
     </main>
   );
 }

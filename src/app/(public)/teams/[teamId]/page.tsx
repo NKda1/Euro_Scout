@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { startConversationAction } from "@/app/actions/messages";
 import { routes } from "@/constants/routes";
 import { getTeamByIdOrSlug, leagues, teams } from "@/lib/data";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import type { Team } from "@/types";
 
 interface TeamDetailsPageProps {
@@ -13,9 +13,70 @@ interface TeamDetailsPageProps {
   }>;
 }
 
+interface DbTeamRow {
+  id: string;
+  name: string;
+  slug: string;
+  league_id: string;
+  region_id: string;
+  city: string;
+  country: string;
+  division: string | null;
+  stadium: string | null;
+  logo_url: string | null;
+  tier: number | null;
+  claim_status: Team["claim_status"] | null;
+  claimed_at: string | null;
+  claim_expires_at: string | null;
+  claimed_by: string | null;
+  website: string | null;
+  contact_email: string | null;
+  open_roster_spots: number | null;
+  recruiting_active: boolean | null;
+}
+
+function dbTeamToTeam(team: DbTeamRow): Team {
+  return {
+    id: team.id,
+    name: team.name,
+    city: team.city,
+    country: team.country,
+    countryFlag: "",
+    leagueId: team.league_id,
+    regionId: team.region_id,
+    marketTier: team.tier === 1 ? "gold" : team.tier === 2 ? "silver" : "bronze",
+    division: team.division ?? undefined,
+    stadium: team.stadium ?? undefined,
+    logoUrl: team.logo_url ?? undefined,
+    slug: team.slug,
+    claim_status: team.claim_status ?? undefined,
+    claimed_at: team.claimed_at,
+    claim_expires_at: team.claim_expires_at,
+    claimed_by: team.claimed_by,
+    website: team.website,
+    contact_email: team.contact_email,
+    open_roster_spots: team.open_roster_spots,
+    recruiting_active: team.recruiting_active
+  };
+}
+
+async function getLiveTeam(teamId: string) {
+  const localTeam = getTeamByIdOrSlug(teamId);
+  if (localTeam) return localTeam;
+
+  const supabase = createSupabaseServiceRoleClient();
+  const { data } = await supabase
+    .from("teams")
+    .select("id, name, slug, league_id, region_id, city, country, division, stadium, logo_url, tier, claim_status, claimed_at, claim_expires_at, claimed_by, website, contact_email, open_roster_spots, recruiting_active")
+    .or(`id.eq.${teamId},slug.eq.${teamId}`)
+    .maybeSingle<DbTeamRow>();
+
+  return data ? dbTeamToTeam(data) : null;
+}
+
 export async function generateMetadata({ params }: TeamDetailsPageProps): Promise<Metadata> {
   const { teamId } = await params;
-  const team = getTeamByIdOrSlug(teamId);
+  const team = await getLiveTeam(teamId);
 
   if (!team) {
     return {
@@ -37,7 +98,7 @@ export function generateStaticParams() {
 
 export default async function TeamDetailsPage({ params }: TeamDetailsPageProps) {
   const { teamId } = await params;
-  const team = getTeamByIdOrSlug(teamId);
+  const team = await getLiveTeam(teamId);
 
   if (!team) {
     notFound();
@@ -46,7 +107,7 @@ export default async function TeamDetailsPage({ params }: TeamDetailsPageProps) 
   const league = leagues.find((item) => item.id === team.leagueId);
 
   // Fetch live DB fields (claim status, recruiting, roster spots)
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceRoleClient();
   const { data: dbTeam } = await supabase
     .from("teams")
     .select("claim_status, recruiting_active, open_roster_spots, website, contact_email, claimed_by")

@@ -5,16 +5,9 @@ import { restoreAdminRoleAction } from "@/app/actions/profile";
 import { requireOnboardedProfile, roleLabel, isReservedAdminEmail } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "Dashboard | EuroScout Pro",
-  description: "Your EuroScout Pro dashboard."
+  title: "Settings | EuroScout Pro",
+  description: "EuroScout Pro account settings."
 };
-
-const actions = [
-  { href: "/account", label: "View account", detail: "Review your public profile and role details." },
-  { href: "/account/edit", label: "Edit profile", detail: "Update your profile, role fields and visibility." },
-  { href: "/profiles", label: "Browse profiles", detail: "Find players, scouts, coaches and team admins." },
-  { href: "/messages", label: "Messages", detail: "Read conversations and keep connections moving." }
-];
 
 interface DashboardPageProps {
   searchParams: Promise<{
@@ -22,58 +15,119 @@ interface DashboardPageProps {
   }>;
 }
 
+function initials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function SettingsRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between border-b border-white/10 py-4 last:border-b-0">
+      <span className="text-sm font-bold text-white/40">{label}</span>
+      <span className="text-right text-sm font-black text-white">{value}</span>
+    </div>
+  );
+}
+
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const { profile, user } = await requireOnboardedProfile();
   const { error } = await searchParams;
   const adminRoleDrifted = isReservedAdminEmail(user.email) && profile.role !== "admin";
-  const dashboardActions =
-    profile.role === "admin"
-      ? [
-          { href: "/admin", label: "Admin dashboard", detail: "Review users, profiles, players and message activity." },
-          { href: "/onboarding?preview=1", label: "Preview onboarding", detail: "Open the onboarding experience without leaving your admin account." },
-          ...actions
-        ]
-      : actions;
 
   return (
-    <main className="app-surface">
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-3xl glass-card p-6 sm:p-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.24em] text-red-600">Dashboard</p>
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 dark:text-white">Welcome, {profile.display_name}.</h1>
-              <p className="mt-3 text-base font-semibold text-slate-600 dark:text-slate-300">{roleLabel(profile.role)} profile active</p>
-              {error ? <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">{error}</p> : null}
+    <main className="min-h-screen bg-[#090909] text-white">
+      <section className="border-b border-white/10 bg-[#101010]">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-5">
+            <div
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-xl font-black"
+              style={profile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.12), rgba(0,0,0,.55)), url(${profile.avatar_url})` } : undefined}
+            >
+              {profile.avatar_url ? "" : initials(profile.display_name)}
             </div>
-            <form action={signOutAction}>
-              <button className="h-11 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 px-5 text-sm font-black text-slate-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:border-red-400/40 dark:hover:bg-red-500/10 dark:hover:text-red-300">Sign out</button>
-            </form>
+            <div>
+              <p className="text-sm font-black uppercase text-red-500">Settings</p>
+              <h1 className="mt-1 text-3xl font-black leading-none">{profile.display_name}</h1>
+            </div>
           </div>
+          <Link href="/account" className="inline-flex h-11 items-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
+            Back to account
+          </Link>
+        </div>
+      </section>
+
+      <section className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
+        <div className="space-y-6">
+          {error ? <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm font-bold text-red-200">{error}</p> : null}
 
           {adminRoleDrifted ? (
-            <form action={restoreAdminRoleAction} className="mt-6">
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 dark:border-amber-400/40 dark:bg-amber-500/10">
+            <form action={restoreAdminRoleAction} className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-black text-amber-900 dark:text-amber-200">Admin role overwritten during QA testing.</p>
-                  <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">Your account was detected as a super admin but is currently set to <span className="uppercase">{profile.role}</span>.</p>
+                  <p className="text-sm font-black text-amber-200">Admin role overwritten during QA testing.</p>
+                  <p className="mt-1 text-xs font-semibold text-amber-300">This account is currently set to {profile.role}.</p>
                 </div>
-                <button type="submit" className="shrink-0 rounded-2xl bg-amber-600 px-5 py-2.5 text-sm font-black text-white transition hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400">
+                <button className="h-10 rounded-lg bg-amber-500 px-4 text-sm font-black text-white transition hover:bg-amber-400">
                   Restore admin role
                 </button>
               </div>
             </form>
           ) : null}
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            {dashboardActions.map((item) => (
-              <Link key={item.href} href={item.href} className="rounded-3xl border border-white/70 bg-white/75 p-5 shadow-sm backdrop-blur-xl transition hover:border-red-200 hover:shadow-md dark:border-white/10 dark:bg-white/10 dark:hover:border-red-400/40">
-                <p className="text-lg font-black text-slate-950 dark:text-white">{item.label}</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.detail}</p>
+          <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-6">
+            <p className="text-sm font-black uppercase text-red-500">Account Settings</p>
+            <div className="mt-5 rounded-lg border border-white/10 bg-black/20 px-5">
+              <SettingsRow label="Email" value={user.email ?? "Not available"} />
+              <SettingsRow label="Role" value={roleLabel(profile.role)} />
+              <SettingsRow label="Visibility" value={profile.is_public ? "Public" : "Private"} />
+              <SettingsRow label="Onboarding" value={profile.onboarding_complete ? "Complete" : "Incomplete"} />
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-6">
+            <p className="text-sm font-black uppercase text-red-500">Account Actions</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <Link href="/account" className="flex h-12 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
+                Edit profile details
               </Link>
-            ))}
-          </div>
+              <Link href="/messages" className="flex h-12 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
+                Messages
+              </Link>
+              {profile.role === "club" ? (
+                <>
+                  <Link href="/account" className="flex h-12 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
+                    Club claim tools
+                  </Link>
+                  <Link href="/watchlists" className="flex h-12 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
+                    Watchlists
+                  </Link>
+                </>
+              ) : null}
+              {profile.role === "admin" ? (
+                <Link href="/admin" className="flex h-12 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
+                  Admin control room
+                </Link>
+              ) : null}
+            </div>
+          </section>
         </div>
+
+        <aside className="space-y-6">
+          <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-6">
+            <p className="text-sm font-black uppercase text-red-500">Session</p>
+            <p className="mt-4 text-sm leading-6 text-white/55">Use account for profile edits and media. Use settings for security, session, and role-level account actions.</p>
+            <form action={signOutAction} className="mt-5">
+              <button className="h-11 w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 text-sm font-black text-red-200 transition hover:bg-red-600 hover:text-white">
+                Sign out
+              </button>
+            </form>
+          </section>
+        </aside>
       </section>
     </main>
   );

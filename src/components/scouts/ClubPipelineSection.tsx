@@ -32,10 +32,10 @@ export default function ClubPipelineSection({ teamId, isOwner, pipelineNamesPubl
   return (
     <section className="space-y-5">
       <div className="flex items-center justify-between gap-4">
-        <p className="eyebrow-red">Recruitment Pipeline</p>
+        <p className="text-sm font-black uppercase text-red-500">Recruitment Pipeline</p>
         {!pipelineNamesPublic && (
-          <span className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500 dark:bg-white/10 dark:text-slate-400">
-            🔒 Names hidden
+          <span className="rounded px-3 py-1 text-xs font-black uppercase text-white/30">
+            Owner View
           </span>
         )}
       </div>
@@ -48,18 +48,22 @@ export default function ClubPipelineSection({ teamId, isOwner, pipelineNamesPubl
         {PIPELINE_STAGES.map(({ key, label }) => (
           <div
             key={key}
-            className="rounded-2xl border border-slate-200 bg-white p-3 text-center dark:border-white/10 dark:bg-white/5"
+            className={`rounded-lg border p-4 text-center ${
+              key === "reached_out"
+                ? "border-red-500/35 bg-red-500/10"
+                : "border-white/10 bg-[#1a1a1a]"
+            }`}
           >
-            <p className="text-2xl font-black text-slate-950 dark:text-white">{stageCounts[key]}</p>
-            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</p>
+            <p className={`text-[11px] font-black uppercase ${key === "reached_out" ? "text-red-500" : "text-white/35"}`}>{label}</p>
+            <p className="mt-2 text-3xl font-black text-white">{stageCounts[key]}</p>
           </div>
         ))}
       </div>
 
       {pipelineNamesPublic ? (
         /* Names-public view: show full Kanban — stub until club_pipeline_items exists */
-        <div className="rounded-2xl border border-slate-200 bg-white/60 p-5 text-center dark:border-white/10 dark:bg-white/5">
-          <p className="text-sm font-bold text-slate-400">
+        <div className="rounded-lg border border-white/10 bg-[#111] p-5 text-center">
+          <p className="text-sm font-bold text-white/35">
             Pipeline details will appear here once players are added to your roster.
           </p>
         </div>
@@ -67,24 +71,24 @@ export default function ClubPipelineSection({ teamId, isOwner, pipelineNamesPubl
         /* Privacy mode: signing stats + lock notice */
         <>
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/5">
-              <p className="text-2xl font-black text-slate-950 dark:text-white">{totalSigned}</p>
+            <div className="rounded-lg border border-white/10 bg-[#111] p-5 text-center">
+              <p className="text-xs font-black uppercase text-white/35">Total Signed</p>
+              <p className="mt-2 text-3xl font-black text-white">{totalSigned}</p>
               {/* TODO: Total Signed — count from club_pipeline_items WHERE stage = 'signed' */}
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Total Signed</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/5">
+            <div className="rounded-lg border border-white/10 bg-[#111] p-5 text-center">
+              <p className="text-xs font-black uppercase text-white/35">Int&apos;l Recruits</p>
               {/* TODO: International Recruits — future field on club_pipeline_items */}
-              <p className="text-2xl font-black text-slate-950 dark:text-white">0</p>
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Int&apos;l Recruits</p>
+              <p className="mt-2 text-3xl font-black text-white">0</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/5">
+            <div className="rounded-lg border border-white/10 bg-[#111] p-5 text-center">
+              <p className="text-xs font-black uppercase text-white/35">From Pipeline</p>
               {/* TODO: University Pipeline — future field on club_pipeline_items */}
-              <p className="text-2xl font-black text-slate-950 dark:text-white">0</p>
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Univ. Pipeline</p>
+              <p className="mt-2 text-3xl font-black text-white">0</p>
             </div>
           </div>
-          <p className="text-center text-xs font-bold text-slate-400">
-            🔒 Player names are not publicly visible
+          <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm font-semibold text-white/35">
+            Player names are not publicly visible. Only club staff can see candidate identities.
           </p>
         </>
       )}

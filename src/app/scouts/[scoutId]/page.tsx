@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Profile } from "@/lib/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { getLeagueByIdOrSlug } from "@/lib/data";
 import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMediaSection";
 import ContactClubButton from "@/components/scouts/ContactClubButton";
 import ClubPipelineSection from "@/components/scouts/ClubPipelineSection";
@@ -23,6 +24,9 @@ interface ClubTeam {
   name: string;
   city: string | null;
   country: string | null;
+  league_id: string | null;
+  stadium: string | null;
+  tier: number | null;
   claim_status: string | null;
   recruiting_active: boolean | null;
   open_roster_spots: number | null;
@@ -39,6 +43,12 @@ interface ClubMemberRow {
   profiles: Profile;
 }
 
+interface StaffMemberRow {
+  profile_id: string;
+  club_role: string;
+  profiles: Profile;
+}
+
 function initials(name: string) {
   return name
     .trim()
@@ -51,10 +61,11 @@ function initials(name: string) {
 
 export default async function ClubProfilePage({ params }: ClubProfilePageProps) {
   const { scoutId } = await params;
-  const supabase = await createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceRoleClient();
   const {
     data: { user }
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   // Fetch the club owner member row
   const { data: member } = await supabase
@@ -65,7 +76,7 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
         club_role,
         team_id,
         teams!team_id (
-          id, name, city, country, claim_status,
+          id, name, city, country, league_id, stadium, tier, claim_status,
           recruiting_active, open_roster_spots, website,
           contact_email, pipeline_names_public
         ),
@@ -132,175 +143,202 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
   const allMedia = (media ?? []) as ClubMediaRow[];
   const photos = allMedia.filter((m) => m.media_type === "photo");
   const video = allMedia.find((m) => m.media_type === "video") ?? null;
+  const { data: staffRows } = teamId
+    ? await supabase
+        .from("club_members")
+        .select(
+          `
+            profile_id,
+            club_role,
+            profiles!profile_id (
+              id, role, display_name, headline, bio, location,
+              avatar_url, is_public, onboarding_complete, created_at, updated_at
+            )
+          `
+        )
+        .eq("team_id", teamId)
+        .order("joined_at", { ascending: true })
+        .returns<StaffMemberRow[]>()
+    : { data: [] as StaffMemberRow[] };
 
   const isVerified = team?.claim_status === "verified";
   const pipelineNamesPublic = team?.pipeline_names_public ?? false;
   const isAuthenticated = Boolean(user);
   const canContact = isAuthenticated && !isMember;
+  const staff = staffRows ?? [];
+  const league = team?.league_id ? getLeagueByIdOrSlug(team.league_id) : null;
+  const leagueLabel = league?.shortName ?? league?.name ?? "League";
+  const teamName = team?.name ?? resolvedProfile.display_name;
+  const location = [team?.city, team?.country].filter(Boolean).join(", ");
+  const profileText =
+    resolvedProfile.bio ??
+    resolvedProfile.headline ??
+    `${teamName} is setting up its EuroScout club profile. Recruiting information, staff details, media, and contact preferences will appear here as the club completes its profile.`;
+  const openSpots = team?.open_roster_spots ?? 0;
 
   return (
-    <main className="app-surface">
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <article className="overflow-hidden rounded-[2rem] border border-red-100 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-slate-950 dark:shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
+    <main className="min-h-screen bg-[#090909] text-white">
+      <section className="border-b border-white/10 bg-[#101010]">
+        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+          <Link
+            href="/scouts"
+            className="inline-flex h-11 items-center rounded-lg border border-white/10 bg-white/[0.02] px-4 text-sm font-semibold text-white/30 transition hover:border-red-500/50 hover:text-white"
+          >
+            ← Back to clubs
+          </Link>
+        </div>
+      </section>
 
-          {/* Header */}
-          <header className="relative overflow-hidden bg-[radial-gradient(circle_at_8%_10%,rgba(239,68,68,.16),transparent_26rem),linear-gradient(135deg,#ffffff_0%,#fff7f7_42%,#fee2e2_100%)] px-5 py-6 dark:bg-[radial-gradient(circle_at_8%_10%,rgba(239,68,68,.28),transparent_26rem),linear-gradient(135deg,#020617_0%,#0f172a_48%,#2a0f14_100%)] sm:px-8 lg:px-10">
-            <div className="absolute inset-0 opacity-45 [background-image:linear-gradient(135deg,rgba(220,38,38,.08)_1px,transparent_1px)] [background-size:30px_30px] dark:opacity-30" />
-            <div className="relative">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <Link
-                  href="/scouts"
-                  className="inline-flex w-fit items-center rounded-full border border-red-100 bg-white/80 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-red-700 shadow-sm backdrop-blur-xl transition hover:bg-red-50 dark:border-white/10 dark:bg-white/10 dark:text-red-200 dark:hover:bg-red-500/10"
-                >
-                  Back to clubs
-                </Link>
-                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-red-600/20">
-                  <span className="h-2 w-2 rounded-full bg-white" />
-                  {isVerified ? "Verified Club" : "Club"}
+      <article>
+        <header className="border-b border-white/10 bg-[#120807]">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+              <div>
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                  <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] text-5xl font-black text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+                    {initials(teamName)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded border border-indigo-400/60 bg-indigo-500/15 px-3 py-1 text-xs font-bold uppercase text-indigo-200">
+                        Club
+                      </span>
+                      <span className="rounded border border-green-500/50 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase text-green-400">
+                        <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-green-400 align-middle" />
+                        {isVerified ? "Verified" : "Pending"}
+                      </span>
+                      <span className="rounded border border-blue-500/60 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase text-blue-300">
+                        {leagueLabel} {team?.tier ? `- Tier ${team.tier}` : ""}
+                      </span>
+                    </div>
+                    <h1 className="mt-4 text-5xl font-black leading-none text-white sm:text-6xl">{teamName}</h1>
+                    {location && <p className="mt-3 text-lg font-bold text-white/45">{location}</p>}
+                  </div>
+                </div>
+
+                <div className="mt-9 flex flex-wrap gap-3">
+                  {[
+                    ["Region", team?.country ?? "Europe"],
+                    ["Type", league?.tier ?? "Club"],
+                    ["Market", league?.marketTier ?? "—"],
+                    ["Pipeline", pipelineNamesPublic ? "Public" : "Open"]
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-h-9 rounded border border-white/20 bg-black/20 px-4 py-2 text-sm">
+                      <span className="mr-1.5 uppercase text-white/35">{label}</span>
+                      <span className="font-bold capitalize text-white/75">{value}</span>
+                    </div>
+                  ))}
+                  <span className="min-h-9 px-2 py-2 text-sm font-black uppercase text-red-500">
+                    {resolvedProfile.is_public ? "Public Profile" : "Private Profile"}
+                  </span>
                 </div>
               </div>
 
-              <div className="mt-8 grid gap-8 sm:mt-14 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
-                <div className="flex flex-col gap-7 sm:flex-row sm:items-end">
-                  <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] bg-slate-950 text-4xl font-black tracking-tight text-white shadow-2xl shadow-red-100 ring-4 ring-red-500 dark:shadow-red-950/40 sm:h-44 sm:w-44 sm:rounded-[2rem] sm:text-6xl">
-                    <span className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(239,68,68,.35),transparent_48%)]" />
-                    <span className="relative">{initials(resolvedProfile.display_name)}</span>
+              <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/15 bg-[#1a1a1a]">
+                {([
+                  ["League", leagueLabel],
+                  ["Founded", "—"],
+                  ["Open Spots", String(openSpots || "—")],
+                  ["Staff", String(staff.length || "—")]
+                ] as [string, string][]).map(([label, value], index) => (
+                  <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-white/10" : ""} ${index < 2 ? "border-b border-white/10" : ""}`}>
+                    <p className="text-xs font-bold uppercase text-white/35">{label}</p>
+                    <p className={`mt-2 text-2xl font-black ${label === "Open Spots" ? "text-green-400" : "text-white"}`}>{value}</p>
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap gap-3">
-                      <span className="rounded-full border border-red-200 bg-white/80 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-red-700 shadow-sm backdrop-blur-xl dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
-                        Club
-                      </span>
-                      {team && (
-                        <span className="rounded-full border border-slate-200 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-slate-800 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/10 dark:text-slate-100">
-                          {[team.city, team.country].filter(Boolean).join(", ")}
-                        </span>
-                      )}
-                    </div>
-                    <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:mt-5 sm:text-5xl lg:text-7xl">
-                      {team?.name ?? resolvedProfile.display_name}
-                    </h1>
-                    {resolvedProfile.headline && (
-                      <p className="mt-5 max-w-3xl text-lg font-semibold leading-8 text-slate-600 dark:text-slate-300">
-                        {resolvedProfile.headline}
-                      </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-8">
+          <div className="space-y-8 lg:border-r lg:border-white/10 lg:pr-10">
+            {teamId && (
+              <ClubMediaSection
+                scoutId={scoutId}
+                teamId={teamId}
+                media={allMedia}
+                isMember={isMember}
+              />
+            )}
+
+            {teamId && (
+              <ClubPipelineSection
+                teamId={teamId}
+                isOwner={isOwner}
+                pipelineNamesPublic={pipelineNamesPublic}
+              />
+            )}
+
+            <section>
+              <p className="text-sm font-black uppercase text-red-500">Club Profile</p>
+              <div className="mt-5 flex gap-8 border-b border-white/10 text-sm font-black uppercase">
+                {["About", "Roster", "History", "News"].map((tab, index) => (
+                  <span key={tab} className={`pb-4 ${index === 0 ? "border-b-2 border-red-500 text-red-500" : "text-white/35"}`}>
+                    {tab}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-6 rounded-lg border border-white/15 bg-[#1a1a1a] p-7">
+                <p className="text-lg font-semibold leading-8 text-white/65">{profileText}</p>
+                <div className="mt-7 space-y-0 border-t border-white/10 text-sm">
+                  <div className="flex items-center justify-between border-b border-white/10 py-3">
+                    <span className="text-white/35">Stadium</span>
+                    <span className="font-bold text-white">{team?.stadium ?? "—"}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/10 py-3">
+                    <span className="text-white/35">Website</span>
+                    {team?.website ? (
+                      <a href={team.website} target="_blank" rel="noopener noreferrer" className="font-bold text-blue-400 hover:text-blue-300">
+                        {team.website.replace(/^https?:\/\//, "")}
+                      </a>
+                    ) : (
+                      <span className="font-bold text-white">—</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-white/35">Contact</span>
+                    {team?.contact_email ? (
+                      <a href={`mailto:${team.contact_email}`} className="font-bold text-blue-400 hover:text-blue-300">
+                        {team.contact_email}
+                      </a>
+                    ) : (
+                      <span className="font-bold text-white">—</span>
                     )}
                   </div>
                 </div>
-
-                <div className="rounded-[1.75rem] border border-white/70 bg-white/72 p-4 shadow-xl backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
-                  <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-slate-200/70 dark:bg-white/10">
-                    {([
-                      ["Status", isVerified ? "Verified" : "Unverified"],
-                      ["Location", [team?.city, team?.country].filter(Boolean).join(", ") || "—"],
-                      ["Recruiting", team?.recruiting_active ? "Active" : "Inactive"],
-                      ["Open Spots", String(team?.open_roster_spots ?? "—")]
-                    ] as [string, string][]).map(([label, val]) => (
-                      <div key={label} className="bg-white/88 p-4 dark:bg-slate-950/70">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
-                        <p className="mt-2 text-xl font-black text-slate-950 dark:text-white">{val}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
-            </div>
-          </header>
+            </section>
 
-          {/* Status strip */}
-          <div className="border-y border-red-100 bg-white/70 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 sm:px-8 lg:px-10">
-            <div className="flex flex-wrap gap-2">
-              {team?.recruiting_active && (
-                <span className="rounded-full bg-green-50 px-3 py-1.5 text-xs font-black text-green-700 dark:bg-green-500/15 dark:text-green-300">
-                  Actively recruiting
-                </span>
-              )}
-              {team?.open_roster_spots != null && team.open_roster_spots > 0 && (
-                <span className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-black text-red-700 dark:bg-red-500/15 dark:text-red-300">
-                  {team.open_roster_spots} open spot{team.open_roster_spots !== 1 ? "s" : ""}
-                </span>
-              )}
-              {team?.website && (
-                <a
-                  href={team.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
-                >
-                  Website ↗
-                </a>
-              )}
-              {isVerified && (
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                  ✓ Verified
-                </span>
-              )}
-            </div>
           </div>
 
-          {/* Body */}
-          <div className="grid gap-8 bg-slate-50/80 p-5 dark:bg-slate-950/70 sm:p-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:p-10">
-
-            {/* Main column */}
-            <div className="space-y-10">
-
-              {/* Bio */}
-              <section className="border-l-4 border-red-600 pl-6">
-                <p className="eyebrow-red">About</p>
-                <p className="mt-5 max-w-4xl text-2xl font-black leading-snug tracking-tight text-slate-950 dark:text-white">
-                  {resolvedProfile.bio ??
-                    "This club is setting up its EuroScout profile. Check back soon for more detail on their recruiting focus, pipeline, and contact preferences."}
-                </p>
-              </section>
-
-              {teamId && (
-                <ClubMediaSection
-                  scoutId={scoutId}
-                  teamId={teamId}
-                  media={allMedia}
-                  isMember={isMember}
-                />
-              )}
-
-              {teamId && (
-                <ClubPipelineSection
-                  teamId={teamId}
-                  isOwner={isOwner}
-                  pipelineNamesPublic={pipelineNamesPublic}
-                />
-              )}
-            </div>
-
-            {/* Sidebar */}
-            <aside className="space-y-5">
-
-              {/* Contact CTA */}
-              <section className="rounded-[1.75rem] border border-white/70 bg-white/78 p-6 shadow-xl shadow-slate-950/10 backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
-                <p className="eyebrow-red mb-4">Contact</p>
+          <aside className="space-y-6">
+            <section className="rounded-lg border border-red-500/25 bg-[#1a1a1a] p-7">
+              <p className="mb-5 text-sm font-black uppercase text-red-500">Contact Club</p>
                 {canContact && teamId ? (
                   <ContactClubButton
                     scoutId={scoutId}
                     teamId={teamId}
-                    teamName={team?.name ?? "Club"}
+                    teamName={teamName}
                   />
                 ) : isOwner ? (
                   <Link
                     href="/account/edit"
-                    className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-red-600 px-5 text-sm font-black uppercase tracking-[0.16em] text-white shadow-sm transition hover:bg-red-700"
+                    className="inline-flex h-14 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Edit profile
                   </Link>
                 ) : isMember && !isOwner ? (
                   <Link
                     href="/messages"
-                    className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-red-600 px-5 text-sm font-black uppercase tracking-[0.16em] text-white transition hover:bg-red-700"
+                    className="inline-flex h-14 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Club inbox
                   </Link>
                 ) : (
                   <Link
                     href={`/auth/sign-in?return_url=/scouts/${scoutId}`}
-                    className="inline-flex h-16 w-full items-center justify-center rounded-2xl bg-red-600 px-5 text-sm font-black uppercase tracking-[0.16em] text-white shadow-lg shadow-red-600/25 transition hover:bg-red-700"
+                    className="inline-flex h-16 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Sign in to message
                   </Link>
@@ -309,48 +347,67 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
                 {isAuthenticated && (
                   <Link
                     href="/messages"
-                    className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white/70 px-5 text-sm font-black uppercase tracking-[0.14em] text-slate-800 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:border-red-400/40 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                    className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-5 text-sm font-black uppercase text-white/50 transition hover:border-red-500/40 hover:text-white"
                   >
                     Messages
                   </Link>
                 )}
               </section>
 
-              {/* Recruiting Status */}
               {team && (
-                <section className="rounded-[1.75rem] border border-white/70 bg-white/78 p-6 shadow-xl shadow-slate-950/10 backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
-                  <p className="eyebrow-red">Recruiting</p>
-                  <div className="mt-5 flex items-center gap-3 text-lg font-black text-slate-950 dark:text-white">
+                <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+                  <p className="text-sm font-black uppercase text-red-500">Recruiting Status</p>
+                  <div className="mt-5 flex items-center gap-3 text-lg font-black text-white">
                     <span
-                      className={`h-3 w-3 rounded-full shadow-[0_0_0_6px_rgba(16,185,129,0.12)] ${
+                      className={`h-3 w-3 rounded-full ${
                         team.recruiting_active ? "bg-emerald-500" : "bg-slate-300"
                       }`}
                     />
                     {team.recruiting_active ? "Actively recruiting" : "Not currently recruiting"}
                   </div>
-                  {team.open_roster_spots != null && team.open_roster_spots > 0 && (
-                    <div className="mt-4 border-t border-slate-200 pt-4 dark:border-white/10">
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Open spots</p>
-                      <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">
-                        {team.open_roster_spots}
-                      </p>
-                    </div>
-                  )}
-                  {team.contact_email && (
-                    <div className="mt-4 border-t border-slate-200 pt-4 dark:border-white/10">
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Contact email</p>
-                      <a
-                        href={`mailto:${team.contact_email}`}
-                        className="mt-2 block text-sm font-bold text-red-600 hover:underline dark:text-red-400"
-                      >
-                        {team.contact_email}
-                      </a>
-                    </div>
-                  )}
                 </section>
               )}
 
-              {/* Profile Health */}
+              <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+                <p className="text-sm font-black uppercase text-red-500">Open Roster Spots</p>
+                <div className="mt-5 space-y-3">
+                  {(openSpots > 0 ? Array.from({ length: openSpots }) : [null]).map((_, index) => (
+                    <div key={index} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-b-0 last:pb-0">
+                      <span className="font-bold text-white">{openSpots > 0 ? `Roster Spot ${index + 1}` : "No open spots listed"}</span>
+                      <span className={`rounded border px-3 py-1 text-xs font-bold ${openSpots > 0 ? "border-green-500/60 text-green-400" : "border-white/15 text-white/25"}`}>
+                        {openSpots > 0 ? "Open" : "Filled"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+                <p className="text-sm font-black uppercase text-red-500">Staff Directory</p>
+                <div className="mt-5 divide-y divide-white/10">
+                  {staff.length ? (
+                    staff.map((staffMember) => (
+                      <div key={staffMember.profile_id} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-black text-white/50">
+                            {initials(staffMember.profiles.display_name)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-black text-white">{staffMember.profiles.display_name}</p>
+                            <p className="text-sm capitalize text-white/35">{staffMember.profiles.headline ?? staffMember.club_role.replace("_", " ")}</p>
+                          </div>
+                        </div>
+                        <span className="rounded border border-white/20 px-3 py-1 text-xs font-bold uppercase text-white/45">
+                          {staffMember.club_role}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="rounded-lg border border-white/10 bg-white/[0.03] p-5 text-sm font-semibold text-white/40">No staff members listed yet.</p>
+                  )}
+                </div>
+              </section>
+
               <ClubProfileHealthCard
                 hasBio={Boolean(resolvedProfile.bio)}
                 hasWebsite={Boolean(team?.website)}
@@ -362,7 +419,7 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
               {isOwner && (
                 <Link
                   href="/account/edit"
-                  className="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white/70 px-5 text-sm font-black uppercase tracking-[0.14em] text-slate-800 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:border-red-400/40 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                  className="inline-flex h-12 w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-5 text-sm font-black uppercase text-white/50 transition hover:border-red-500/40 hover:text-white"
                 >
                   Edit profile
                 </Link>
@@ -370,7 +427,6 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
             </aside>
           </div>
         </article>
-      </section>
     </main>
   );
 }

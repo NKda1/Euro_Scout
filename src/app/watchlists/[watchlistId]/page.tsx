@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { requireOnboardedProfile } from "@/lib/auth";
-import { removeFromWatchlistAction, updateWatchlistItemNotesAction, exportWatchlistCsvAction } from "@/app/actions/watchlist";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { removeFromWatchlistAction, updateWatchlistItemNotesAction } from "@/app/actions/watchlist";
 
 export const metadata: Metadata = {
   title: "Watchlist | EuroScout Pro",
@@ -40,23 +41,37 @@ interface ItemRow extends WatchlistItem {
 export default async function WatchlistDetailPage({ params, searchParams }: WatchlistDetailPageProps) {
   const { watchlistId } = await params;
   const { error } = await searchParams;
-  const { supabase, profile } = await requireOnboardedProfile();
+  const { profile } = await requireOnboardedProfile();
 
   if (profile.role !== "club" && profile.role !== "admin") {
     redirect("/dashboard?error=Only club accounts can access watchlists.");
   }
 
-  let watchlistQuery = supabase
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { data: membership } = profile.role === "club"
+    ? await serviceClient
+        .from("club_members")
+        .select("team_id")
+        .eq("profile_id", profile.id)
+        .limit(1)
+        .maybeSingle<{ team_id: string }>()
+    : { data: null };
+
+  if (profile.role === "club" && !membership?.team_id) {
+    redirect("/account?error=Claim or create a club before using watchlists.");
+  }
+
+  let watchlistQuery = serviceClient
     .from("watchlists")
     .select("id, name, is_shared, team_id")
     .eq("id", watchlistId);
-  // Admin can view any watchlist; other roles are scoped to their own
-  if (profile.role !== "admin") watchlistQuery = watchlistQuery.eq("user_id", profile.id);
+  // Admin can view any watchlist; club users are scoped to their connected club.
+  if (profile.role !== "admin") watchlistQuery = watchlistQuery.eq("team_id", membership?.team_id ?? "");
   const { data: watchlist } = await watchlistQuery.maybeSingle<{ id: string; name: string; is_shared: boolean; team_id: string | null }>();
 
   if (!watchlist) notFound();
 
-  const { data: items } = await supabase
+  const { data: items } = await serviceClient
     .from("watchlist_items")
     .select(
       `id, notes, added_at, player_id,

@@ -20,6 +20,12 @@ const filmTabs = [
 ];
 
 function hudlEmbedUrl(url: string) {
+  const youtube = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  if (youtube) return `https://www.youtube.com/embed/${youtube[1]}`;
+
+  const vimeo = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+
   return url;
 }
 

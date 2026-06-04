@@ -15,6 +15,7 @@ interface ClubMediaSectionProps {
   teamId: string;
   media: ClubMediaRow[];
   isMember: boolean;
+  returnTo?: string;
 }
 
 function getVideoEmbedUrl(url: string, provider: string | null): string | null {
@@ -29,7 +30,7 @@ function getVideoEmbedUrl(url: string, provider: string | null): string | null {
   return null;
 }
 
-export default function ClubMediaSection({ scoutId, teamId, media, isMember }: ClubMediaSectionProps) {
+export default function ClubMediaSection({ scoutId, teamId, media, isMember, returnTo }: ClubMediaSectionProps) {
   const video = media.find((m) => m.media_type === "video") ?? null;
   const photos = media.filter((m) => m.media_type === "photo").sort((a, b) => a.display_order - b.display_order);
   const embedUrl = video ? getVideoEmbedUrl(video.url, video.provider) : null;
@@ -38,15 +39,12 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember }: C
   if (isEmpty && !isMember) return null;
 
   return (
-    <section className="space-y-6">
-      <p className="eyebrow-red">Club Media</p>
+    <section className="space-y-5">
+      <p className="text-sm font-black uppercase text-red-500">Club Media</p>
 
-      {/* ── Team Video ─────────────────────────────────────────────────────── */}
       <div>
-        <p className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-400">Team Video</p>
-
         {video ? (
-          <div className="relative overflow-hidden rounded-2xl bg-slate-950">
+          <div className="relative overflow-hidden rounded-lg border border-white/15 bg-[#1a1a1a]">
             {embedUrl ? (
               <div className="aspect-video">
                 <iframe
@@ -62,17 +60,18 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember }: C
                 href={video.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex aspect-video items-center justify-center"
+                className="flex min-h-28 items-center gap-5 px-8 py-7"
               >
-                <span className="font-bold text-white">Watch video ↗</span>
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-xl text-white">▶</span>
+                <span className="font-bold text-white">Watch team video</span>
               </a>
             )}
 
             {(video.label || video.provider) && (
-              <div className="flex items-center gap-3 bg-slate-950/90 px-4 py-3">
-                {video.label && <p className="flex-1 text-sm font-bold text-white">{video.label}</p>}
+              <div className="flex items-center gap-3 bg-[#1a1a1a] px-5 py-4">
+                {video.label && <p className="flex-1 text-base font-black text-white">{video.label}</p>}
                 {video.provider && (
-                  <span className="shrink-0 rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                  <span className="shrink-0 rounded border border-white/15 px-3 py-1 text-xs font-bold uppercase text-white/35">
                     {video.provider}
                   </span>
                 )}
@@ -84,6 +83,7 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember }: C
                 <input type="hidden" name="media_id" value={video.id} />
                 <input type="hidden" name="team_id" value={teamId} />
                 <input type="hidden" name="scout_id" value={scoutId} />
+                {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
                 <button
                   type="submit"
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-950/70 text-white backdrop-blur-sm transition hover:bg-red-600"
@@ -95,54 +95,49 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember }: C
             )}
           </div>
         ) : isMember ? (
-          /* TODO: Replace URL-based input with Supabase Storage upload when file upload infrastructure is enabled */
           <form
             action={saveClubVideoAction}
-            className="space-y-3 rounded-2xl border-2 border-dashed border-slate-300 p-5 dark:border-white/15"
+            className="space-y-3 rounded-lg border border-dashed border-white/20 bg-[#1a1a1a] p-5"
           >
             <input type="hidden" name="team_id" value={teamId} />
             <input type="hidden" name="scout_id" value={scoutId} />
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Add team video</p>
+            {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
+            <p className="text-xs font-black uppercase text-white/35">Add team video</p>
             <input
               type="url"
               name="url"
               required
               placeholder="YouTube or Vimeo URL"
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:placeholder-slate-500"
+              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white placeholder-white/25 focus:border-red-500 focus:outline-none"
             />
             <input
               type="text"
               name="label"
               placeholder="Label (optional, e.g. 2025 Season Highlights)"
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-red-400 focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white dark:placeholder-slate-500"
+              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white placeholder-white/25 focus:border-red-500 focus:outline-none"
             />
             <button
               type="submit"
-              className="rounded-xl bg-red-600 px-4 py-2 text-xs font-black uppercase tracking-wide text-white transition hover:bg-red-700"
+              className="rounded-lg bg-red-600 px-4 py-2 text-xs font-black uppercase text-white transition hover:bg-red-700"
             >
               Save video
             </button>
           </form>
         ) : (
-          <div className="flex aspect-video items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">
-            <p className="text-sm font-bold text-slate-400">No team video yet</p>
+          <div className="flex min-h-28 items-center justify-center rounded-lg border border-dashed border-white/15 bg-[#1a1a1a]">
+            <p className="text-sm font-bold text-white/35">No team video yet</p>
           </div>
         )}
       </div>
 
-      {/* ── Photos (3 slots) ───────────────────────────────────────────────── */}
       <div>
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Photos</p>
-          <span className="text-xs font-bold text-slate-400">{photos.length} / 3</span>
-        </div>
         <div className="grid grid-cols-3 gap-3">
           {[0, 1, 2].map((slot) => {
             const photo = photos[slot];
 
             if (photo) {
               return (
-                <div key={photo.id} className="relative aspect-[4/3] overflow-hidden rounded-xl">
+                <div key={photo.id} className="relative aspect-[4/3] overflow-hidden rounded-lg border border-white/15">
                   {/* Next.js <Image> not used intentionally — external URL origin is unknown at build time */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={photo.url} alt={`Club photo ${slot + 1}`} className="h-full w-full object-cover" />
@@ -151,6 +146,7 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember }: C
                       <input type="hidden" name="media_id" value={photo.id} />
                       <input type="hidden" name="team_id" value={teamId} />
                       <input type="hidden" name="scout_id" value={scoutId} />
+                      {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
                       <button
                         type="submit"
                         className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-950/70 text-xs text-white backdrop-blur-sm transition hover:bg-red-600"
@@ -166,26 +162,26 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember }: C
 
             if (isMember) {
               return (
-                /* TODO: Replace URL-based input with Supabase Storage upload when file upload infrastructure is enabled */
                 <form
                   key={`slot-${slot}`}
                   action={saveClubPhotoAction}
-                  className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 p-3 dark:border-white/15"
+                  className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 bg-[#1a1a1a] p-3"
                 >
                   <input type="hidden" name="team_id" value={teamId} />
                   <input type="hidden" name="scout_id" value={scoutId} />
                   <input type="hidden" name="display_order" value={slot} />
-                  <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Photo {slot + 1}</p>
+                  {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
+                  <p className="text-[10px] font-black uppercase text-white/35">Photo {slot + 1}</p>
                   <input
-                    type="url"
-                    name="url"
+                    type="file"
+                    name="photo"
                     required
-                    placeholder="Image URL"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 placeholder-slate-400 focus:border-red-400 focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="w-full rounded border border-white/10 bg-black/30 px-2 py-1 text-[10px] text-white file:mr-2 file:rounded file:border-0 file:bg-red-600 file:px-2 file:py-1 file:text-[10px] file:font-black file:text-white focus:border-red-500 focus:outline-none"
                   />
                   <button
                     type="submit"
-                    className="rounded-lg bg-red-600 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-red-700"
+                    className="rounded bg-red-600 px-3 py-1 text-[10px] font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Add
                   </button>
@@ -196,9 +192,9 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember }: C
             return (
               <div
                 key={`empty-${slot}`}
-                className="flex aspect-[4/3] items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5"
+                className="flex aspect-[4/3] items-end rounded-lg border border-dashed border-white/15 bg-[#1a1a1a] p-4"
               >
-                <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Photo {slot + 1}</p>
+                <p className="text-xs font-black uppercase text-white/35">Photo {slot + 1}</p>
               </div>
             );
           })}

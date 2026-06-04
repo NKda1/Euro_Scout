@@ -62,8 +62,8 @@ export default function MobileMenu({ isSignedIn, isAdmin }: MobileMenuProps) {
                   </Link>
                 )}
                 <div className="mt-1 border-t border-slate-100 pt-2 dark:border-white/10">
-                  <Link href={routes.dashboard} onClick={close} className="block rounded-xl bg-red-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-red-700">
-                    Dashboard
+                  <Link href={routes.account} onClick={close} className="block rounded-xl bg-red-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-red-700">
+                    Account
                   </Link>
                 </div>
               </>

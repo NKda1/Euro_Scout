@@ -18,7 +18,7 @@ export async function saveFilmLinkAction(formData: FormData) {
   const { data: playerProfile } = await supabase.from("player_profiles").select("id").eq("profile_id", profile.id).maybeSingle<{ id: string }>();
 
   if (!playerProfile) {
-    redirect("/account/edit?error=Create your player profile before adding film.");
+    redirect("/account?error=Create your player profile before adding film.");
   }
 
   const id = text(formData, "film_id");
@@ -28,7 +28,7 @@ export async function saveFilmLinkAction(formData: FormData) {
   const isDefault = formData.get("is_default") === "on";
 
   if (!url) {
-    redirect("/account/edit?error=Film URL is required.");
+    redirect("/account?error=Film URL is required.");
   }
 
   if (isDefault) {
@@ -50,13 +50,13 @@ export async function saveFilmLinkAction(formData: FormData) {
     : await supabase.from("film_links").insert(payload);
 
   if (error) {
-    redirect(`/account/edit?error=${encodeURIComponent(error.message)}`);
+    redirect(`/account?error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath("/account");
   revalidatePath("/account/edit");
   revalidatePath(`/players/${profile.id}`);
-  redirect("/account/edit");
+  redirect("/account?notice=Film link saved.");
 }
 
 export async function deleteFilmLinkAction(formData: FormData) {
@@ -64,11 +64,12 @@ export async function deleteFilmLinkAction(formData: FormData) {
   const id = text(formData, "film_id");
 
   if (!profile || profile.role !== "player" || !id) {
-    redirect("/account/edit");
+    redirect("/account");
   }
 
   await supabase.from("film_links").delete().eq("id", id);
+  revalidatePath("/account");
   revalidatePath("/account/edit");
   revalidatePath(`/players/${profile.id}`);
-  redirect("/account/edit");
+  redirect("/account?notice=Film link removed.");
 }

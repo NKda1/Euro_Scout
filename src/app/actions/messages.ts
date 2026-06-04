@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthenticatedProfile } from "@/lib/auth";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 // ─── Input constraints ────────────────────────────────────────────────────────
 const MAX_SUBJECT_LENGTH = 200;
@@ -12,12 +13,30 @@ function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
+async function requireConnectedClubForClubUser(profileId: string, role: string) {
+  if (role !== "club") return;
+
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { data: membership } = await serviceClient
+    .from("club_members")
+    .select("team_id")
+    .eq("profile_id", profileId)
+    .limit(1)
+    .maybeSingle<{ team_id: string }>();
+
+  if (!membership?.team_id) {
+    redirect("/account?error=Claim or create a club before messaging players.");
+  }
+}
+
 export async function startConversationAction(formData: FormData) {
   const { supabase, profile } = await getAuthenticatedProfile();
 
   if (!profile?.onboarding_complete) {
     redirect("/onboarding");
   }
+
+  await requireConnectedClubForClubUser(profile.id, profile.role);
 
   const targetProfileId = text(formData, "target_profile_id");
   const teamId = text(formData, "team_id") || null;
@@ -88,6 +107,8 @@ export async function sendMessageAction(formData: FormData) {
   if (!profile?.onboarding_complete) {
     redirect("/onboarding");
   }
+
+  await requireConnectedClubForClubUser(profile.id, profile.role);
 
   const conversationId = text(formData, "conversation_id");
   const body = text(formData, "body").slice(0, MAX_BODY_LENGTH);

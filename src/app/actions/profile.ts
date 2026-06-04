@@ -38,25 +38,29 @@ function requireAllowedRole(role: UserRole, email?: string | null, redirectPath 
 async function upsertPlayerProfile(supabase: Awaited<ReturnType<typeof getAuthenticatedUser>>["supabase"], userId: string, formData: FormData) {
   const displayName = requiredText(formData, "display_name");
   const name = splitName(displayName);
+  const payload: Record<string, unknown> = {
+    profile_id: userId,
+    first_name: text(formData, "first_name") ?? name.firstName,
+    last_name: text(formData, "last_name") ?? name.lastName,
+    dob: text(formData, "dob") || null,
+    nationality: text(formData, "nationality"),
+    languages: text(formData, "languages")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [],
+    passport_ready: text(formData, "passport_ready") === "on" ? true : text(formData, "passport_ready") === "" && formData.has("passport_ready") ? false : null,
+    position: text(formData, "position"),
+    height_cm: numberOrNull(formData, "height_cm"),
+    weight_kg: numberOrNull(formData, "weight_kg"),
+    current_team_id: text(formData, "current_team_id"),
+    pipeline_type: text(formData, "pipeline_type"),
+    available_for_transfer: boolValue(formData, "available_for_transfer"),
+    updated_at: new Date().toISOString()
+  };
+
+  if (formData.has("photo_urls")) {
+    payload.photo_urls = text(formData, "photo_urls")?.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 5) ?? [];
+  }
 
   await supabase.from("player_profiles").upsert(
-    {
-      profile_id: userId,
-      first_name: text(formData, "first_name") ?? name.firstName,
-      last_name: text(formData, "last_name") ?? name.lastName,
-      dob: text(formData, "dob") || null,
-      nationality: text(formData, "nationality"),
-      languages: text(formData, "languages")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [],
-      passport_ready: text(formData, "passport_ready") === "on" ? true : text(formData, "passport_ready") === "" && formData.has("passport_ready") ? false : null,
-      position: text(formData, "position"),
-      height_cm: numberOrNull(formData, "height_cm"),
-      weight_kg: numberOrNull(formData, "weight_kg"),
-      current_team_id: text(formData, "current_team_id"),
-      pipeline_type: text(formData, "pipeline_type"),
-      available_for_transfer: boolValue(formData, "available_for_transfer"),
-      photo_urls: text(formData, "photo_urls")?.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 5) ?? [],
-      updated_at: new Date().toISOString()
-    },
+    payload,
     { onConflict: "profile_id" }
   );
 }
@@ -115,8 +119,9 @@ export async function completeOnboardingAction(formData: FormData) {
     if (teamId && clubAction === "claim") {
       const now = new Date().toISOString();
       const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+      const serviceClient = createSupabaseServiceRoleClient();
 
-      await supabase
+      const { data: teamClaim, error: claimError } = await serviceClient
         .from("teams")
         .update({
           claim_status: "pending",
@@ -125,14 +130,28 @@ export async function completeOnboardingAction(formData: FormData) {
           claimed_by: user.id
         })
         .eq("id", teamId)
-        .in("claim_status", ["unclaimed", null]);
+        .or("claim_status.is.null,claim_status.eq.unclaimed")
+        .select("id")
+        .maybeSingle<{ id: string }>();
 
-      await supabase.from("club_members").insert({
+      if (claimError) {
+        redirect(`/onboarding?error=${encodeURIComponent(claimError.message)}`);
+      }
+
+      if (!teamClaim) {
+        redirect("/onboarding?error=That club is already claimed or unavailable for claiming.");
+      }
+
+      const { error: memberError } = await serviceClient.from("club_members").insert({
         team_id: teamId,
         profile_id: user.id,
         club_role: "owner",
         joined_at: now
       });
+
+      if (memberError) {
+        redirect(`/onboarding?error=${encodeURIComponent(memberError.message)}`);
+      }
     } else if (teamId && clubAction === "join") {
       await supabase.from("club_members").insert({
         team_id: teamId,
@@ -141,19 +160,16 @@ export async function completeOnboardingAction(formData: FormData) {
         joined_at: new Date().toISOString()
       });
     } else if (teamNameRequest) {
-      // Record team addition request as a dispute for admin review
-      await supabase.from("club_disputes").insert({
-        team_id: "pending-review",
-        raised_by: user.id,
-        reason: `New team addition request: ${teamNameRequest}`,
-        status: "open"
-      });
+      revalidatePath("/account");
+      redirect(`/account?notice=${encodeURIComponent(`Account created. Add ${teamNameRequest} from the club creation form to create its unverified profile.`)}`);
     }
   }
 
   revalidatePath("/account");
   revalidatePath("/dashboard");
-  redirect("/dashboard");
+  revalidatePath("/scouts");
+  revalidatePath(`/scouts/${user.id}`);
+  redirect("/account");
 }
 
 export async function updateAccountAction(formData: FormData) {
@@ -170,11 +186,11 @@ export async function updateAccountAction(formData: FormData) {
   const roleValue = isCurrentlyAdmin ? "admin" : requiredText(formData, "role");
 
   if (!isCurrentlyAdmin && !isUserRole(roleValue)) {
-    redirect("/account/edit?error=Choose a valid role.");
+    redirect("/account?error=Choose a valid role.");
   }
 
   if (!isCurrentlyAdmin) {
-    requireAllowedRole(roleValue as UserRole, user.email, "/account/edit");
+    requireAllowedRole(roleValue as UserRole, user.email, "/account");
   }
 
   const { error } = await supabase
@@ -192,7 +208,7 @@ export async function updateAccountAction(formData: FormData) {
     .eq("id", user.id);
 
   if (error) {
-    redirect(`/account/edit?error=${encodeURIComponent(error.message)}`);
+    redirect(`/account?error=${encodeURIComponent(error.message)}`);
   }
 
   if (roleValue === "player") {
@@ -223,4 +239,3 @@ export async function restoreAdminRoleAction() {
   revalidatePath("/admin");
   redirect("/dashboard");
 }
-

@@ -2,12 +2,67 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import LeagueHeader from "@/components/leagues/LeagueHeader";
 import TeamGrid from "@/components/teams/TeamGrid";
-import { getLeagueByIdOrSlug, getTeamsForLeague, leagues, regions } from "@/lib/data";
+import { getLeagueByIdOrSlug, getTeamsForLeague, leagues, regions, type MarketTier } from "@/lib/data";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import type { Team } from "@/types";
 
 interface LeagueDetailsPageProps {
   params: Promise<{
     leagueId: string;
   }>;
+}
+
+interface DbTeamRow {
+  id: string;
+  name: string;
+  slug: string;
+  league_id: string;
+  region_id: string;
+  city: string;
+  country: string;
+  division: string | null;
+  stadium: string | null;
+  logo_url: string | null;
+  tier: number | null;
+  claim_status: Team["claim_status"] | null;
+  claimed_at: string | null;
+  claim_expires_at: string | null;
+  claimed_by: string | null;
+  website: string | null;
+  contact_email: string | null;
+  open_roster_spots: number | null;
+  recruiting_active: boolean | null;
+}
+
+function tierToMarketTier(tier: number | null): MarketTier {
+  if (tier === 1) return "gold";
+  if (tier === 2) return "silver";
+  return "bronze";
+}
+
+function dbTeamToTeam(team: DbTeamRow): Team {
+  return {
+    id: team.id,
+    name: team.name,
+    city: team.city,
+    country: team.country,
+    countryFlag: "",
+    leagueId: team.league_id,
+    regionId: team.region_id,
+    marketTier: tierToMarketTier(team.tier),
+    division: team.division ?? undefined,
+    stadium: team.stadium ?? undefined,
+    logoUrl: team.logo_url ?? undefined,
+    slug: team.slug,
+    claim_status: team.claim_status ?? undefined,
+    claimed_at: team.claimed_at,
+    claim_expires_at: team.claim_expires_at,
+    claimed_by: team.claimed_by,
+    website: team.website,
+    contact_email: team.contact_email,
+    open_roster_spots: team.open_roster_spots,
+    recruiting_active: team.recruiting_active
+  };
 }
 
 export async function generateMetadata({ params }: LeagueDetailsPageProps): Promise<Metadata> {
@@ -40,7 +95,16 @@ export default async function LeagueDetailsPage({ params }: LeagueDetailsPagePro
     notFound();
   }
 
-  const leagueTeams = getTeamsForLeague(league.id);
+  const supabase = createSupabaseServiceRoleClient();
+  const { data: dbTeams } = await supabase
+    .from("teams")
+    .select("id, name, slug, league_id, region_id, city, country, division, stadium, logo_url, tier, claim_status, claimed_at, claim_expires_at, claimed_by, website, contact_email, open_roster_spots, recruiting_active")
+    .eq("league_id", league.id)
+    .returns<DbTeamRow[]>();
+
+  const leagueTeams = Array.from(
+    new Map([...getTeamsForLeague(league.id), ...(dbTeams ?? []).map(dbTeamToTeam)].map((team) => [team.id, team])).values()
+  );
   const leagueRegions = regions.filter((region) => league.regionIds.includes(region.id));
 
   return (

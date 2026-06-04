@@ -18,7 +18,7 @@ export default function HeroSection() {
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase text-red-300">European Football Intelligence</p>
             <h1 className="mt-4 text-3xl font-semibold leading-[1.08] text-white sm:mt-5 sm:text-5xl lg:text-6xl">
-              Explore Europe's football market from the map first.
+              Explore Europe&apos;s football market from the map first.
             </h1>
             <p className="mt-4 max-w-2xl text-sm font-normal leading-6 text-slate-200 sm:mt-5 sm:text-base sm:leading-7 sm:text-lg">
               EuroScout Pro puts countries, leagues, teams and player discovery into one command view so scouts can move from market signal to profile detail quickly.
