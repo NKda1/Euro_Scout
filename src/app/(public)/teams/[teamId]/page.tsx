@@ -185,7 +185,7 @@ export default async function TeamDetailsPage({ params }: TeamDetailsPageProps) 
               </div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Club representative</p>
-                <Link href={`/scouts/${owner.id}`} className="text-sm font-black text-slate-950 transition hover:text-red-700 dark:text-white dark:hover:text-red-300">
+                <Link href={`/scouts/${team.id}`} className="text-sm font-black text-slate-950 transition hover:text-red-700 dark:text-white dark:hover:text-red-300">
                   {owner.display_name}
                 </Link>
                 {owner.headline && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{owner.headline}</p>}

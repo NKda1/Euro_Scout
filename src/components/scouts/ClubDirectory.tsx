@@ -32,7 +32,7 @@ export default function ClubDirectory({ clubs }: { clubs: ClubDirectoryItem[] })
       {clubs.map((club) => (
         <Link
           key={club.team_id}
-          href={`/scouts/${club.profile_id}`}
+          href={`/scouts/${club.team_id}`}
           className="rounded-3xl glass-card p-5 transition hover:-translate-y-0.5 hover:border-red-200 hover:shadow-lg dark:hover:border-red-400/40"
         >
           <div className="flex items-start justify-between gap-2">

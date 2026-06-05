@@ -13,6 +13,7 @@ interface ClaimedTeamRow {
   name: string;
   city: string | null;
   country: string | null;
+  logo_url: string | null;
   claim_status: string | null;
   recruiting_active: boolean | null;
   claimed_by: string | null;
@@ -30,7 +31,7 @@ export default async function ClubDirectoryPage() {
 
   const { data: teams, error } = await supabase
     .from("teams")
-    .select("id, name, city, country, claim_status, recruiting_active, claimed_by")
+    .select("id, name, city, country, logo_url, claim_status, recruiting_active, claimed_by")
     .in("claim_status", ["pending", "verified"])
     .order("updated_at", { ascending: false })
     .returns<ClaimedTeamRow[]>();
@@ -110,10 +111,10 @@ export default async function ClubDirectoryPage() {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {clubs.map(({ team, profile, profileId }) => (
+            {clubs.map(({ team, profile }) => (
               <Link
                 key={team.id}
-                href={profileId ? `/scouts/${profileId}` : `/teams/${team.id}`}
+                href={`/scouts/${team.id}`}
                 className="rounded-3xl glass-card p-5 transition hover:-translate-y-0.5 hover:border-red-200 hover:shadow-lg dark:hover:border-red-400/40"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -126,7 +127,15 @@ export default async function ClubDirectoryPage() {
                     </span>
                   )}
                 </div>
-                <h2 className="mt-3 text-2xl font-black text-slate-950 dark:text-white">{team.name}</h2>
+                <div className="mt-4 flex items-center gap-3">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-950 bg-cover bg-center text-sm font-black text-white ring-4 ring-red-100 dark:ring-red-500/20"
+                    style={team.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.58)), url(${team.logo_url})` } : undefined}
+                  >
+                    {team.logo_url ? "" : team.name.split(" ").slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
+                  </div>
+                  <h2 className="min-w-0 text-2xl font-black text-slate-950 dark:text-white">{team.name}</h2>
+                </div>
                 {(team.city || team.country) && (
                   <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
                     {[team.city, team.country].filter(Boolean).join(", ")}

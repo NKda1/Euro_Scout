@@ -5,16 +5,17 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { getAuthenticatedProfile } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import type { ClubRole } from "@/types";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
 const MAX_MEDIA_IMAGE_BYTES = 7 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-import type { ClubRole } from "@/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function requireClubOwner(supabase: Awaited<ReturnType<typeof getAuthenticatedProfile>>["supabase"], profileId: string, teamId: string) {
-  const { data, error } = await supabase
+async function requireClubOwner(_supabase: Awaited<ReturnType<typeof getAuthenticatedProfile>>["supabase"], profileId: string, teamId: string) {
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { data, error } = await serviceClient
     .from("club_members")
     .select("club_role")
     .eq("team_id", teamId)
@@ -29,6 +30,27 @@ async function requireClubOwner(supabase: Awaited<ReturnType<typeof getAuthentic
 function formText(formData: FormData, key: string, maxLength = 500) {
   const value = String(formData.get(key) ?? "").trim();
   return value ? value.slice(0, maxLength) : null;
+}
+
+function formNumber(formData: FormData, key: string, options: { min?: number; max?: number; integer?: boolean } = {}) {
+  const raw = String(formData.get(key) ?? "").trim();
+  if (!raw) return null;
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+
+  const normalized = options.integer ? Math.trunc(parsed) : parsed;
+  const min = options.min ?? normalized;
+  const max = options.max ?? normalized;
+  return Math.min(max, Math.max(min, normalized));
+}
+
+function formList(formData: FormData, key: string, maxItems = 12) {
+  return String(formData.get(key) ?? "")
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, maxItems);
 }
 
 function slugify(value: string) {
@@ -169,7 +191,7 @@ export async function claimTeamAction(teamId: string) {
   revalidatePath("/dashboard");
   revalidatePath("/scouts");
   revalidatePath("/watchlists");
-  revalidatePath(`/scouts/${profile.id}`);
+  revalidatePath(`/scouts/${teamId}`);
   redirect("/account?notice=Club claimed. Your public club profile and club shortlist are ready.");
 }
 
@@ -253,7 +275,7 @@ export async function requestNewTeamFromAccountAction(formData: FormData) {
   revalidatePath("/scouts");
   revalidatePath("/teams");
   revalidatePath("/watchlists");
-  revalidatePath(`/scouts/${profile.id}`);
+  revalidatePath(`/scouts/${team.id}`);
   redirect("/account?notice=Club created. Your public club profile and club shortlist are ready.");
 }
 
@@ -272,6 +294,7 @@ export async function updateClubProfileFromAccountAction(formData: FormData) {
 
   const openRosterSpotsRaw = formText(formData, "open_roster_spots", 10);
   const openRosterSpots = openRosterSpotsRaw ? Math.max(0, Number(openRosterSpotsRaw)) : 0;
+  const leaguePosition = formNumber(formData, "league_position", { min: 1, integer: true });
   const serviceClient = createSupabaseServiceRoleClient();
   const { error } = await serviceClient
     .from("teams")
@@ -283,6 +306,12 @@ export async function updateClubProfileFromAccountAction(formData: FormData) {
       website: formText(formData, "website", 240),
       contact_email: formText(formData, "contact_email", 240),
       open_roster_spots: Number.isFinite(openRosterSpots) ? openRosterSpots : 0,
+      roster_needs: formList(formData, "roster_needs"),
+      pass_run_percentage: formNumber(formData, "pass_run_percentage", { min: 0, max: 100 }),
+      passing_yards: formNumber(formData, "passing_yards", { min: 0, integer: true }),
+      rushing_yards: formNumber(formData, "rushing_yards", { min: 0, integer: true }),
+      touchdowns_scored: formNumber(formData, "touchdowns_scored", { min: 0, integer: true }),
+      league_position: leaguePosition,
       recruiting_active: formData.get("recruiting_active") === "on",
       pipeline_names_public: formData.get("pipeline_names_public") === "on",
       updated_at: new Date().toISOString()
@@ -295,7 +324,7 @@ export async function updateClubProfileFromAccountAction(formData: FormData) {
 
   revalidatePath("/account");
   revalidatePath("/scouts");
-  revalidatePath(`/scouts/${profile.id}`);
+  revalidatePath(`/scouts/${teamId}`);
   revalidatePath(`/teams/${teamId}`);
   redirect("/account?notice=Club profile saved.");
 }
@@ -323,7 +352,7 @@ export async function inviteMemberAction(teamId: string, inviteeProfileId: strin
     redirect(`/dashboard?error=${encodeURIComponent(error.message)}`);
   }
 
-  revalidatePath(`/scouts/${profile.id}`);
+  revalidatePath(`/scouts/${teamId}`);
 }
 
 // ─── Remove a member ──────────────────────────────────────────────────────────
@@ -347,7 +376,7 @@ export async function removeMemberAction(teamId: string, memberProfileId: string
     redirect(`/dashboard?error=${encodeURIComponent(error.message)}`);
   }
 
-  revalidatePath(`/scouts/${profile.id}`);
+  revalidatePath(`/scouts/${teamId}`);
 }
 
 // ─── Raise a dispute ──────────────────────────────────────────────────────────
@@ -403,7 +432,7 @@ export async function updateClubProfileAction(
     redirect(`/dashboard?error=${encodeURIComponent(error.message)}`);
   }
 
-  revalidatePath(`/scouts/${profile.id}`);
+  revalidatePath(`/scouts/${teamId}`);
   revalidatePath(`/teams/${teamId}`);
 }
 
@@ -454,6 +483,263 @@ function validateImage(file: File, redirectPath: string) {
   if (file.size > MAX_MEDIA_IMAGE_BYTES) {
     redirect(`${redirectPath}?error=Club images must be 7MB or smaller.`);
   }
+}
+
+async function uploadTeamImage(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedProfile>>["supabase"],
+  profileId: string,
+  teamId: string,
+  file: File,
+  folder: "club-logo" | "club-photo",
+  redirectPath: string
+) {
+  validateImage(file, redirectPath);
+  const extension = safeFileName(file.name).split(".").pop() || "jpg";
+  const path = `${profileId}/club-${teamId}/${folder}-${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const { error: uploadError } = await supabase.storage.from(PROFILE_MEDIA_BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    contentType: file.type,
+    upsert: false
+  });
+
+  if (uploadError) {
+    redirect(`${redirectPath}?error=${encodeURIComponent(uploadError.message)}`);
+  }
+
+  const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// ─── Club Logo ────────────────────────────────────────────────────────────────
+
+export async function uploadClubLogoAction(formData: FormData) {
+  const { supabase, profile } = await getAuthenticatedProfile();
+  if (!profile) redirect("/auth/sign-in");
+
+  const teamId = String(formData.get("team_id") ?? "").trim();
+  const logo = fileValue(formData, "logo");
+
+  if (!teamId || !logo) {
+    redirect("/account?error=Choose a club logo to upload.");
+  }
+
+  await requireClubOwner(supabase, profile.id, teamId);
+  const publicUrl = await uploadTeamImage(supabase, profile.id, teamId, logo, "club-logo", "/account");
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { error } = await serviceClient
+    .from("teams")
+    .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
+    .eq("id", teamId);
+
+  if (error) {
+    redirect(`/account?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/account");
+  revalidatePath("/scouts");
+  revalidatePath(`/scouts/${teamId}`);
+  revalidatePath(`/teams/${teamId}`);
+  redirect("/account?notice=Club logo updated.");
+}
+
+// ─── Account Staff Management ────────────────────────────────────────────────
+
+export async function inviteStaffFromAccountAction(formData: FormData) {
+  const { supabase, profile } = await getAuthenticatedProfile();
+  if (!profile) redirect("/auth/sign-in");
+
+  const teamId = formText(formData, "team_id", 120);
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const clubRole = (formText(formData, "club_role", 30) ?? "recruiter") as ClubRole;
+
+  if (!teamId || !email) {
+    redirect("/account?error=Staff email and club are required.");
+  }
+
+  if (!["coach", "recruiter", "analyst"].includes(clubRole)) {
+    redirect("/account?error=Choose coach, recruiter or analyst for invited staff.");
+  }
+
+  await requireClubOwner(supabase, profile.id, teamId);
+  const serviceClient = createSupabaseServiceRoleClient();
+
+  const { count } = await serviceClient
+    .from("club_members")
+    .select("id", { count: "exact", head: true })
+    .eq("team_id", teamId)
+    .neq("club_role", "owner");
+
+  if ((count ?? 0) >= 3) {
+    redirect("/account?error=You can invite up to 3 staff members for this club.");
+  }
+
+  const { data: inviteeUser } = await serviceClient
+    .from("users")
+    .select("id, email")
+    .ilike("email", email)
+    .limit(1)
+    .maybeSingle<{ id: string; email: string }>();
+
+  if (!inviteeUser) {
+    redirect("/account?error=That user does not exist yet. Ask them to create an account first.");
+  }
+
+  if (inviteeUser.id === profile.id) {
+    redirect("/account?error=You are already this club owner.");
+  }
+
+  const { data: inviteeProfile } = await serviceClient
+    .from("profiles")
+    .select("id, role")
+    .eq("id", inviteeUser.id)
+    .maybeSingle<{ id: string; role: string }>();
+
+  if (!inviteeProfile) {
+    redirect("/account?error=That user has not completed their EuroScout profile yet.");
+  }
+
+  if (inviteeProfile.role === "player") {
+    redirect("/account?error=Player profiles cannot be added as club staff from this panel.");
+  }
+
+  const { data: existing } = await serviceClient
+    .from("club_members")
+    .select("id")
+    .eq("team_id", teamId)
+    .eq("profile_id", inviteeUser.id)
+    .maybeSingle<{ id: string }>();
+
+  const payload = {
+    team_id: teamId,
+    profile_id: inviteeUser.id,
+    club_role: clubRole,
+    invited_by: profile.id,
+    joined_at: new Date().toISOString()
+  };
+
+  const { error } = existing
+    ? await serviceClient.from("club_members").update(payload).eq("id", existing.id)
+    : await serviceClient.from("club_members").insert(payload);
+
+  if (error) {
+    redirect(`/account?error=${encodeURIComponent(error.message)}`);
+  }
+
+  await serviceClient
+    .from("profiles")
+    .update({ role: "club", onboarding_complete: true, updated_at: new Date().toISOString() })
+    .eq("id", inviteeUser.id)
+    .neq("role", "admin");
+
+  revalidatePath("/account");
+  revalidatePath(`/scouts/${teamId}`);
+  redirect("/account?notice=Staff member added.");
+}
+
+export async function removeStaffFromAccountAction(formData: FormData) {
+  const { supabase, profile } = await getAuthenticatedProfile();
+  if (!profile) redirect("/auth/sign-in");
+
+  const teamId = formText(formData, "team_id", 120);
+  const memberProfileId = formText(formData, "profile_id", 120);
+
+  if (!teamId || !memberProfileId) {
+    redirect("/account?error=Missing staff member.");
+  }
+
+  await requireClubOwner(supabase, profile.id, teamId);
+
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { data: member } = await serviceClient
+    .from("club_members")
+    .select("club_role")
+    .eq("team_id", teamId)
+    .eq("profile_id", memberProfileId)
+    .maybeSingle<{ club_role: string }>();
+
+  if (member?.club_role === "owner") {
+    redirect("/account?error=Transfer ownership before removing the current owner.");
+  }
+
+  const { error } = await serviceClient
+    .from("club_members")
+    .delete()
+    .eq("team_id", teamId)
+    .eq("profile_id", memberProfileId);
+
+  if (error) {
+    redirect(`/account?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/account");
+  revalidatePath(`/scouts/${teamId}`);
+  redirect("/account?notice=Staff member removed.");
+}
+
+export async function transferOwnerFromAccountAction(formData: FormData) {
+  const { supabase, profile } = await getAuthenticatedProfile();
+  if (!profile) redirect("/auth/sign-in");
+
+  const teamId = formText(formData, "team_id", 120);
+  const newOwnerProfileId = formText(formData, "new_owner_profile_id", 120);
+
+  if (!teamId || !newOwnerProfileId) {
+    redirect("/account?error=Choose a staff member to receive ownership.");
+  }
+
+  if (newOwnerProfileId === profile.id) {
+    redirect("/account?error=You are already the club owner.");
+  }
+
+  await requireClubOwner(supabase, profile.id, teamId);
+  const serviceClient = createSupabaseServiceRoleClient();
+
+  const { data: newOwner } = await serviceClient
+    .from("club_members")
+    .select("id, club_role")
+    .eq("team_id", teamId)
+    .eq("profile_id", newOwnerProfileId)
+    .maybeSingle<{ id: string; club_role: string }>();
+
+  if (!newOwner) {
+    redirect("/account?error=Ownership can only transfer to an existing staff member.");
+  }
+
+  const now = new Date().toISOString();
+  const { error: demoteError } = await serviceClient
+    .from("club_members")
+    .update({ club_role: "coach" })
+    .eq("team_id", teamId)
+    .eq("profile_id", profile.id)
+    .eq("club_role", "owner");
+
+  if (demoteError) {
+    redirect(`/account?error=${encodeURIComponent(demoteError.message)}`);
+  }
+
+  const { error: promoteError } = await serviceClient
+    .from("club_members")
+    .update({ club_role: "owner", joined_at: now })
+    .eq("id", newOwner.id);
+
+  if (promoteError) {
+    await serviceClient
+      .from("club_members")
+      .update({ club_role: "owner" })
+      .eq("team_id", teamId)
+      .eq("profile_id", profile.id);
+    redirect(`/account?error=${encodeURIComponent(promoteError.message)}`);
+  }
+
+  await serviceClient
+    .from("teams")
+    .update({ claimed_by: newOwnerProfileId, updated_at: now })
+    .eq("id", teamId);
+
+  revalidatePath("/account");
+  revalidatePath("/scouts");
+  revalidatePath(`/scouts/${teamId}`);
+  redirect("/account?notice=Club ownership transferred.");
 }
 
 // ─── Club Media ───────────────────────────────────────────────────────────────
@@ -605,8 +891,8 @@ export async function togglePipelinePrivacyAction(teamId: string, isPublic: bool
     .eq("id", teamId);
 
   if (error) {
-    redirect(`/scouts/${profile.id}?error=${encodeURIComponent(error.message)}`);
+    redirect(`/scouts/${teamId}?error=${encodeURIComponent(error.message)}`);
   }
 
-  revalidatePath(`/scouts/${profile.id}`);
+  revalidatePath(`/scouts/${teamId}`);
 }

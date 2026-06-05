@@ -9,6 +9,14 @@ export const metadata: Metadata = {
   description: "EuroScout Pro admin overview."
 };
 
+interface SampleClubRow {
+  id: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  claimed_by: string | null;
+}
+
 export default async function AdminDashboardPage() {
   const { supabase } = await requireAdminProfile();
 
@@ -21,8 +29,22 @@ export default async function AdminDashboardPage() {
     supabase.from("film_links").select("id", { count: "exact", head: true }),
     supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(6).returns<Profile[]>(),
     supabase.from("profiles").select("id, display_name, headline, bio").eq("role", "player").limit(1).maybeSingle<Pick<Profile, "id" | "display_name" | "headline" | "bio">>(),
-    supabase.from("profiles").select("id, display_name, headline, bio").eq("role", "club").limit(1).maybeSingle<Pick<Profile, "id" | "display_name" | "headline" | "bio">>()
+    supabase
+      .from("teams")
+      .select("id, name, city, country, claimed_by")
+      .in("claim_status", ["pending", "verified"])
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<SampleClubRow>()
   ]);
+
+  const { data: sampleClubOwner } = sampleClub?.claimed_by
+    ? await supabase
+        .from("profiles")
+        .select("id, display_name, headline, bio")
+        .eq("id", sampleClub.claimed_by)
+        .maybeSingle<Pick<Profile, "id" | "display_name" | "headline" | "bio">>()
+    : { data: null };
 
   const roleCounts = await Promise.all(
     userRoles.map(async (role) => {
@@ -218,9 +240,11 @@ export default async function AdminDashboardPage() {
                   <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Club Profile</p>
                   {sampleClub ? (
                     <>
-                      <p className="mt-1 text-base font-black text-slate-950 dark:text-white">{sampleClub.display_name}</p>
-                      {sampleClub.headline && (
-                        <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400 line-clamp-2">{sampleClub.headline}</p>
+                      <p className="mt-1 text-base font-black text-slate-950 dark:text-white">{sampleClub.name}</p>
+                      {(sampleClub.city || sampleClub.country || sampleClubOwner?.headline) && (
+                        <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400 line-clamp-2">
+                          {sampleClubOwner?.headline ?? [sampleClub.city, sampleClub.country].filter(Boolean).join(", ")}
+                        </p>
                       )}
                     </>
                   ) : (

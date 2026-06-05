@@ -41,7 +41,7 @@ export default function AddToWatchlistButton({ playerProfileId, returnPath, watc
             aria-label="Close"
             tabIndex={-1}
           />
-          <div className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-slate-900">
+          <div className="relative z-20 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-slate-900">
             <p className="border-b border-slate-100 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
               Your watchlists
             </p>

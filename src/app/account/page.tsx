@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { claimTeamFromAccountAction, requestNewTeamFromAccountAction, updateClubProfileFromAccountAction } from "@/app/actions/club";
+import {
+  claimTeamFromAccountAction,
+  inviteStaffFromAccountAction,
+  removeStaffFromAccountAction,
+  requestNewTeamFromAccountAction,
+  transferOwnerFromAccountAction,
+  updateClubProfileFromAccountAction,
+  uploadClubLogoAction
+} from "@/app/actions/club";
 import { uploadAvatarAction } from "@/app/actions/media";
 import { updateAccountAction } from "@/app/actions/profile";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
@@ -35,11 +43,35 @@ interface ClubMembership {
     stadium: string | null;
     website: string | null;
     contact_email: string | null;
+    logo_url: string | null;
     claim_status: string | null;
     recruiting_active: boolean | null;
     open_roster_spots: number | null;
     pipeline_names_public: boolean | null;
+    roster_needs: string[] | null;
+    pass_run_percentage: number | null;
+    passing_yards: number | null;
+    rushing_yards: number | null;
+    touchdowns_scored: number | null;
+    league_position: number | null;
   } | null;
+}
+
+interface StaffMemberRow {
+  profile_id: string;
+  club_role: string;
+  joined_at: string;
+  profiles: {
+    id: string;
+    display_name: string;
+    headline: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
+interface PublicUserRow {
+  id: string;
+  email: string;
 }
 
 interface ClaimableTeam {
@@ -128,10 +160,17 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               stadium,
               website,
               contact_email,
+              logo_url,
               claim_status,
               recruiting_active,
               open_roster_spots,
-              pipeline_names_public
+              pipeline_names_public,
+              roster_needs,
+              pass_run_percentage,
+              passing_yards,
+              rushing_yards,
+              touchdowns_scored,
+              league_position
             )
           `
         )
@@ -151,8 +190,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         .returns<ClaimableTeam[]>()
     : { data: [] as ClaimableTeam[] };
 
-  const publicHref = profile.role === "player" ? `/players/${profile.id}` : profile.role === "club" ? `/scouts/${profile.id}` : `/profiles/${profile.id}`;
   const team = clubMembership?.teams ?? null;
+  const publicHref = profile.role === "player" ? `/players/${profile.id}` : profile.role === "club" && team ? `/scouts/${team.id}` : `/profiles/${profile.id}`;
   const playerPhotoUrls = Array.isArray(roleProfile?.photo_urls) ? roleProfile.photo_urls.slice(0, 5).map((item) => String(item)) : [];
   const { data: clubMedia } = team
     ? await serviceClient
@@ -162,6 +201,39 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         .order("display_order", { ascending: true })
         .returns<ClubMediaRow[]>()
     : { data: [] as ClubMediaRow[] };
+  const { data: staffRows } = team
+    ? await serviceClient
+        .from("club_members")
+        .select(
+          `
+            profile_id,
+            club_role,
+            joined_at,
+            profiles!profile_id (
+              id,
+              display_name,
+              headline,
+              avatar_url
+            )
+          `
+        )
+        .eq("team_id", team.id)
+        .order("joined_at", { ascending: true })
+        .returns<StaffMemberRow[]>()
+    : { data: [] as StaffMemberRow[] };
+  const staffProfileIds = (staffRows ?? []).map((staffMember) => staffMember.profile_id);
+  const { data: staffUsers } = staffProfileIds.length
+    ? await serviceClient
+        .from("users")
+        .select("id, email")
+        .in("id", staffProfileIds)
+        .returns<PublicUserRow[]>()
+    : { data: [] as PublicUserRow[] };
+  const staffEmailById = new Map((staffUsers ?? []).map((userRow) => [userRow.id, userRow.email]));
+  const staff = staffRows ?? [];
+  const isClubOwner = clubMembership?.club_role === "owner";
+  const nonOwnerStaff = staff.filter((staffMember) => staffMember.club_role !== "owner");
+  const availableStaffSlots = Math.max(0, 3 - nonOwnerStaff.length);
 
   return (
     <main className="min-h-screen bg-[#090909] text-white">
@@ -305,6 +377,30 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "club" && team ? (
+            <Panel eyebrow="Club Brand" title="Upload club logo">
+              <div className="grid gap-5 md:grid-cols-[140px_minmax(0,1fr)] md:items-center">
+                <div
+                  className="flex aspect-square items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-4xl font-black"
+                  style={team.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.58)), url(${team.logo_url})` } : undefined}
+                >
+                  {team.logo_url ? "" : initials(team.name)}
+                </div>
+                {isClubOwner ? (
+                  <form action={uploadClubLogoAction} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <input type="hidden" name="team_id" value={team.id} />
+                    <input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required className={fileClass} />
+                    <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
+                      Upload logo
+                    </button>
+                  </form>
+                ) : (
+                  <p className="text-sm font-semibold text-white/45">Only the club owner can update the club logo.</p>
+                )}
+              </div>
+            </Panel>
+          ) : null}
+
+          {profile.role === "club" && team ? (
             <Panel eyebrow="Club Profile" title="Edit public club metrics">
               <form action={updateClubProfileFromAccountAction} className="grid gap-4 md:grid-cols-2">
                 <input type="hidden" name="team_id" value={team.id} />
@@ -329,6 +425,21 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <Field label="Open roster spots">
                   <input name="open_roster_spots" type="number" min="0" defaultValue={team.open_roster_spots ?? 0} className={inputClass} />
                 </Field>
+                <Field label="Pass play percentage">
+                  <input name="pass_run_percentage" type="number" min="0" max="100" step="0.1" defaultValue={team.pass_run_percentage ?? ""} placeholder="64" className={inputClass} />
+                </Field>
+                <Field label="Passing yards">
+                  <input name="passing_yards" type="number" min="0" defaultValue={team.passing_yards ?? ""} placeholder="3120" className={inputClass} />
+                </Field>
+                <Field label="Rushing yards">
+                  <input name="rushing_yards" type="number" min="0" defaultValue={team.rushing_yards ?? ""} placeholder="1840" className={inputClass} />
+                </Field>
+                <Field label="Touchdowns scored">
+                  <input name="touchdowns_scored" type="number" min="0" defaultValue={team.touchdowns_scored ?? ""} placeholder="42" className={inputClass} />
+                </Field>
+                <Field label="League position">
+                  <input name="league_position" type="number" min="1" defaultValue={team.league_position ?? ""} placeholder="3" className={inputClass} />
+                </Field>
                 <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
                   <input name="recruiting_active" type="checkbox" defaultChecked={Boolean(team.recruiting_active)} className="h-4 w-4 rounded border-white/20 text-red-600" />
                   Recruiting active
@@ -337,6 +448,16 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   <input name="pipeline_names_public" type="checkbox" defaultChecked={Boolean(team.pipeline_names_public)} className="h-4 w-4 rounded border-white/20 text-red-600" />
                   Show pipeline names publicly
                 </label>
+                <div className="md:col-span-2">
+                  <Field label="Roster needs">
+                    <textarea
+                      name="roster_needs"
+                      defaultValue={Array.isArray(team.roster_needs) ? team.roster_needs.join("\n") : ""}
+                      placeholder={"Wide Receiver\nOffensive Line\nCornerback"}
+                      className={textareaClass}
+                    />
+                  </Field>
+                </div>
                 <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 md:w-fit">
                   Save club profile
                 </button>
@@ -346,7 +467,87 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           {profile.role === "club" && team ? (
             <Panel eyebrow="Club Media" title="Manage public club media">
-              <ClubMediaSection scoutId={profile.id} teamId={team.id} media={clubMedia ?? []} isMember returnTo="/account" />
+              <ClubMediaSection scoutId={team.id} teamId={team.id} media={clubMedia ?? []} isMember returnTo="/account" />
+            </Panel>
+          ) : null}
+
+          {profile.role === "club" && team ? (
+            <Panel eyebrow="Staff Directory" title="Manage club staff">
+              <div className="space-y-3">
+                {staff.map((staffMember) => {
+                  const staffProfile = staffMember.profiles;
+                  const email = staffEmailById.get(staffMember.profile_id);
+                  const canTransfer = isClubOwner && staffMember.profile_id !== profile.id && staffMember.club_role !== "owner";
+                  const canRemove = isClubOwner && staffMember.club_role !== "owner";
+
+                  return (
+                    <div key={staffMember.profile_id} className="rounded-lg border border-white/10 bg-black/20 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 bg-cover bg-center text-sm font-black text-white/50"
+                            style={staffProfile?.avatar_url ? { backgroundImage: `linear-gradient(180deg, transparent, rgba(0,0,0,.65)), url(${staffProfile.avatar_url})` } : undefined}
+                          >
+                            {staffProfile?.avatar_url ? "" : initials(staffProfile?.display_name ?? "Staff")}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-white">{staffProfile?.display_name ?? email ?? staffMember.profile_id}</p>
+                            <p className="truncate text-xs font-semibold text-white/35">{email ?? staffProfile?.headline ?? "EuroScout staff"}</p>
+                          </div>
+                        </div>
+                        <span className="w-fit rounded border border-white/20 px-3 py-1 text-xs font-bold uppercase text-white/45">
+                          {staffMember.club_role}
+                        </span>
+                      </div>
+
+                      {(canTransfer || canRemove) ? (
+                        <div className="mt-3 flex flex-wrap gap-2 border-t border-white/10 pt-3">
+                          {canTransfer ? (
+                            <form action={transferOwnerFromAccountAction}>
+                              <input type="hidden" name="team_id" value={team.id} />
+                              <input type="hidden" name="new_owner_profile_id" value={staffMember.profile_id} />
+                              <button className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs font-black uppercase text-amber-200 transition hover:bg-amber-500 hover:text-white">
+                                Transfer owner
+                              </button>
+                            </form>
+                          ) : null}
+                          {canRemove ? (
+                            <form action={removeStaffFromAccountAction}>
+                              <input type="hidden" name="team_id" value={team.id} />
+                              <input type="hidden" name="profile_id" value={staffMember.profile_id} />
+                              <button className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-black uppercase text-red-200 transition hover:bg-red-600 hover:text-white">
+                                Remove
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {isClubOwner ? (
+                <form action={inviteStaffFromAccountAction} className="mt-5 grid gap-3 border-t border-white/10 pt-5 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+                  <input type="hidden" name="team_id" value={team.id} />
+                  <input name="email" type="email" required disabled={availableStaffSlots === 0} placeholder="Staff member email" className={inputClass} />
+                  <select name="club_role" defaultValue="recruiter" disabled={availableStaffSlots === 0} className={inputClass}>
+                    <option value="coach">Coach</option>
+                    <option value="recruiter">Recruiter</option>
+                    <option value="analyst">Analyst</option>
+                  </select>
+                  <button disabled={availableStaffSlots === 0} className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25">
+                    Invite staff
+                  </button>
+                  <p className="text-sm font-semibold text-white/35 md:col-span-3">
+                    {availableStaffSlots} staff slot{availableStaffSlots === 1 ? "" : "s"} available.
+                  </p>
+                </form>
+              ) : (
+                <p className="mt-5 rounded-lg border border-white/10 bg-black/20 p-4 text-sm font-semibold text-white/40">
+                  Only the owner can invite staff, remove staff, or transfer ownership.
+                </p>
+              )}
             </Panel>
           ) : null}
         </div>
@@ -371,7 +572,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       </div>
                     ))}
                   </div>
-                  <Link href={`/scouts/${profile.id}`} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
+                  <Link href={`/scouts/${team.id}`} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
                     View club profile
                   </Link>
                 </div>

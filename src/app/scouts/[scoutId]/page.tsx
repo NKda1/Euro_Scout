@@ -26,6 +26,7 @@ interface ClubTeam {
   country: string | null;
   league_id: string | null;
   stadium: string | null;
+  logo_url: string | null;
   tier: number | null;
   claim_status: string | null;
   recruiting_active: boolean | null;
@@ -67,28 +68,38 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
     data: { user }
   } = await authClient.auth.getUser();
 
-  // Fetch the club owner member row
-  const { data: member } = await supabase
-    .from("club_members")
-    .select(
-      `
-        profile_id,
-        club_role,
-        team_id,
-        teams!team_id (
-          id, name, city, country, league_id, stadium, tier, claim_status,
-          recruiting_active, open_roster_spots, website,
-          contact_email, pipeline_names_public
-        ),
-        profiles!profile_id (
-          id, role, display_name, headline, bio, location,
-          avatar_url, is_public, onboarding_complete, created_at, updated_at
-        )
-      `
+  const memberSelect = `
+    profile_id,
+    club_role,
+    team_id,
+    teams!team_id (
+      id, name, city, country, league_id, stadium, tier, claim_status,
+      logo_url, recruiting_active, open_roster_spots, website,
+      contact_email, pipeline_names_public
+    ),
+    profiles!profile_id (
+      id, role, display_name, headline, bio, location,
+      avatar_url, is_public, onboarding_complete, created_at, updated_at
     )
-    .eq("profile_id", scoutId)
+  `;
+
+  const { data: memberByTeam } = await supabase
+    .from("club_members")
+    .select(memberSelect)
+    .eq("team_id", scoutId)
     .eq("club_role", "owner")
     .maybeSingle<ClubMemberRow>();
+
+  const { data: memberByProfile } = !memberByTeam
+    ? await supabase
+        .from("club_members")
+        .select(memberSelect)
+        .eq("profile_id", scoutId)
+        .eq("club_role", "owner")
+        .maybeSingle<ClubMemberRow>()
+    : { data: null };
+
+  const member = memberByTeam ?? memberByProfile;
 
   const { data: profileFallback } = !member
     ? await supabase
@@ -195,8 +206,11 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
               <div>
                 <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                  <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] text-5xl font-black text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-                    {initials(teamName)}
+                  <div
+                    className="flex h-32 w-32 shrink-0 items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-5xl font-black text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+                    style={team?.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,.62)), url(${team.logo_url})` } : undefined}
+                  >
+                    {team?.logo_url ? "" : initials(teamName)}
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap gap-2">
