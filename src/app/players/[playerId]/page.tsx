@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import ProfileSummary from "@/components/profiles/ProfileSummary";
 import type { FilmLink } from "@/components/players/HudlFilmViewer";
 import type { Profile } from "@/lib/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 interface PlayerPageProps {
   params: Promise<{
@@ -44,6 +44,9 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   const {
     data: { user }
   } = await supabase.auth.getUser();
+  const { data: currentProfile } = user
+    ? await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role: string }>()
+    : { data: null };
 
   const { data: player } = await supabase
     .from("player_profiles")
@@ -104,7 +107,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             backHref="/players"
             backLabel="Back to players"
             showEditLink={user?.id === profile.id}
-            showMessageButton={Boolean(user && user.id !== profile.id)}
+            showMessageButton={Boolean(user && currentProfile?.role === "club" && user.id !== profile.id)}
             showMessagesLink={Boolean(user)}
             filmLinks={[]}
           />
@@ -117,7 +120,8 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     redirect(`/profiles/${player.profile_id}`);
   }
 
-  const { data: filmLinks } = await supabase
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { data: filmLinks } = await serviceClient
     .from("film_links")
     .select("id, url, provider, film_type, label, is_default")
     .eq("player_profile_id", player.id)
@@ -134,7 +138,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           backHref="/players"
           backLabel="Back to players"
           showEditLink={user?.id === player.profile_id}
-          showMessageButton={Boolean(user && user.id !== player.profile_id)}
+          showMessageButton={Boolean(user && currentProfile?.role === "club" && user.id !== player.profile_id)}
           showMessagesLink={Boolean(user)}
           filmLinks={filmLinks ?? []}
         />

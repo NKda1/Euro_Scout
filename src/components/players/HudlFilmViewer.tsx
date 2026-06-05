@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { detectVideoProvider, getEmbeddableVideoUrl, getVideoProviderLabel, normalizeVideoUrl } from "@/lib/video";
 
 export interface FilmLink {
   id: string;
@@ -19,16 +20,6 @@ const filmTabs = [
   { value: "training", label: "Training" }
 ];
 
-function hudlEmbedUrl(url: string) {
-  const youtube = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-  if (youtube) return `https://www.youtube.com/embed/${youtube[1]}`;
-
-  const vimeo = url.match(/vimeo\.com\/(\d+)/);
-  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
-
-  return url;
-}
-
 export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] }) {
   const defaultFilm = filmLinks.find((film) => film.is_default) ?? filmLinks[0];
   const [activeType, setActiveType] = useState(defaultFilm?.film_type ?? "highlights");
@@ -36,6 +27,10 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
   const activeFilm = useMemo(() => {
     return filmLinks.find((film) => film.film_type === activeType) ?? defaultFilm;
   }, [activeType, defaultFilm, filmLinks]);
+  const activeUrl = activeFilm ? normalizeVideoUrl(activeFilm.url) : "";
+  const activeProvider = activeFilm ? detectVideoProvider(activeFilm.url) : "hudl";
+  const embedUrl = activeFilm ? getEmbeddableVideoUrl(activeFilm.url) : null;
+  const providerLabel = getVideoProviderLabel(activeProvider);
 
   return (
     <section className="overflow-hidden rounded-[1.75rem] border border-slate-800 bg-slate-950 shadow-xl shadow-slate-950/20">
@@ -55,14 +50,33 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
       </div>
 
       <div className="aspect-video bg-[radial-gradient(circle_at_50%_35%,rgba(239,68,68,.22),transparent_34%),linear-gradient(135deg,#020617,#111827)]">
-        {activeFilm ? (
+        {activeFilm && embedUrl ? (
           <iframe
-            src={hudlEmbedUrl(activeFilm.url)}
+            src={embedUrl}
             title={activeFilm.label ?? "Hudl film"}
             className="h-full w-full"
-            allow="fullscreen; picture-in-picture"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            allowFullScreen
             loading="lazy"
           />
+        ) : activeFilm ? (
+          <div className="flex h-full items-center justify-center p-8 text-center">
+            <div className="max-w-md">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-red-300">{providerLabel} Film</p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">Open film externally.</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                This provider does not allow reliable in-page playback, so EuroScout opens the saved film link in a new tab.
+              </p>
+              <a
+                href={activeUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-red-50"
+              >
+                Watch on {providerLabel}
+              </a>
+            </div>
+          </div>
         ) : (
           <div className="flex h-full items-center justify-center p-8 text-center">
             <div>
@@ -80,8 +94,8 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
           <p className="mt-1 text-lg font-black text-white">{activeFilm?.label ?? "Hudl film placeholder"}</p>
         </div>
         {activeFilm ? (
-          <a href={activeFilm.url} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-red-50">
-            Open on Hudl
+          <a href={activeUrl} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-red-50">
+            Open on {providerLabel}
           </a>
         ) : null}
       </div>

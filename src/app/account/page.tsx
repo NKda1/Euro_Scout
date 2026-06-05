@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  claimTeamFromAccountAction,
   inviteStaffFromAccountAction,
   removeStaffFromAccountAction,
-  requestNewTeamFromAccountAction,
   transferOwnerFromAccountAction,
   updateClubProfileFromAccountAction,
   uploadClubLogoAction
@@ -16,7 +14,7 @@ import PlayerPhotoManager from "@/components/account/PlayerPhotoManager";
 import type { FilmLink } from "@/components/players/HudlFilmViewer";
 import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMediaSection";
 import { requireOnboardedProfile, roleLabel } from "@/lib/auth";
-import { leagues, regions } from "@/lib/data";
+import { countUnreadMessages, type MessageRow } from "@/lib/messaging";
 import { getRoleProfile } from "@/lib/profile-data";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -74,12 +72,9 @@ interface PublicUserRow {
   email: string;
 }
 
-interface ClaimableTeam {
-  id: string;
-  name: string;
-  city: string | null;
-  country: string | null;
-  claim_status: string | null;
+interface AccountConversationParticipant {
+  conversation_id: string;
+  last_seen_at: string | null;
 }
 
 function textValue(record: Record<string, unknown> | null | undefined, key: string) {
@@ -135,13 +130,38 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const { error, notice } = await searchParams;
   const roleProfile = (await getRoleProfile(supabase, profile)) as Record<string, unknown> | null;
   const serviceClient = createSupabaseServiceRoleClient();
+  const { data: accountConversationParticipants } = await serviceClient
+    .from("conversation_participants")
+    .select("conversation_id, last_seen_at")
+    .eq("profile_id", profile.id)
+    .returns<AccountConversationParticipant[]>();
+  const accountConversationIds = accountConversationParticipants?.map((participant) => participant.conversation_id) ?? [];
+  const { data: accountMessages } = accountConversationIds.length
+    ? await serviceClient
+        .from("messages")
+        .select("id, conversation_id, sender_profile_id, body, created_at")
+        .in("conversation_id", accountConversationIds)
+        .returns<MessageRow[]>()
+    : { data: [] as MessageRow[] };
+  const accountMessagesByConversation = new Map<string, MessageRow[]>();
+  for (const message of accountMessages ?? []) {
+    if (!message.conversation_id) continue;
+    const existing = accountMessagesByConversation.get(message.conversation_id) ?? [];
+    accountMessagesByConversation.set(message.conversation_id, [...existing, message]);
+  }
+  const unreadMessageCount = (accountConversationParticipants ?? []).reduce(
+    (total, participant) => total + countUnreadMessages(accountMessagesByConversation.get(participant.conversation_id) ?? [], profile.id, participant.last_seen_at),
+    0
+  );
 
   const playerProfileId = profile.role === "player" && roleProfile && "id" in roleProfile ? String(roleProfile.id) : "";
   const { data: filmLinks } = playerProfileId
-    ? await supabase
+    ? await serviceClient
         .from("film_links")
         .select("id, url, provider, film_type, label, is_default")
         .eq("player_profile_id", playerProfileId)
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: false })
         .returns<FilmLink[]>()
     : { data: [] as FilmLink[] };
 
@@ -178,17 +198,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         .limit(1)
         .maybeSingle<ClubMembership>()
     : { data: null };
-
-  const { data: claimableTeams } = profile.role === "club" && !clubMembership
-    ? await serviceClient
-        .from("teams")
-        .select("id, name, city, country, claim_status")
-        .or("claim_status.is.null,claim_status.eq.unclaimed")
-        .order("country", { ascending: true })
-        .order("name", { ascending: true })
-        .limit(500)
-        .returns<ClaimableTeam[]>()
-    : { data: [] as ClaimableTeam[] };
 
   const team = clubMembership?.teams ?? null;
   const publicHref = profile.role === "player" ? `/players/${profile.id}` : profile.role === "club" && team ? `/scouts/${team.id}` : `/profiles/${profile.id}`;
@@ -266,8 +275,13 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <Link href={publicHref} className="inline-flex h-11 items-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
               Public profile
             </Link>
-            <Link href="/messages" className="inline-flex h-11 items-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
+            <Link href="/messages" className="relative inline-flex h-11 items-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
               Messages
+              {unreadMessageCount ? (
+                <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-black text-red-600">
+                  {unreadMessageCount}
+                </span>
+              ) : null}
             </Link>
           </div>
         </div>
@@ -277,6 +291,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         <div className="space-y-6">
           {error ? <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm font-bold text-red-200">{error}</p> : null}
           {notice ? <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm font-bold text-emerald-200">{notice}</p> : null}
+          {unreadMessageCount ? (
+            <Link href="/messages" className="block rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm font-bold text-red-100 transition hover:border-red-400 hover:bg-red-500/15">
+              You have {unreadMessageCount} unread message{unreadMessageCount === 1 ? "" : "s"}.
+            </Link>
+          ) : null}
 
           <Panel eyebrow="Profile Photo" title="Upload profile picture">
             <div className="grid gap-5 md:grid-cols-[140px_minmax(0,1fr)] md:items-center">
@@ -577,42 +596,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   </Link>
                 </div>
               ) : (
-                <div className="space-y-5">
-                  <form action={claimTeamFromAccountAction}>
-                    <p className="text-sm font-black text-white">Claim existing club</p>
-                    <select name="team_id" required className={`${inputClass} mt-3`}>
-                      <option value="">Choose a club</option>
-                      {(claimableTeams ?? []).map((claimableTeam) => (
-                        <option key={claimableTeam.id} value={claimableTeam.id}>
-                          {claimableTeam.name} {[claimableTeam.city, claimableTeam.country].filter(Boolean).join(", ")}
-                        </option>
-                      ))}
-                    </select>
-                    <button className="mt-3 h-11 w-full rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
-                      Claim club
-                    </button>
-                  </form>
-
-                  <form action={requestNewTeamFromAccountAction} className="border-t border-white/10 pt-5">
-                    <p className="text-sm font-black text-white">Create unverified club</p>
-                    <div className="mt-3 space-y-3">
-                      <input name="team_name" required placeholder="Official club name" className={inputClass} />
-                      <input name="city" required placeholder="City" className={inputClass} />
-                      <input name="country" required placeholder="Country" className={inputClass} />
-                      <select name="league_id" required className={inputClass}>
-                        <option value="">League</option>
-                        {leagues.map((league) => <option key={league.id} value={league.id}>{league.name}</option>)}
-                      </select>
-                      <select name="region_id" required className={inputClass}>
-                        <option value="">Region</option>
-                        {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
-                      </select>
-                      <input name="stadium" placeholder="Stadium" className={inputClass} />
-                    </div>
-                    <button className="mt-3 h-11 w-full rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/55 transition hover:border-red-500/40 hover:text-white">
-                      Create club profile
-                    </button>
-                  </form>
+                <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+                  <p className="text-sm font-black text-white">No connected club</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-white/40">
+                    Club creation and claiming are only available during onboarding.
+                  </p>
                 </div>
               )}
             </Panel>
@@ -626,7 +614,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 [profile.role === "club" ? "Watchlists" : "News", profile.role === "club" ? "/watchlists" : "/"]
               ].map(([label, href]) => (
                 <Link key={label} href={href} className="flex h-11 items-center justify-between rounded-lg border border-white/10 bg-black/20 px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
-                  {label}
+                  <span className="inline-flex items-center gap-2">
+                    {label}
+                    {label === "Messages" && unreadMessageCount ? (
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-black text-white">
+                        {unreadMessageCount}
+                      </span>
+                    ) : null}
+                  </span>
                   <span>→</span>
                 </Link>
               ))}

@@ -31,7 +31,12 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   return (
     <main className="app-surface">
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-        <ProfileSummary profile={profile} roleProfile={roleProfile} showMessageButton={profile.id !== currentProfile.id} showEditLink={profile.id === currentProfile.id} />
+        <ProfileSummary
+          profile={profile}
+          roleProfile={roleProfile}
+          showMessageButton={profile.role === "player" && currentProfile.role === "club" && profile.id !== currentProfile.id}
+          showEditLink={profile.id === currentProfile.id}
+        />
       </section>
     </main>
   );

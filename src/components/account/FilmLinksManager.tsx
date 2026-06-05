@@ -1,20 +1,15 @@
 import { deleteFilmLinkAction, saveFilmLinkAction } from "@/app/actions/film";
 import type { FilmLink } from "@/components/players/HudlFilmViewer";
+import { detectVideoProvider, getEmbeddableVideoUrl, getVideoProviderLabel, normalizeVideoUrl } from "@/lib/video";
 
 const inputClass = "h-11 w-full rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/25 focus:border-red-500";
 
-function getVideoEmbedUrl(url: string): string {
-  const youtube = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-  if (youtube) return `https://www.youtube.com/embed/${youtube[1]}`;
-
-  const vimeo = url.match(/vimeo\.com\/(\d+)/);
-  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
-
-  return url;
-}
-
 export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] }) {
   const defaultFilm = filmLinks.find((film) => film.is_default) ?? filmLinks[0] ?? null;
+  const defaultUrl = defaultFilm ? normalizeVideoUrl(defaultFilm.url) : "";
+  const defaultProvider = defaultFilm ? detectVideoProvider(defaultFilm.url) : "hudl";
+  const defaultProviderLabel = getVideoProviderLabel(defaultProvider);
+  const defaultEmbedUrl = defaultFilm ? getEmbeddableVideoUrl(defaultFilm.url) : null;
 
   return (
     <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-6">
@@ -22,15 +17,33 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
 
       <div className="mt-5 overflow-hidden rounded-lg border border-white/15 bg-black/30">
         <div className="aspect-video">
-          {defaultFilm ? (
+          {defaultFilm && defaultEmbedUrl ? (
             <iframe
-              src={getVideoEmbedUrl(defaultFilm.url)}
+              src={defaultEmbedUrl}
               title={defaultFilm.label ?? "Player film"}
               className="h-full w-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
               allowFullScreen
               loading="lazy"
             />
+          ) : defaultFilm ? (
+            <div className="flex h-full items-center justify-center p-8 text-center">
+              <div className="max-w-md">
+                <p className="text-xs font-black uppercase text-red-500">{defaultProviderLabel} preview</p>
+                <p className="mt-2 text-xl font-black text-white">Open this film in a new tab.</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-white/45">
+                  Hudl and some film providers block iframe playback, but the saved link is ready to use.
+                </p>
+                <a
+                  href={defaultUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700"
+                >
+                  Watch on {defaultProviderLabel}
+                </a>
+              </div>
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center p-8 text-center">
               <div>
@@ -88,7 +101,7 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
                   <option value="college_bucs">College/BUCS</option>
                   <option value="training">Training</option>
                 </select>
-                <input name="url" required defaultValue={film.url} placeholder="Hudl URL" className={`${inputClass} md:col-span-2`} />
+                <input name="url" required defaultValue={film.url} placeholder="Hudl, YouTube or Vimeo URL" className={`${inputClass} md:col-span-2`} />
                 <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
                   <input name="is_default" type="checkbox" defaultChecked={film.is_default} className="h-4 w-4 rounded border-white/20 text-red-600" />
                   Set as default film

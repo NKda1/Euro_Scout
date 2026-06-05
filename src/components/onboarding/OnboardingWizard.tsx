@@ -2,7 +2,7 @@
 
 import { useTransition, useState, useMemo } from "react";
 import type { ReactNode } from "react";
-import { teams } from "@/lib/data";
+import { leagues, regions, teams } from "@/lib/data";
 import { countries } from "@/constants/countries";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/auth";
@@ -411,6 +411,11 @@ function ClubStep(props: {
   selectedTeamId:  string; setSelectedTeamId:  (v: string) => void;
   clubAction:      ClubAction; setClubAction:  (v: ClubAction) => void;
   newTeamName:     string; setNewTeamName:     (v: string) => void;
+  newTeamCity:     string; setNewTeamCity:     (v: string) => void;
+  newTeamCountry:  string; setNewTeamCountry:  (v: string) => void;
+  newTeamLeagueId: string; setNewTeamLeagueId: (v: string) => void;
+  newTeamRegionId: string; setNewTeamRegionId: (v: string) => void;
+  newTeamStadium:  string; setNewTeamStadium:  (v: string) => void;
 }) {
   const filtered = useMemo(() => {
     const q = props.teamSearch.toLowerCase().trim();
@@ -538,11 +543,39 @@ function ClubStep(props: {
               className={inputClass}
             />
           </label>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <FieldLabel required>City</FieldLabel>
+              <input value={props.newTeamCity} onChange={(e) => props.setNewTeamCity(e.target.value)} placeholder="Team city" className={inputClass} />
+            </label>
+            <label className="block">
+              <FieldLabel required>Country</FieldLabel>
+              <input value={props.newTeamCountry} onChange={(e) => props.setNewTeamCountry(e.target.value)} placeholder="Team country" className={inputClass} />
+            </label>
+            <label className="block">
+              <FieldLabel required>League</FieldLabel>
+              <select value={props.newTeamLeagueId} onChange={(e) => props.setNewTeamLeagueId(e.target.value)} className={selectClass}>
+                <option value="">Select league</option>
+                {leagues.map((league) => <option key={league.id} value={league.id}>{league.name}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <FieldLabel required>Region</FieldLabel>
+              <select value={props.newTeamRegionId} onChange={(e) => props.setNewTeamRegionId(e.target.value)} className={selectClass}>
+                <option value="">Select region</option>
+                {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
+              </select>
+            </label>
+            <label className="block sm:col-span-2">
+              <FieldLabel>Stadium</FieldLabel>
+              <input value={props.newTeamStadium} onChange={(e) => props.setNewTeamStadium(e.target.value)} placeholder="Home stadium" className={inputClass} />
+            </label>
+          </div>
         </div>
       )}
 
       <p className="text-xs text-slate-400 dark:text-slate-500">
-        You can skip this and connect to a club later from your dashboard.
+        Club connection happens during onboarding so every account stays tied to a single club.
       </p>
     </div>
   );
@@ -630,6 +663,11 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [clubAction,     setClubAction]     = useState<ClubAction>("");
   const [newTeamName,    setNewTeamName]    = useState("");
+  const [newTeamCity,    setNewTeamCity]    = useState("");
+  const [newTeamCountry, setNewTeamCountry] = useState("");
+  const [newTeamLeagueId, setNewTeamLeagueId] = useState("");
+  const [newTeamRegionId, setNewTeamRegionId] = useState("");
+  const [newTeamStadium, setNewTeamStadium] = useState("");
 
   // Final
   const [isPublic, setIsPublic] = useState(true);
@@ -683,6 +721,11 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     fd.append("team_id",           selectedTeamId);
     fd.append("club_action",       clubAction);
     fd.append("team_name_request", newTeamName.trim());
+    fd.append("new_team_city",     newTeamCity.trim());
+    fd.append("new_team_country",  newTeamCountry.trim());
+    fd.append("new_team_league_id", newTeamLeagueId);
+    fd.append("new_team_region_id", newTeamRegionId);
+    fd.append("new_team_stadium",  newTeamStadium.trim());
 
     setSubmitError(null);
     startTransition(async () => {
@@ -757,6 +800,11 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
               selectedTeamId={selectedTeamId} setSelectedTeamId={setSelectedTeamId}
               clubAction={clubAction}         setClubAction={setClubAction}
               newTeamName={newTeamName}       setNewTeamName={setNewTeamName}
+              newTeamCity={newTeamCity}       setNewTeamCity={setNewTeamCity}
+              newTeamCountry={newTeamCountry} setNewTeamCountry={setNewTeamCountry}
+              newTeamLeagueId={newTeamLeagueId} setNewTeamLeagueId={setNewTeamLeagueId}
+              newTeamRegionId={newTeamRegionId} setNewTeamRegionId={setNewTeamRegionId}
+              newTeamStadium={newTeamStadium} setNewTeamStadium={setNewTeamStadium}
             />
           )}
           {step === confirmStepNum && (

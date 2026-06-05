@@ -33,7 +33,7 @@ function formText(formData: FormData, key: string, maxLength = 500) {
 }
 
 function formNumber(formData: FormData, key: string, options: { min?: number; max?: number; integer?: boolean } = {}) {
-  const raw = String(formData.get(key) ?? "").trim();
+  const raw = String(formData.get(key) ?? "").trim().replace(",", ".");
   if (!raw) return null;
 
   const parsed = Number(raw);
@@ -118,6 +118,23 @@ async function ensureDefaultClubWatchlist(
   });
 }
 
+async function requireNoExistingClubMembership(
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>,
+  profileId: string,
+  redirectPath: string
+) {
+  const { data: existingMembership } = await serviceClient
+    .from("club_members")
+    .select("team_id")
+    .eq("profile_id", profileId)
+    .limit(1)
+    .maybeSingle<{ team_id: string }>();
+
+  if (existingMembership?.team_id) {
+    redirect(`${redirectPath}?error=This account is already connected to a club.`);
+  }
+}
+
 async function ensurePublicUserRow(
   serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>,
   user: Awaited<ReturnType<typeof getAuthenticatedProfile>>["user"],
@@ -153,6 +170,7 @@ export async function claimTeamAction(teamId: string) {
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
   const serviceClient = createSupabaseServiceRoleClient();
+  await requireNoExistingClubMembership(serviceClient, profile.id, "/account");
 
   const { data: teamClaim, error: teamError } = await serviceClient
     .from("teams")
@@ -228,6 +246,7 @@ export async function requestNewTeamFromAccountAction(formData: FormData) {
   }
 
   const serviceClient = createSupabaseServiceRoleClient();
+  await requireNoExistingClubMembership(serviceClient, profile.id, "/account");
   const now = new Date().toISOString();
   const baseSlug = slugify(teamName);
   const id = `${baseSlug}-${randomUUID().slice(0, 8)}`;
@@ -293,7 +312,7 @@ export async function updateClubProfileFromAccountAction(formData: FormData) {
   await requireClubOwner(supabase, profile.id, teamId);
 
   const openRosterSpotsRaw = formText(formData, "open_roster_spots", 10);
-  const openRosterSpots = openRosterSpotsRaw ? Math.max(0, Number(openRosterSpotsRaw)) : 0;
+  const openRosterSpots = openRosterSpotsRaw ? Math.max(0, Number(openRosterSpotsRaw.replace(",", "."))) : 0;
   const leaguePosition = formNumber(formData, "league_position", { min: 1, integer: true });
   const serviceClient = createSupabaseServiceRoleClient();
   const { error } = await serviceClient

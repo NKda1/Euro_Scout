@@ -13,134 +13,276 @@ function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
-async function requireConnectedClubForClubUser(profileId: string, role: string) {
-  if (role !== "club") return;
+type ServiceClient = ReturnType<typeof createSupabaseServiceRoleClient>;
 
-  const serviceClient = createSupabaseServiceRoleClient();
+async function getConnectedClub(serviceClient: ServiceClient, profileId: string) {
   const { data: membership } = await serviceClient
     .from("club_members")
-    .select("team_id")
+    .select("team_id, club_role")
     .eq("profile_id", profileId)
     .limit(1)
-    .maybeSingle<{ team_id: string }>();
+    .maybeSingle<{ team_id: string; club_role: string }>();
+
+  return membership ?? null;
+}
+
+async function requireConnectedClubForClubUser(serviceClient: ServiceClient, profileId: string, role: string) {
+  if (role !== "club") return null;
+
+  const membership = await getConnectedClub(serviceClient, profileId);
 
   if (!membership?.team_id) {
     redirect("/account?error=Claim or create a club before messaging players.");
   }
+
+  return membership;
 }
 
-export async function startConversationAction(formData: FormData) {
-  const { supabase, profile } = await getAuthenticatedProfile();
+async function getClubParticipantIds(serviceClient: ServiceClient, teamId: string) {
+  const { data: members } = await serviceClient
+    .from("club_members")
+    .select("profile_id")
+    .eq("team_id", teamId)
+    .returns<Array<{ profile_id: string }>>();
 
-  if (!profile?.onboarding_complete) {
-    redirect("/onboarding");
+  return (members ?? []).map((member) => member.profile_id);
+}
+
+async function createThread(params: {
+  serviceClient: ServiceClient;
+  createdBy: string;
+  subject: string;
+  teamId: string | null;
+  participantIds: string[];
+  initialMessage?: string;
+  errorPath: string;
+}) {
+  const { serviceClient, createdBy, subject, teamId, participantIds, initialMessage, errorPath } = params;
+  const uniqueParticipantIds = Array.from(new Set([createdBy, ...participantIds].filter(Boolean)));
+  const now = new Date().toISOString();
+
+  if (uniqueParticipantIds.length < 2) {
+    redirect(`${errorPath}?error=That conversation needs both a player and a club contact.`);
   }
 
-  await requireConnectedClubForClubUser(profile.id, profile.role);
-
-  const targetProfileId = text(formData, "target_profile_id");
-  const teamId = text(formData, "team_id") || null;
-  const rawSubject = text(formData, "subject") || "EuroScout conversation";
-  const subject = rawSubject.slice(0, MAX_SUBJECT_LENGTH);
-
-  // Club inbox threads: team_id on the conversation is sufficient for access via RLS.
-  // For direct messages, a target_profile_id is required.
-  if (!targetProfileId && !teamId) {
-    redirect("/messages?error=No connected profile is available for that conversation yet.");
-  }
-
-  if (targetProfileId && targetProfileId === profile.id) {
-    redirect("/messages?error=You cannot start a conversation with yourself.");
-  }
-
-  const { data: conversation, error } = await supabase
+  const { data: conversation, error: conversationError } = await serviceClient
     .from("conversations")
     .insert({
-      created_by: profile.id,
+      created_by: createdBy,
       subject,
       ...(teamId ? { team_id: teamId } : {})
     })
     .select("id")
     .single<{ id: string }>();
 
-  if (error || !conversation) {
-    redirect(`/messages?error=${encodeURIComponent(error?.message ?? "Could not start conversation.")}`);
+  if (conversationError || !conversation) {
+    redirect(`${errorPath}?error=${encodeURIComponent(conversationError?.message ?? "Could not start conversation.")}`);
   }
 
-  // For direct (non-club-inbox) conversations, add both participants.
-  if (!teamId && targetProfileId) {
-    await supabase.from("conversation_participants").insert([
-      {
+  const { error: participantsError } = await serviceClient
+    .from("conversation_participants")
+    .upsert(
+      uniqueParticipantIds.map((profileId) => ({
         conversation_id: conversation.id,
-        profile_id: profile.id
-      },
-      {
-        conversation_id: conversation.id,
-        profile_id: targetProfileId
-      }
-    ]);
-  } else if (!teamId) {
-    // Fallback: at minimum add the creator
-    await supabase.from("conversation_participants").insert({
-      conversation_id: conversation.id,
-      profile_id: profile.id
-    });
-  }
+        profile_id: profileId,
+        last_seen_at: profileId === createdBy ? now : null
+      })),
+      { onConflict: "conversation_id,profile_id" }
+    );
 
-  const initialMessage = text(formData, "body").slice(0, MAX_BODY_LENGTH);
+  if (participantsError) {
+    redirect(`${errorPath}?error=${encodeURIComponent(participantsError.message)}`);
+  }
 
   if (initialMessage) {
-    await supabase.from("messages").insert({
+    const { error: messageError } = await serviceClient.from("messages").insert({
       conversation_id: conversation.id,
-      sender_profile_id: profile.id,
+      sender_profile_id: createdBy,
       body: initialMessage
     });
+
+    if (messageError) {
+      redirect(`${errorPath}?error=${encodeURIComponent(messageError.message)}`);
+    }
   }
 
-  revalidatePath("/messages");
-  redirect(`/messages/${conversation.id}`);
+  return conversation.id;
 }
 
-export async function sendMessageAction(formData: FormData) {
-  const { supabase, profile } = await getAuthenticatedProfile();
+export async function startConversationAction(formData: FormData) {
+  const { profile } = await getAuthenticatedProfile();
 
   if (!profile?.onboarding_complete) {
     redirect("/onboarding");
   }
 
-  await requireConnectedClubForClubUser(profile.id, profile.role);
+  const serviceClient = createSupabaseServiceRoleClient();
+  const targetProfileId = text(formData, "target_profile_id");
+  const teamId = text(formData, "team_id") || null;
+  const rawSubject = text(formData, "subject") || "EuroScout conversation";
+  const subject = rawSubject.slice(0, MAX_SUBJECT_LENGTH);
+  const initialMessage = text(formData, "body").slice(0, MAX_BODY_LENGTH);
+
+  if (!targetProfileId && !teamId) {
+    redirect("/messages?error=No connected profile is available for that conversation yet.");
+  }
+
+  if (targetProfileId && teamId) {
+    redirect("/messages?error=Choose either a player or a club, not both.");
+  }
+
+  if (targetProfileId && targetProfileId === profile.id) {
+    redirect("/messages?error=You cannot start a conversation with yourself.");
+  }
+
+  let conversationId: string;
+
+  if (targetProfileId) {
+    if (profile.role !== "club") {
+      redirect("/messages?error=Only club accounts can message player accounts.");
+    }
+
+    const membership = await requireConnectedClubForClubUser(serviceClient, profile.id, profile.role);
+    const { data: targetProfile } = await serviceClient
+      .from("profiles")
+      .select("id, role, display_name")
+      .eq("id", targetProfileId)
+      .maybeSingle<{ id: string; role: string; display_name: string }>();
+
+    if (!targetProfile || targetProfile.role !== "player") {
+      redirect("/messages?error=Club accounts can only message player accounts.");
+    }
+
+    const clubParticipantIds = membership?.team_id ? await getClubParticipantIds(serviceClient, membership.team_id) : [];
+    conversationId = await createThread({
+      serviceClient,
+      createdBy: profile.id,
+      subject,
+      teamId: membership?.team_id ?? null,
+      participantIds: [targetProfile.id, ...clubParticipantIds],
+      initialMessage,
+      errorPath: "/messages"
+    });
+  } else {
+    if (profile.role !== "player") {
+      redirect("/messages?error=Only player accounts can contact club accounts.");
+    }
+
+    const { data: team } = await serviceClient
+      .from("teams")
+      .select("id, name")
+      .eq("id", teamId)
+      .maybeSingle<{ id: string; name: string }>();
+
+    if (!team) {
+      redirect("/messages?error=Club not found.");
+    }
+
+    const participantIds = await getClubParticipantIds(serviceClient, team.id);
+    conversationId = await createThread({
+      serviceClient,
+      createdBy: profile.id,
+      subject: subject || `Message to ${team.name}`,
+      teamId: team.id,
+      participantIds,
+      initialMessage,
+      errorPath: "/messages"
+    });
+  }
+
+  revalidatePath("/messages");
+  redirect(`/messages/${conversationId}`);
+}
+
+export async function sendMessageAction(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const { profile } = await getAuthenticatedProfile();
+
+  if (!profile?.onboarding_complete) {
+    redirect("/onboarding");
+  }
+
+  if (profile.role !== "player" && profile.role !== "club") {
+    return { ok: false, error: "Only player and club accounts can send messages." };
+  }
+
+  const serviceClient = createSupabaseServiceRoleClient();
+  await requireConnectedClubForClubUser(serviceClient, profile.id, profile.role);
 
   const conversationId = text(formData, "conversation_id");
   const body = text(formData, "body").slice(0, MAX_BODY_LENGTH);
 
   if (!conversationId || !body) {
-    redirect(`/messages/${conversationId}?error=Write a message before sending.`);
+    return { ok: false, error: "Write a message before sending." };
   }
 
-  const { error } = await supabase.from("messages").insert({
+  const { data: participantRows } = await serviceClient
+    .from("conversation_participants")
+    .select("profile_id")
+    .eq("conversation_id", conversationId)
+    .returns<Array<{ profile_id: string }>>();
+
+  const participantIds = participantRows?.map((participant) => participant.profile_id) ?? [];
+  if (!participantIds.includes(profile.id)) {
+    return { ok: false, error: "You are not a participant in this conversation." };
+  }
+
+  const { data: participantProfiles } = await serviceClient
+    .from("profiles")
+    .select("id, role")
+    .in("id", participantIds)
+    .returns<Array<{ id: string; role: string }>>();
+
+  const participantRoles = new Set((participantProfiles ?? []).map((participant) => participant.role));
+  if (!participantRoles.has("player") || !participantRoles.has("club")) {
+    return { ok: false, error: "Messages are only available between player and club accounts." };
+  }
+
+  const { error } = await serviceClient.from("messages").insert({
     conversation_id: conversationId,
     sender_profile_id: profile.id,
     body
   });
 
   if (error) {
-    redirect(`/messages/${conversationId}?error=${encodeURIComponent(error.message)}`);
+    return { ok: false, error: error.message };
   }
 
-  await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+  const now = new Date().toISOString();
+  await Promise.all([
+    serviceClient.from("conversations").update({ updated_at: now }).eq("id", conversationId),
+    serviceClient
+      .from("conversation_participants")
+      .update({ last_seen_at: now })
+      .eq("conversation_id", conversationId)
+      .eq("profile_id", profile.id)
+  ]);
+  revalidatePath("/messages");
   revalidatePath(`/messages/${conversationId}`);
-  redirect(`/messages/${conversationId}`);
+  return { ok: true };
 }
 
 export async function markConversationReadAction(conversationId: string) {
-  const { supabase, profile } = await getAuthenticatedProfile();
+  const { profile } = await getAuthenticatedProfile();
   if (!profile) return;
-  // last_seen_at column added via: ALTER TABLE conversation_participants ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
-  await supabase
+
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { data: participant } = await serviceClient
+    .from("conversation_participants")
+    .select("id")
+    .eq("conversation_id", conversationId)
+    .eq("profile_id", profile.id)
+    .maybeSingle<{ id: string }>();
+
+  if (!participant) return;
+
+  await serviceClient
     .from("conversation_participants")
     .update({ last_seen_at: new Date().toISOString() })
     .eq("conversation_id", conversationId)
     .eq("profile_id", profile.id);
+
+  revalidatePath("/messages");
+  revalidatePath(`/messages/${conversationId}`);
 }
 
 export async function flagContactAction(formData: FormData) {
@@ -194,10 +336,14 @@ export async function flagContactAction(formData: FormData) {
 // ─── Contact a club directly from its profile page ────────────────────────────
 
 export async function contactClubAction(formData: FormData) {
-  const { supabase, profile } = await getAuthenticatedProfile();
+  const { profile } = await getAuthenticatedProfile();
 
   if (!profile?.onboarding_complete) {
     redirect("/onboarding");
+  }
+
+  if (profile.role !== "player") {
+    redirect("/messages?error=Only player accounts can contact club accounts.");
   }
 
   const teamId = text(formData, "team_id");
@@ -211,8 +357,9 @@ export async function contactClubAction(formData: FormData) {
     redirect(`/scouts/${scoutId}?error=Please write a message before sending.`);
   }
 
+  const serviceClient = createSupabaseServiceRoleClient();
   // Prevent club members from messaging their own club
-  const { data: selfMembership } = await supabase
+  const { data: selfMembership } = await serviceClient
     .from("club_members")
     .select("id")
     .eq("team_id", teamId)
@@ -223,46 +370,17 @@ export async function contactClubAction(formData: FormData) {
     redirect(`/scouts/${scoutId}?error=You are already a member of this club.`);
   }
 
-  // Find the club owner to add as a participant
-  const { data: ownerMember } = await supabase
-    .from("club_members")
-    .select("profile_id")
-    .eq("team_id", teamId)
-    .eq("club_role", "owner")
-    .limit(1)
-    .maybeSingle<{ profile_id: string }>();
-
-  // Create the conversation — team_id routes it to the club inbox
-  const { data: conversation, error } = await supabase
-    .from("conversations")
-    .insert({
-      created_by: profile.id,
-      subject: `Message from ${profile.display_name}`,
-      team_id: teamId
-    })
-    .select("id")
-    .single<{ id: string }>();
-
-  if (error || !conversation) {
-    redirect(`/scouts/${scoutId}?error=${encodeURIComponent(error?.message ?? "Could not start conversation.")}`);
-  }
-
-  // Add sender + owner as participants
-  const participants: Array<{ conversation_id: string; profile_id: string }> = [
-    { conversation_id: conversation.id, profile_id: profile.id }
-  ];
-  if (ownerMember) {
-    participants.push({ conversation_id: conversation.id, profile_id: ownerMember.profile_id });
-  }
-  await supabase.from("conversation_participants").insert(participants);
-
-  // Send initial message
-  await supabase.from("messages").insert({
-    conversation_id: conversation.id,
-    sender_profile_id: profile.id,
-    body: message
+  const participantIds = await getClubParticipantIds(serviceClient, teamId);
+  const conversationId = await createThread({
+    serviceClient,
+    createdBy: profile.id,
+    subject: `Message from ${profile.display_name}`,
+    teamId,
+    participantIds,
+    initialMessage: message,
+    errorPath: `/scouts/${scoutId}`
   });
 
   revalidatePath("/messages");
-  redirect(`/messages/${conversation.id}`);
+  redirect(`/messages/${conversationId}`);
 }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { randomUUID } from "node:crypto";
 import { getAuthenticatedUser, isReservedAdminEmail, isUserRole, splitName, type UserRole } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -27,6 +28,14 @@ function numberOrNull(formData: FormData, key: string) {
 
 function boolValue(formData: FormData, key: string) {
   return formData.get(key) === "on";
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
 }
 
 function requireAllowedRole(role: UserRole, email?: string | null, redirectPath = "/onboarding") {
@@ -65,18 +74,83 @@ async function upsertPlayerProfile(supabase: Awaited<ReturnType<typeof getAuthen
   );
 }
 
+async function ensurePublicUserRow(
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>,
+  user: Awaited<ReturnType<typeof getAuthenticatedUser>>["user"],
+  role: UserRole,
+  displayName: string
+) {
+  const email = user.email;
+  if (!email) return;
+
+  await serviceClient.from("users").upsert(
+    {
+      id: user.id,
+      email,
+      role,
+      display_name: displayName
+    },
+    { onConflict: "id" }
+  );
+}
+
+async function ensureDefaultClubWatchlist(
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>,
+  teamId: string,
+  profileId: string
+) {
+  const { data: existing } = await serviceClient
+    .from("watchlists")
+    .select("id")
+    .eq("team_id", teamId)
+    .eq("name", "Club shortlist")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
+  if (existing) return;
+
+  await serviceClient.from("watchlists").insert({
+    user_id: profileId,
+    team_id: teamId,
+    name: "Club shortlist",
+    is_shared: true,
+    updated_at: new Date().toISOString()
+  });
+}
+
+async function requireNoExistingClubMembership(
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>,
+  profileId: string,
+  redirectPath: string
+) {
+  const { data: existingMembership } = await serviceClient
+    .from("club_members")
+    .select("team_id")
+    .eq("profile_id", profileId)
+    .limit(1)
+    .maybeSingle<{ team_id: string }>();
+
+  if (existingMembership?.team_id) {
+    redirect(`${redirectPath}?error=This account is already connected to a club.`);
+  }
+}
+
 export async function completeOnboardingAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUser();
 
   // Never strip admin role — admins may preview any role in the wizard
   const { data: currentProfile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, onboarding_complete")
     .eq("id", user.id)
     .single();
 
   const isCurrentlyAdmin = currentProfile?.role === "admin";
   const roleValue = isCurrentlyAdmin ? "admin" : requiredText(formData, "role");
+
+  if (!isCurrentlyAdmin && currentProfile?.onboarding_complete) {
+    redirect("/dashboard");
+  }
 
   if (!isCurrentlyAdmin && !isUserRole(roleValue)) {
     redirect("/onboarding?error=Choose a valid role.");
@@ -87,6 +161,7 @@ export async function completeOnboardingAction(formData: FormData) {
   }
 
   const displayName = requiredText(formData, "display_name");
+  const serviceClient = createSupabaseServiceRoleClient();
 
   const { error } = await supabase.from("profiles").upsert(
     {
@@ -116,10 +191,12 @@ export async function completeOnboardingAction(formData: FormData) {
     const clubAction = text(formData, "club_action");
     const teamNameRequest = text(formData, "team_name_request");
 
+    await ensurePublicUserRow(serviceClient, user, roleValue as UserRole, displayName);
+
     if (teamId && clubAction === "claim") {
+      await requireNoExistingClubMembership(serviceClient, user.id, "/onboarding");
       const now = new Date().toISOString();
       const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-      const serviceClient = createSupabaseServiceRoleClient();
 
       const { data: teamClaim, error: claimError } = await serviceClient
         .from("teams")
@@ -152,7 +229,10 @@ export async function completeOnboardingAction(formData: FormData) {
       if (memberError) {
         redirect(`/onboarding?error=${encodeURIComponent(memberError.message)}`);
       }
+
+      await ensureDefaultClubWatchlist(serviceClient, teamId, user.id);
     } else if (teamId && clubAction === "join") {
+      await requireNoExistingClubMembership(serviceClient, user.id, "/onboarding");
       await supabase.from("club_members").insert({
         team_id: teamId,
         profile_id: user.id,
@@ -160,8 +240,59 @@ export async function completeOnboardingAction(formData: FormData) {
         joined_at: new Date().toISOString()
       });
     } else if (teamNameRequest) {
-      revalidatePath("/account");
-      redirect(`/account?notice=${encodeURIComponent(`Account created. Add ${teamNameRequest} from the club creation form to create its unverified profile.`)}`);
+      await requireNoExistingClubMembership(serviceClient, user.id, "/onboarding");
+      const country = text(formData, "new_team_country");
+      const city = text(formData, "new_team_city");
+      const leagueId = text(formData, "new_team_league_id");
+      const regionId = text(formData, "new_team_region_id");
+      const stadium = text(formData, "new_team_stadium");
+
+      if (!country || !city || !leagueId || !regionId) {
+        redirect("/onboarding?error=Club name, city, country, league and region are required.");
+      }
+
+      const now = new Date().toISOString();
+      const baseSlug = slugify(teamNameRequest);
+      const id = `${baseSlug}-${randomUUID().slice(0, 8)}`;
+      const { data: team, error: teamError } = await serviceClient
+        .from("teams")
+        .insert({
+          id,
+          name: teamNameRequest,
+          slug: id,
+          league_id: leagueId,
+          region_id: regionId,
+          city,
+          country,
+          stadium,
+          claim_status: "pending",
+          claimed_at: now,
+          claim_expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          claimed_by: user.id,
+          recruiting_active: false,
+          open_roster_spots: 0,
+          pipeline_names_public: false,
+          verified: false
+        })
+        .select("id")
+        .single<{ id: string }>();
+
+      if (teamError || !team) {
+        redirect(`/onboarding?error=${encodeURIComponent(teamError?.message ?? "Could not create club.")}`);
+      }
+
+      const { error: memberError } = await serviceClient.from("club_members").insert({
+        team_id: team.id,
+        profile_id: user.id,
+        club_role: "owner",
+        joined_at: now
+      });
+
+      if (memberError) {
+        redirect(`/onboarding?error=${encodeURIComponent(memberError.message)}`);
+      }
+
+      await ensureDefaultClubWatchlist(serviceClient, team.id, user.id);
     }
   }
 

@@ -31,6 +31,12 @@ interface ClubTeam {
   claim_status: string | null;
   recruiting_active: boolean | null;
   open_roster_spots: number | null;
+  roster_needs: string[] | null;
+  pass_run_percentage: number | null;
+  passing_yards: number | null;
+  rushing_yards: number | null;
+  touchdowns_scored: number | null;
+  league_position: number | null;
   website: string | null;
   contact_email: string | null;
   pipeline_names_public: boolean;
@@ -48,6 +54,26 @@ interface StaffMemberRow {
   profile_id: string;
   club_role: string;
   profiles: Profile;
+}
+
+interface ShortlistRow {
+  id: string;
+  name: string;
+  is_shared: boolean;
+  watchlist_items: Array<{
+    id: string;
+    notes: string | null;
+    player_profiles: {
+      profile_id: string;
+      position: string | null;
+      nationality: string | null;
+      profiles: {
+        display_name: string;
+        headline: string | null;
+        location: string | null;
+      } | null;
+    } | null;
+  }> | null;
 }
 
 function initials(name: string) {
@@ -74,8 +100,9 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
     team_id,
     teams!team_id (
       id, name, city, country, league_id, stadium, tier, claim_status,
-      logo_url, recruiting_active, open_roster_spots, website,
-      contact_email, pipeline_names_public
+      logo_url, recruiting_active, open_roster_spots, roster_needs,
+      pass_run_percentage, passing_yards, rushing_yards, touchdowns_scored,
+      league_position, website, contact_email, pipeline_names_public
     ),
     profiles!profile_id (
       id, role, display_name, headline, bio, location,
@@ -172,11 +199,32 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
         .returns<StaffMemberRow[]>()
     : { data: [] as StaffMemberRow[] };
 
+  const { data: shortlistRows } = teamId && isMember
+    ? await supabase
+        .from("watchlists")
+        .select(
+          `
+            id, name, is_shared,
+            watchlist_items (
+              id, notes,
+              player_profiles!player_id (
+                profile_id, position, nationality,
+                profiles!profile_id ( display_name, headline, location )
+              )
+            )
+          `
+        )
+        .eq("team_id", teamId)
+        .order("created_at", { ascending: false })
+        .returns<ShortlistRow[]>()
+    : { data: [] as ShortlistRow[] };
+
   const isVerified = team?.claim_status === "verified";
   const pipelineNamesPublic = team?.pipeline_names_public ?? false;
   const isAuthenticated = Boolean(user);
-  const canContact = isAuthenticated && !isMember;
+  const canContact = isAuthenticated && viewerRole === "player" && !isMember;
   const staff = staffRows ?? [];
+  const shortlists = shortlistRows ?? [];
   const league = team?.league_id ? getLeagueByIdOrSlug(team.league_id) : null;
   const leagueLabel = league?.shortName ?? league?.name ?? "League";
   const teamName = team?.name ?? resolvedProfile.display_name;
@@ -186,6 +234,17 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
     resolvedProfile.headline ??
     `${teamName} is setting up its EuroScout club profile. Recruiting information, staff details, media, and contact preferences will appear here as the club completes its profile.`;
   const openSpots = team?.open_roster_spots ?? 0;
+  const rosterNeeds = (team?.roster_needs ?? []).filter(Boolean);
+  const formatNumber = (value: number | null | undefined) => value == null ? "—" : new Intl.NumberFormat("en-GB").format(value);
+  const formatPercent = (value: number | null | undefined) => value == null ? "—" : `${new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 }).format(value)}%`;
+  const teamStats = [
+    ["Pass Play", formatPercent(team?.pass_run_percentage)],
+    ["Passing Yards", formatNumber(team?.passing_yards)],
+    ["Rushing Yards", formatNumber(team?.rushing_yards)],
+    ["Touchdowns", formatNumber(team?.touchdowns_scored)],
+    ["League Rank", team?.league_position ? `#${team.league_position}` : "—"],
+    ["Open Spots", String(openSpots || "—")]
+  ] as [string, string][];
 
   return (
     <main className="min-h-screen bg-[#090909] text-white">
@@ -251,7 +310,7 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
               <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/15 bg-[#1a1a1a]">
                 {([
                   ["League", leagueLabel],
-                  ["Founded", "—"],
+                  ["Pass Play", formatPercent(team?.pass_run_percentage)],
                   ["Open Spots", String(openSpots || "—")],
                   ["Staff", String(staff.length || "—")]
                 ] as [string, string][]).map(([label, value], index) => (
@@ -282,6 +341,72 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
                 isOwner={isOwner}
                 pipelineNamesPublic={pipelineNamesPublic}
               />
+            )}
+
+            {isMember && teamId && (
+              <section className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-black uppercase text-red-500">Player Shortlists</p>
+                  <Link
+                    href="/watchlists"
+                    className="inline-flex h-10 items-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-xs font-black uppercase text-white/50 transition hover:border-red-500/40 hover:text-white"
+                  >
+                    Manage shortlists
+                  </Link>
+                </div>
+                {shortlists.length ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {shortlists.map((shortlist) => {
+                      const items = shortlist.watchlist_items ?? [];
+                      return (
+                        <div key={shortlist.id} className="rounded-lg border border-white/10 bg-[#1a1a1a] p-5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-lg font-black text-white">{shortlist.name}</p>
+                              <p className="mt-1 text-xs font-bold uppercase text-white/35">
+                                {items.length} player{items.length !== 1 ? "s" : ""} · {shortlist.is_shared ? "Shared" : "Personal"}
+                              </p>
+                            </div>
+                            <Link
+                              href={`/watchlists/${shortlist.id}`}
+                              className="shrink-0 rounded border border-white/10 px-3 py-1.5 text-xs font-black uppercase text-white/45 transition hover:border-red-500/40 hover:text-white"
+                            >
+                              Open
+                            </Link>
+                          </div>
+                          <div className="mt-4 divide-y divide-white/10">
+                            {items.slice(0, 4).map((item) => {
+                              const playerProfile = item.player_profiles;
+                              const profile = playerProfile?.profiles;
+                              const playerHref = playerProfile?.profile_id ? `/players/${playerProfile.profile_id}` : "/players";
+                              return (
+                                <Link
+                                  key={item.id}
+                                  href={playerHref}
+                                  className="block py-3 first:pt-0 last:pb-0"
+                                >
+                                  <p className="font-black text-white transition hover:text-red-300">{profile?.display_name ?? "Unknown player"}</p>
+                                  <p className="mt-1 text-xs font-bold uppercase text-white/35">
+                                    {[playerProfile?.position, playerProfile?.nationality, profile?.location].filter(Boolean).join(" · ") || "Player profile"}
+                                  </p>
+                                  {item.notes && <p className="mt-1 line-clamp-1 text-xs font-semibold text-white/35">{item.notes}</p>}
+                                </Link>
+                              );
+                            })}
+                            {!items.length && (
+                              <p className="py-3 text-sm font-semibold text-white/35">No players added yet.</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-white/10 bg-[#1a1a1a] p-5">
+                    <p className="text-sm font-semibold text-white/35">No player shortlists have been created for this club yet.</p>
+                  </div>
+                )}
+              </section>
             )}
 
             <section>
@@ -324,6 +449,18 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
               </div>
             </section>
 
+            <section>
+              <p className="text-sm font-black uppercase text-red-500">Team Stats</p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {teamStats.map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-white/10 bg-[#1a1a1a] p-5">
+                    <p className="text-xs font-black uppercase text-white/35">{label}</p>
+                    <p className="mt-2 text-2xl font-black text-white">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
           </div>
 
           <aside className="space-y-6">
@@ -337,7 +474,7 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
                   />
                 ) : isOwner ? (
                   <Link
-                    href="/account/edit"
+                    href="/account"
                     className="inline-flex h-14 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Edit profile
@@ -349,13 +486,17 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
                   >
                     Club inbox
                   </Link>
-                ) : (
+                ) : !isAuthenticated ? (
                   <Link
                     href={`/auth/sign-in?return_url=/scouts/${scoutId}`}
                     className="inline-flex h-16 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Sign in to message
                   </Link>
+                ) : (
+                  <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm font-semibold text-white/35">
+                    Club messaging is available between player accounts and this club.
+                  </p>
                 )}
 
                 {isAuthenticated && (
@@ -383,13 +524,13 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
               )}
 
               <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
-                <p className="text-sm font-black uppercase text-red-500">Open Roster Spots</p>
+                <p className="text-sm font-black uppercase text-red-500">Roster Specifications</p>
                 <div className="mt-5 space-y-3">
-                  {(openSpots > 0 ? Array.from({ length: openSpots }) : [null]).map((_, index) => (
+                  {(rosterNeeds.length ? rosterNeeds : openSpots > 0 ? Array.from({ length: openSpots }).map((_, index) => `Roster Spot ${index + 1}`) : ["No open spots listed"]).map((need, index) => (
                     <div key={index} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-b-0 last:pb-0">
-                      <span className="font-bold text-white">{openSpots > 0 ? `Roster Spot ${index + 1}` : "No open spots listed"}</span>
-                      <span className={`rounded border px-3 py-1 text-xs font-bold ${openSpots > 0 ? "border-green-500/60 text-green-400" : "border-white/15 text-white/25"}`}>
-                        {openSpots > 0 ? "Open" : "Filled"}
+                      <span className="font-bold text-white">{need}</span>
+                      <span className={`rounded border px-3 py-1 text-xs font-bold ${rosterNeeds.length || openSpots > 0 ? "border-green-500/60 text-green-400" : "border-white/15 text-white/25"}`}>
+                        {rosterNeeds.length ? "Needed" : openSpots > 0 ? "Open" : "Filled"}
                       </span>
                     </div>
                   ))}
@@ -432,7 +573,7 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
 
               {isOwner && (
                 <Link
-                  href="/account/edit"
+                  href="/account"
                   className="inline-flex h-12 w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-5 text-sm font-black uppercase text-white/50 transition hover:border-red-500/40 hover:text-white"
                 >
                   Edit profile
