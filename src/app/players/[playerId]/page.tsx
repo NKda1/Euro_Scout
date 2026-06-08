@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import ProfileSummary from "@/components/profiles/ProfileSummary";
 import type { FilmLink } from "@/components/players/HudlFilmViewer";
+import type { PublicPlayerNote } from "@/components/players/PublicNotesPanel";
+import type { CareerEntry } from "@/components/profiles/ProfileSummary";
 import type { Profile } from "@/lib/auth";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -46,6 +48,15 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   } = await supabase.auth.getUser();
   const { data: currentProfile } = user
     ? await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role: string }>()
+    : { data: null };
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { data: viewerMembership } = user && currentProfile?.role === "club"
+    ? await serviceClient
+        .from("club_members")
+        .select("team_id")
+        .eq("profile_id", user.id)
+        .limit(1)
+        .maybeSingle<{ team_id: string }>()
     : { data: null };
 
   const { data: player } = await supabase
@@ -108,7 +119,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             backLabel="Back to players"
             showEditLink={user?.id === profile.id}
             showMessageButton={Boolean(user && currentProfile?.role === "club" && user.id !== profile.id)}
-            showMessagesLink={Boolean(user)}
             filmLinks={[]}
           />
         </section>
@@ -120,7 +130,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     redirect(`/profiles/${player.profile_id}`);
   }
 
-  const serviceClient = createSupabaseServiceRoleClient();
   const { data: filmLinks } = await serviceClient
     .from("film_links")
     .select("id, url, provider, film_type, label, is_default")
@@ -128,6 +137,25 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: false })
     .returns<FilmLink[]>();
+  const { data: careerEntries } = await serviceClient
+    .from("player_career_entries")
+    .select("id, team_name, league_name, country, position, start_year, end_year, is_current")
+    .eq("player_profile_id", player.id)
+    .order("start_year", { ascending: false, nullsFirst: false })
+    .returns<CareerEntry[]>();
+  const { data: noteRows } = await serviceClient
+    .from("player_profile_notes")
+    .select("id, note, created_at, teams!team_id ( name )")
+    .eq("player_profile_id", player.id)
+    .eq("status", "published")
+    .order("published_at", { ascending: false })
+    .returns<Array<{ id: string; note: string; created_at: string; teams: { name: string | null } | null }>>();
+  const publicNotes: PublicPlayerNote[] = (noteRows ?? []).map((note) => ({
+    id: note.id,
+    note: note.note,
+    createdAt: note.created_at,
+    clubName: note.teams?.name ?? null
+  }));
 
   return (
     <main className="app-surface">
@@ -139,8 +167,10 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           backLabel="Back to players"
           showEditLink={user?.id === player.profile_id}
           showMessageButton={Boolean(user && currentProfile?.role === "club" && user.id !== player.profile_id)}
-          showMessagesLink={Boolean(user)}
           filmLinks={filmLinks ?? []}
+          careerEntries={careerEntries ?? []}
+          publicNotes={publicNotes}
+          viewerTeamId={viewerMembership?.team_id ?? null}
         />
       </section>
     </main>

@@ -129,49 +129,52 @@ export default async function TeamDetailsPage({ params }: TeamDetailsPageProps) 
 
   return (
     <main className="app-surface">
-      <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-3xl glass-card p-8">
+      <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="glass-card p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-black uppercase tracking-[0.22em] text-red-600">Team Profile</p>
             {isVerified && (
-              <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-700 dark:bg-green-500/15 dark:text-green-300">Verified Club</span>
+              <span className="bg-green-50 px-3 py-1 text-xs font-black text-green-700 dark:bg-green-500/15 dark:text-green-300">Verified Club</span>
             )}
             {isPending && (
-              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Claim Pending</span>
+              <span className="bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Claim Pending</span>
             )}
             {isUnclaimed && (
-              <span className="rounded-full border border-dashed border-slate-300 px-3 py-1 text-xs font-bold text-slate-500 dark:border-white/20 dark:text-slate-400">Unclaimed</span>
+              <span className="border border-dashed border-slate-300 px-3 py-1 text-xs font-bold text-slate-500 dark:border-white/20 dark:text-slate-400">Unclaimed</span>
             )}
             {dbTeam?.recruiting_active && (
-              <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 dark:bg-red-500/15 dark:text-red-300">Recruiting</span>
+              <span className="bg-red-50 px-3 py-1 text-xs font-black text-red-700 dark:bg-red-500/15 dark:text-red-300">Recruiting</span>
             )}
           </div>
 
           <div className="mt-5 flex flex-col gap-6 sm:flex-row sm:items-center">
-            <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-red-50 text-3xl font-black text-red-700 dark:bg-red-500/15 dark:text-red-200">
-              {team.name.split(" ").slice(0, 2).map((part) => part[0]).join("")}
+            <div
+              className="flex h-24 w-24 items-center justify-center border border-red-200 bg-red-50 bg-cover bg-center text-3xl font-black text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-200"
+              style={team.logoUrl ? { backgroundImage: `url(${team.logoUrl})` } : undefined}
+            >
+              {team.logoUrl ? "" : team.name.split(" ").slice(0, 2).map((part) => part[0]).join("")}
             </div>
             <div>
-              <h1 className="text-4xl font-black tracking-tight text-slate-950 dark:text-white">{team.name}</h1>
+              <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">{team.name}</h1>
               <p className="mt-2 text-base text-slate-600 dark:text-slate-300">{team.city}, {team.country}</p>
             </div>
           </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
+            <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">League</p>
               <p className="mt-2 text-sm font-black text-slate-950 dark:text-white">{league?.name ?? team.leagueId}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
+            <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Country</p>
               <p className="mt-2 text-sm font-black text-slate-950 dark:text-white">{team.country}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
+            <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Stadium</p>
               <p className="mt-2 text-sm font-black text-slate-950 dark:text-white">{team.stadium ?? "TBD"}</p>
             </div>
             {dbTeam?.open_roster_spots != null && dbTeam.open_roster_spots > 0 && (
-              <div className="rounded-2xl border border-red-100 bg-red-50/60 p-4 dark:border-red-500/20 dark:bg-red-500/10">
+              <div className="border border-red-100 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
                 <p className="text-xs font-bold uppercase tracking-wide text-red-600 dark:text-red-400">Open Roster Spots</p>
                 <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{dbTeam.open_roster_spots}</p>
               </div>
@@ -179,8 +182,8 @@ export default async function TeamDetailsPage({ params }: TeamDetailsPageProps) 
           </div>
 
           {owner && (
-            <div className="mt-6 flex items-center gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-sm font-black text-red-700 dark:bg-red-500/15 dark:text-red-200">
+            <div className="mt-6 flex items-center gap-4 border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-red-200 bg-red-50 text-sm font-black text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-200">
                 {owner.display_name?.[0] ?? "C"}
               </div>
               <div>
@@ -195,19 +198,19 @@ export default async function TeamDetailsPage({ params }: TeamDetailsPageProps) 
 
           <div className="mt-8 flex flex-wrap gap-3">
             {league && (
-              <Link href={routes.league(league.id)} className="inline-flex h-11 items-center rounded-xl bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
+              <Link href={routes.league(league.id)} className="inline-flex h-11 items-center bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
                 View League
               </Link>
             )}
             {dbTeam?.website && (
-              <a href={dbTeam.website} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center rounded-xl border border-slate-200 bg-white/80 px-5 text-sm font-bold text-slate-700 transition hover:border-red-200 hover:text-red-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+              <a href={dbTeam.website} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-[#111] dark:text-slate-300">
                 Website ↗
               </a>
             )}
             <form action={startConversationAction}>
               <input type="hidden" name="team_id" value={team.id} />
               <input type="hidden" name="subject" value={`EuroScout intro with ${team.name}`} />
-              <button className="h-11 rounded-xl border border-red-200 bg-white/80 px-5 text-sm font-black text-red-700 transition hover:bg-red-50 dark:border-red-400/30 dark:bg-white/10 dark:text-red-200 dark:hover:bg-red-500/10">
+              <button className="h-11 border border-red-200 bg-white px-5 text-sm font-black text-red-700 transition hover:bg-red-50 dark:border-red-400/30 dark:bg-[#111] dark:text-red-200 dark:hover:bg-red-500/10">
                 Contact club
               </button>
             </form>

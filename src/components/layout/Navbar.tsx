@@ -17,15 +17,15 @@ export default async function Navbar() {
   const isAdmin = Boolean(profile?.role === "admin" && isReservedAdminEmail(user?.email));
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/85 shadow-sm shadow-slate-950/[0.04] backdrop-blur-2xl dark:border-white/[0.08] dark:bg-[#060914]/90 dark:shadow-black/20">
-      <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#090909]">
+      <div className="relative mx-auto flex h-16 max-w-[92rem] items-center justify-between px-4 sm:px-6 lg:px-8">
 
         {/* Logo */}
         <Link
           href={routes.home}
           className="flex shrink-0 items-center gap-2.5 transition-opacity duration-150 hover:opacity-80"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-red-500 to-red-700 text-[12px] font-black text-white shadow-lg shadow-red-600/30">
+          <span className="flex h-8 w-8 items-center justify-center bg-red-600 text-[12px] font-black text-white">
             ES
           </span>
           <span className="hidden sm:block">
@@ -46,7 +46,7 @@ export default async function Navbar() {
           {user ? (
             <Link
               href={routes.account}
-              className="hidden items-center gap-1.5 rounded-full bg-red-600 px-4 py-2 text-[13px] font-black text-white shadow-md shadow-red-600/25 transition duration-150 hover:bg-red-700 hover:shadow-lg hover:shadow-red-600/30 active:scale-[0.97] lg:flex"
+              className="hidden items-center gap-1.5 bg-red-600 px-4 py-2 text-[13px] font-black text-white transition duration-150 hover:bg-red-700 active:scale-[0.97] lg:flex"
             >
               Account
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -56,7 +56,7 @@ export default async function Navbar() {
           ) : (
             <Link
               href={routes.signIn}
-              className="hidden rounded-full bg-red-600 px-4 py-2 text-[13px] font-black text-white shadow-md shadow-red-600/25 transition duration-150 hover:bg-red-700 active:scale-[0.97] lg:flex"
+              className="hidden bg-red-600 px-4 py-2 text-[13px] font-black text-white transition duration-150 hover:bg-red-700 active:scale-[0.97] lg:flex"
             >
               Sign In
             </Link>

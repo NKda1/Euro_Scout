@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import type { NewsArticle } from "@/app/api/news/route";
 
@@ -9,10 +9,8 @@ const SOURCE_STYLES: Record<string, { label: string; bg: string; text: string }>
   EFA:  { label: "EFA",  bg: "bg-emerald-600", text: "text-white" }
 };
 
-// Card width (w-72 = 288) + gap (gap-5 = 20)
-const CARD_STEP = 308;
-// How long to pause between auto-steps (ms)
-const AUTO_INTERVAL = 3500;
+const CARD_STEP = 272;
+const SCROLL_SPEED = 34;
 
 function NewsCard({ article }: { article: NewsArticle }) {
   const style = SOURCE_STYLES[article.source] ?? { label: article.source, bg: "bg-slate-600", text: "text-white" };
@@ -22,16 +20,16 @@ function NewsCard({ article }: { article: NewsArticle }) {
       href={article.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex w-72 flex-shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md dark:border-white/10 dark:bg-slate-800/70"
+      className="group flex w-64 flex-shrink-0 flex-col overflow-hidden border border-slate-200 bg-white transition hover:border-red-300 dark:border-white/10 dark:bg-[#111] dark:hover:border-red-500/45"
     >
       {/* Image / fallback */}
-      <div className="relative h-36 overflow-hidden bg-slate-100 dark:bg-slate-700">
+      <div className="relative h-32 overflow-hidden bg-slate-100 dark:bg-[#181818]">
         {article.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={article.image}
             alt={article.title}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className="h-full w-full object-cover"
             onError={(e) => {
               const target = e.currentTarget;
               target.style.display = "none";
@@ -44,11 +42,11 @@ function NewsCard({ article }: { article: NewsArticle }) {
           className="flex h-full w-full items-center justify-center"
           style={{ display: article.image ? "none" : "flex" }}
         >
-          <span className={`rounded-xl px-3 py-1 text-xs font-black ${style.bg} ${style.text}`}>
+          <span className={`px-3 py-1 text-xs font-black ${style.bg} ${style.text}`}>
             {style.label}
           </span>
         </div>
-        <span className={`absolute left-3 top-3 rounded-lg px-2 py-0.5 text-[10px] font-black uppercase tracking-wider shadow ${style.bg} ${style.text}`}>
+        <span className={`absolute left-3 top-3 px-2 py-0.5 text-[10px] font-black uppercase ${style.bg} ${style.text}`}>
           {style.label}
         </span>
       </div>
@@ -72,7 +70,8 @@ export default function EuroNewsSection() {
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     fetch("/api/news")
@@ -81,47 +80,65 @@ export default function EuroNewsSection() {
       .catch(() => setLoading(false));
   }, []);
 
-  const stepForward = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    // If at or near the end, snap back to start
-    if (el.scrollLeft + el.clientWidth >= el.scrollWidth - CARD_STEP) {
-      el.scrollTo({ left: 0, behavior: "smooth" });
-    } else {
-      el.scrollBy({ left: CARD_STEP, behavior: "smooth" });
-    }
-  }, []);
-
-  // Start auto-scroll once articles are loaded
   useEffect(() => {
     if (loading || articles.length === 0) return;
-    intervalRef.current = setInterval(() => {
-      if (!pausedRef.current) stepForward();
-    }, AUTO_INTERVAL);
+
+    function animate(timestamp: number) {
+      const el = scrollRef.current;
+      if (el) {
+        if (lastFrameRef.current == null) {
+          lastFrameRef.current = timestamp;
+        }
+
+        const deltaSeconds = (timestamp - lastFrameRef.current) / 1000;
+        lastFrameRef.current = timestamp;
+
+        if (!pausedRef.current) {
+          const loopWidth = el.scrollWidth / 2;
+          el.scrollLeft += SCROLL_SPEED * deltaSeconds;
+
+          if (loopWidth > 0 && el.scrollLeft >= loopWidth) {
+            el.scrollLeft -= loopWidth;
+          }
+        }
+      }
+
+      rafRef.current = window.requestAnimationFrame(animate);
+    }
+
+    rafRef.current = window.requestAnimationFrame(animate);
+
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      lastFrameRef.current = null;
     };
-  }, [loading, articles.length, stepForward]);
+  }, [loading, articles.length]);
 
   function scroll(dir: "left" | "right") {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollBy({ left: dir === "right" ? CARD_STEP : -CARD_STEP, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (!el) return;
+    const loopWidth = el.scrollWidth / 2;
+    if (dir === "left" && loopWidth > 0 && el.scrollLeft < CARD_STEP) {
+      el.scrollLeft += loopWidth;
+    }
+    el.scrollBy({ left: dir === "right" ? CARD_STEP : -CARD_STEP, behavior: "smooth" });
   }
 
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex items-end justify-between">
-        <div>
-          <p className="text-sm font-black uppercase tracking-[0.22em] text-red-600">Latest News</p>
-          <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <div className="max-w-xl">
+          <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Latest News</p>
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white sm:text-2xl">
             European Football Headlines
           </h2>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => scroll("left")}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="flex h-9 w-9 items-center justify-center border border-slate-200 bg-white text-slate-600 transition hover:border-red-300 dark:border-white/10 dark:bg-[#111] dark:text-slate-300 dark:hover:border-red-500/45"
             aria-label="Scroll left"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,7 +147,7 @@ export default function EuroNewsSection() {
           </button>
           <button
             onClick={() => scroll("right")}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="flex h-9 w-9 items-center justify-center border border-slate-200 bg-white text-slate-600 transition hover:border-red-300 dark:border-white/10 dark:bg-[#111] dark:text-slate-300 dark:hover:border-red-500/45"
             aria-label="Scroll right"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,9 +159,9 @@ export default function EuroNewsSection() {
 
       {/* Cards */}
       {loading ? (
-        <div className="flex gap-5">
+        <div className="flex gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-52 w-72 flex-shrink-0 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+            <div key={i} className="h-52 w-64 flex-shrink-0 animate-pulse bg-slate-100 dark:bg-[#111]" />
           ))}
         </div>
       ) : articles.length === 0 ? (
@@ -152,14 +169,14 @@ export default function EuroNewsSection() {
       ) : (
         <div
           ref={scrollRef}
-          className="flex gap-5 overflow-x-auto pb-2 scrollbar-none"
+          className="flex gap-4 overflow-x-auto pb-2 scrollbar-none"
           style={{ scrollbarWidth: "none" }}
           onMouseEnter={() => { pausedRef.current = true; }}
           onMouseLeave={() => { pausedRef.current = false; }}
           onTouchStart={() => { pausedRef.current = true; }}
           onTouchEnd={() => { pausedRef.current = false; }}
         >
-          {articles.map((article, i) => (
+          {[...articles, ...articles].map((article, i) => (
             <NewsCard key={`${article.source}-${i}`} article={article} />
           ))}
         </div>

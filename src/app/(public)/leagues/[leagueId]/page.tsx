@@ -109,7 +109,7 @@ export default async function LeagueDetailsPage({ params }: LeagueDetailsPagePro
 
   return (
     <main className="app-surface">
-      <section className="mx-auto max-w-7xl space-y-8 px-4 py-12 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[92rem] space-y-8 px-4 py-10 sm:px-6 lg:px-8">
         <LeagueHeader league={league} />
 
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -117,12 +117,12 @@ export default async function LeagueDetailsPage({ params }: LeagueDetailsPagePro
             <h2 className="mb-4 text-2xl font-black tracking-tight text-slate-950 dark:text-white">Teams</h2>
             <TeamGrid teams={leagueTeams} />
           </div>
-          <aside className="rounded-3xl glass-card p-6">
-            <h2 className="text-sm font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Coverage</h2>
+          <aside className="glass-card p-6">
+            <h2 className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">Coverage</h2>
             <div className="mt-4 space-y-3">
               {leagueRegions.map((region) => (
-                <div key={region.id} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                  <span className="text-sm font-bold text-slate-800">{region.name}</span>
+                <div key={region.id} className="flex items-center justify-between border border-slate-200 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-[#090909]">
+                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{region.name}</span>
                   <span className="text-xs font-black text-red-600">{region.countryCode}</span>
                 </div>
               ))}

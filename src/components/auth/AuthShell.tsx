@@ -7,58 +7,44 @@ interface AuthShellProps {
 }
 
 export default function AuthShell({ eyebrow, title, children }: AuthShellProps) {
+  const points = [
+    ["🌍", "Discover leagues and teams across 11+ countries"],
+    ["🔍", "Scout, player and coach profiles in one network"],
+    ["🎬", "Film links, market tiers and transfer availability"]
+  ] as const;
+
   return (
-    <main className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-slate-950">
-      {/* Cinematic background carousel — same frames as the hero */}
+    <main className="relative isolate min-h-[calc(100vh-4rem)] overflow-hidden border-t border-slate-200 bg-slate-950 text-white dark:border-white/10">
       <div className="hero-cinematic-frame hero-cinematic-frame-1" />
       <div className="hero-cinematic-frame hero-cinematic-frame-2" />
       <div className="hero-cinematic-frame hero-cinematic-frame-3" />
       <div className="hero-cinematic-frame hero-cinematic-frame-4" />
       <div className="hero-cinematic-frame hero-cinematic-frame-5" />
       <div className="hero-cinematic-frame hero-cinematic-frame-6" />
-
-      {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(2,6,23,.97)_0%,rgba(2,6,23,.84)_42%,rgba(2,6,23,.52)_72%,rgba(2,6,23,.76)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(220,38,38,.3),transparent_32rem)]" />
-      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-slate-950 to-transparent" />
-
-      {/* Content */}
-      <section className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid w-full gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
-
-          {/* Left — marketing copy */}
-          <div>
-            <p className="text-sm font-black uppercase tracking-[0.24em] text-red-400">{eyebrow}</p>
-            <h1 className="mt-4 text-4xl font-black tracking-tight text-white sm:text-5xl">{title}</h1>
-            <p className="mt-5 max-w-lg text-base leading-7 text-slate-300 sm:text-lg">
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,.97)_0%,rgba(2,6,23,.82)_54%,rgba(2,6,23,.62)_100%)]" />
+      <section className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid w-full gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-12">
+          <div className="border-l-4 border-red-600 pl-5">
+            <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">{eyebrow}</p>
+            <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">{title}</h1>
+            <p className="mt-4 max-w-lg text-base leading-7 text-slate-200">
               Build your scouting identity, connect with European football talent and track the market from one premium platform.
             </p>
-            <div className="mt-8 space-y-3">
-              {(
-                [
-                  ["Discover leagues & teams across 11+ countries", "🌍"],
-                  ["Scout, player and coach profiles in one network", "🔍"],
-                  ["Film links, market tiers and transfer availability", "🎬"]
-                ] as [string, string][]
-              ).map(([text, icon]) => (
+            <div className="mt-7 space-y-3">
+              {points.map(([emoji, text]) => (
                 <div key={text} className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-red-600/20 text-base">{icon}</span>
-                  <span className="text-sm font-semibold text-slate-200">{text}</span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/10 bg-white/10 text-base">{emoji}</span>
+                  <span className="text-sm font-semibold text-slate-100">{text}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Right — form card (forced dark so dark: variants apply inside) */}
-          <div className="dark">
-            <div className="rounded-3xl border border-white/12 bg-slate-900/85 p-6 shadow-2xl shadow-black/50 backdrop-blur-2xl sm:p-8">
-              {children}
-            </div>
+          <div className="border border-white/10 bg-[#111]/95 p-6 shadow-2xl shadow-black/30 sm:p-8">
+            {children}
           </div>
-
         </div>
       </section>
     </main>
   );
 }
-

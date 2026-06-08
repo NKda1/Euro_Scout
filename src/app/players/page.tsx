@@ -98,22 +98,22 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
   }
 
   return (
-    <main className="app-surface">
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <p className="eyebrow-red">Player Accounts</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 dark:text-white">Browse EuroScout players.</h1>
-          <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 dark:text-slate-300">
+    <main className="min-h-screen bg-[#090909] text-white">
+      <section className="mx-auto max-w-[92rem] px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mb-8 border-b border-white/10 pb-8">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-500">Player Accounts</p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-white">Browse EuroScout players.</h1>
+          <p className="mt-3 max-w-3xl text-base leading-7 text-white/55">
             Public player profiles are visible to everyone. Filter to find the right prospect pool.
           </p>
         </div>
 
-        <Suspense fallback={<div className="mb-6 h-28 animate-pulse rounded-3xl bg-slate-100 dark:bg-white/10" />}>
+        <Suspense fallback={<div className="mb-5 h-28 animate-pulse border border-white/10 bg-white/10" />}>
           <PlayerFilters nationalities={distinctNationalities} activeFilters={sp} />
         </Suspense>
 
         {error ? (
-          <div className="rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
+          <div className="border border-red-500/40 bg-red-500/10 p-5 text-sm font-bold text-red-200">
             {error.message}
           </div>
         ) : (

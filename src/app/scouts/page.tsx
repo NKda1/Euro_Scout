@@ -94,20 +94,20 @@ export default async function ClubDirectoryPage() {
   });
 
   return (
-    <main className="app-surface">
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <p className="eyebrow-red">Club Directory</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 dark:text-white">Browse clubs on EuroScout.</h1>
-          <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 dark:text-slate-300">Find claimed club profiles, see their roster spots and connect with their management.</p>
+    <main className="min-h-screen bg-[#090909] text-white">
+      <section className="mx-auto max-w-[92rem] px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mb-8 border-b border-white/10 pb-8">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-500">Club Directory</p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-white">Browse clubs on EuroScout.</h1>
+          <p className="mt-3 max-w-3xl text-base leading-7 text-white/55">Find claimed club profiles, see their roster spots and connect with their management.</p>
         </div>
 
         {error ? (
-          <p className="rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{error.message}</p>
+          <p className="border border-red-500/40 bg-red-500/10 p-5 text-sm font-bold text-red-200">{error.message}</p>
         ) : clubs.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-white/75 p-8 text-center backdrop-blur-xl dark:border-white/15 dark:bg-white/10">
-            <h2 className="text-sm font-black text-slate-950 dark:text-white">No club accounts yet</h2>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Claimed and newly created clubs will appear here.</p>
+          <div className="border border-dashed border-white/15 bg-[#111] p-8 text-center">
+            <h2 className="text-sm font-black text-white">No club accounts yet</h2>
+            <p className="mt-2 text-sm text-white/45">Claimed and newly created clubs will appear here.</p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -115,35 +115,43 @@ export default async function ClubDirectoryPage() {
               <Link
                 key={team.id}
                 href={`/scouts/${team.id}`}
-                className="rounded-3xl glass-card p-5 transition hover:-translate-y-0.5 hover:border-red-200 hover:shadow-lg dark:hover:border-red-400/40"
+                className="group border border-white/10 bg-[#111] transition hover:border-red-500/45 hover:bg-[#151515]"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-red-600 dark:text-red-400">
-                    {team.claim_status === "verified" ? "Verified Club" : "Pending Verification"}
-                  </p>
-                  {team.recruiting_active && (
-                    <span className="rounded-full bg-green-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-green-700 dark:bg-green-500/15 dark:text-green-300">
-                      Recruiting
-                    </span>
-                  )}
-                </div>
-                <div className="mt-4 flex items-center gap-3">
+                <div className="flex items-center gap-4 border-b border-white/10 p-4">
                   <div
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-950 bg-cover bg-center text-sm font-black text-white ring-4 ring-red-100 dark:ring-red-500/20"
+                    className="flex h-16 w-16 shrink-0 items-center justify-center border border-red-500/50 bg-[#202020] bg-cover bg-center text-sm font-black text-white"
                     style={team.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.58)), url(${team.logo_url})` } : undefined}
                   >
                     {team.logo_url ? "" : team.name.split(" ").slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
                   </div>
-                  <h2 className="min-w-0 text-2xl font-black text-slate-950 dark:text-white">{team.name}</h2>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="border border-white/10 bg-black/25 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-red-300">
+                        {team.claim_status === "verified" ? "Verified" : "Pending"}
+                      </span>
+                      {team.recruiting_active && (
+                        <span className="border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-300">
+                          Recruiting
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="mt-2 truncate text-2xl font-black text-white group-hover:text-red-300">{team.name}</h2>
+                  </div>
                 </div>
-                {(team.city || team.country) && (
-                  <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    {[team.city, team.country].filter(Boolean).join(", ")}
+                <div className="space-y-3 p-4">
+                  {(team.city || team.country) && (
+                    <p className="text-sm font-semibold text-white/45">
+                      {[team.city, team.country].filter(Boolean).join(", ")}
+                    </p>
+                  )}
+                  <p className="line-clamp-2 min-h-10 text-sm leading-5 text-white/55">
+                    {profile?.headline ?? profile?.display_name ?? "Club profile pending setup"}
                   </p>
-                )}
-                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                  {profile?.headline ?? profile?.display_name ?? "Club profile pending setup"}
-                </p>
+                </div>
+                <div className="flex items-center justify-between border-t border-white/10 px-4 py-3">
+                  <span className="text-xs font-bold uppercase tracking-wide text-white/30">Club profile</span>
+                  <span className="text-xs font-black uppercase tracking-wide text-red-400">View</span>
+                </div>
               </Link>
             ))}
           </div>

@@ -187,6 +187,46 @@ export async function updateWatchlistItemNotesAction(formData: FormData) {
   revalidatePath(`/watchlists/${watchlistId}`);
 }
 
+// ─── Update recruitment status on a watchlist item ───────────────────────────
+
+export async function updateWatchlistItemRecruitmentStatusAction(formData: FormData) {
+  const { serviceClient, profile, teamId } = await requireConnectedClub();
+  const watchlistItemId = text(formData, "watchlist_item_id");
+  const watchlistId = text(formData, "watchlist_id");
+  const status = text(formData, "recruitment_status");
+  const returnPath = text(formData, "return_path") || "/watchlists";
+  const allowedStatuses = new Set(["watchlisted", "in_negotiations", "signed", "archived"]);
+
+  if (!allowedStatuses.has(status)) {
+    redirect(`${returnPath}?error=Choose a valid recruitment status.`);
+  }
+
+  if (profile.role !== "admin") {
+    const { data: wl } = await serviceClient
+      .from("watchlists")
+      .select("id")
+      .eq("id", watchlistId)
+      .eq("team_id", teamId)
+      .maybeSingle<{ id: string }>();
+    if (!wl) redirect("/watchlists?error=Watchlist not found.");
+  }
+
+  const { error } = await serviceClient
+    .from("watchlist_items")
+    .update({
+      recruitment_status: status,
+      status_updated_at: new Date().toISOString()
+    })
+    .eq("id", watchlistItemId)
+    .eq("watchlist_id", watchlistId);
+
+  if (error) redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
+
+  revalidatePath(`/watchlists/${watchlistId}`);
+  revalidatePath(returnPath);
+  redirect(`${returnPath}?notice=Recruitment status updated.`);
+}
+
 // ─── Export watchlist as CSV (premium gate stub) ──────────────────────────────
 
 export async function exportWatchlistCsvAction(watchlistId: string): Promise<string> {

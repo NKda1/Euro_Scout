@@ -17,13 +17,13 @@ interface LeagueCardProps {
 
 export default function LeagueCard({ league, compact = false, teams = [], expanded = false, onViewLeague }: LeagueCardProps) {
   return (
-    <article className="rounded-2xl glass-card p-5 transition hover:-translate-y-0.5 hover:border-red-200 hover:shadow-lg dark:hover:border-red-400/40">
+    <article className="glass-card p-5 transition hover:border-red-300 dark:hover:border-red-500/45">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-600">{league.shortName}</p>
           <h3 className="mt-2 text-lg font-bold text-slate-950 dark:text-white">{league.name}</h3>
         </div>
-        <div className="rounded-xl bg-slate-950 px-3 py-2 text-center text-white dark:bg-white dark:text-slate-950">
+        <div className="bg-slate-950 px-3 py-2 text-center text-white dark:bg-white dark:text-slate-950">
           <p className="text-lg font-black leading-none">{league.teamCount}</p>
           <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 dark:text-slate-500">Teams</p>
         </div>
@@ -43,14 +43,14 @@ export default function LeagueCard({ league, compact = false, teams = [], expand
             type="button"
             onClick={onViewLeague}
             aria-expanded={expanded}
-            className="inline-flex h-10 items-center rounded-xl bg-red-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-red-700"
+            className="inline-flex h-10 items-center bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700"
           >
             {expanded ? "Hide Teams" : "View League"}
           </button>
         ) : (
           <Link
             href={routes.league(league.id)}
-            className="inline-flex h-10 items-center rounded-xl bg-red-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-red-700"
+            className="inline-flex h-10 items-center bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-700"
           >
             View League
           </Link>
@@ -58,7 +58,7 @@ export default function LeagueCard({ league, compact = false, teams = [], expand
         {expanded ? (
           <Link
             href={routes.league(league.id)}
-            className="inline-flex h-10 items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/75 px-4 text-sm font-bold text-slate-700 transition hover:border-red-200 hover:text-red-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:border-red-400/40 dark:hover:text-red-300"
+            className="inline-flex h-10 items-center border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-[#111] dark:text-slate-200 dark:hover:border-red-500/45 dark:hover:text-red-300"
           >
             Full Profile
           </Link>

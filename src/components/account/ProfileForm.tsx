@@ -93,7 +93,7 @@ export default function ProfileForm({ action, profile, roleProfile, submitLabel,
             <input name="available_for_transfer" type="checkbox" defaultChecked={Boolean(roleProfile?.available_for_transfer)} className="h-4 w-4 rounded border-slate-300 text-red-600" />
             Available for transfer
           </label>
-          <textarea name="photo_urls" placeholder="Profile photo URLs, one per line (max 5)" defaultValue={roleProfile?.photo_urls?.join("\n") ?? ""} className={`${textareaClass} md:col-span-2`} />
+          <textarea name="photo_urls" placeholder="Profile photo URLs, one per line (max 4)" defaultValue={roleProfile?.photo_urls?.join("\n") ?? ""} className={`${textareaClass} md:col-span-2`} />
         </div>
       </div>
 

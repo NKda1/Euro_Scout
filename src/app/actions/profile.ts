@@ -30,6 +30,46 @@ function boolValue(formData: FormData, key: string) {
   return formData.get(key) === "on";
 }
 
+function parseCareerTimeline(formData: FormData) {
+  const raw = String(formData.get("career_timeline_json") ?? "").trim();
+  if (!raw) return [];
+
+  try {
+    const entries = JSON.parse(raw) as Array<Record<string, unknown>>;
+    return entries
+      .map((entry) => ({
+        team_name: String(entry.team_name ?? "").trim(),
+        league_name: String(entry.league_name ?? "").trim() || null,
+        country: String(entry.country ?? "").trim() || null,
+        position: String(entry.position ?? "").trim() || null,
+        start_year: Number(entry.start_year) || null,
+        end_year: Number(entry.end_year) || null,
+        is_current: entry.is_current === true
+      }))
+      .filter((entry) => entry.team_name)
+      .slice(0, 12);
+  } catch {
+    return raw
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [teamName, leagueName, country, position, startYear, endYear, current] = line.split("|").map((part) => part.trim());
+        return {
+          team_name: teamName,
+          league_name: leagueName || null,
+          country: country || null,
+          position: position || null,
+          start_year: Number(startYear) || null,
+          end_year: Number(endYear) || null,
+          is_current: /^(current|present|yes|true)$/i.test(current ?? "")
+        };
+      })
+      .filter((entry) => entry.team_name)
+      .slice(0, 12);
+  }
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -65,12 +105,36 @@ async function upsertPlayerProfile(supabase: Awaited<ReturnType<typeof getAuthen
   };
 
   if (formData.has("photo_urls")) {
-    payload.photo_urls = text(formData, "photo_urls")?.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 5) ?? [];
+    payload.photo_urls = text(formData, "photo_urls")?.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 4) ?? [];
   }
 
-  await supabase.from("player_profiles").upsert(
-    payload,
-    { onConflict: "profile_id" }
+  const { data: playerProfile } = await supabase
+    .from("player_profiles")
+    .upsert(payload, { onConflict: "profile_id" })
+    .select("id")
+    .single<{ id: string }>();
+
+  return playerProfile?.id ?? null;
+}
+
+async function replaceCareerTimeline(
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>,
+  playerProfileId: string | null,
+  formData: FormData
+) {
+  if (!playerProfileId || !formData.has("career_timeline_json")) return;
+
+  const entries = parseCareerTimeline(formData);
+  await serviceClient.from("player_career_entries").delete().eq("player_profile_id", playerProfileId);
+
+  if (!entries.length) return;
+
+  await serviceClient.from("player_career_entries").insert(
+    entries.map((entry) => ({
+      ...entry,
+      player_profile_id: playerProfileId,
+      updated_at: new Date().toISOString()
+    }))
   );
 }
 
@@ -183,7 +247,8 @@ export async function completeOnboardingAction(formData: FormData) {
   }
 
   if (roleValue === "player") {
-    await upsertPlayerProfile(supabase, user.id, formData);
+    const playerProfileId = await upsertPlayerProfile(supabase, user.id, formData);
+    await replaceCareerTimeline(serviceClient, playerProfileId, formData);
   }
 
   if (roleValue === "club") {
@@ -343,7 +408,9 @@ export async function updateAccountAction(formData: FormData) {
   }
 
   if (roleValue === "player") {
-    await upsertPlayerProfile(supabase, user.id, formData);
+    const serviceClient = createSupabaseServiceRoleClient();
+    const playerProfileId = await upsertPlayerProfile(supabase, user.id, formData);
+    await replaceCareerTimeline(serviceClient, playerProfileId, formData);
   }
 
   revalidatePath("/account");

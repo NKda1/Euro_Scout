@@ -11,14 +11,14 @@ interface TeamListProps {
 export default function TeamList({ teams, className }: TeamListProps) {
   if (teams.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white/75 px-4 py-5 text-sm font-semibold text-slate-500 backdrop-blur-xl dark:border-white/15 dark:bg-white/10 dark:text-slate-400">
+      <div className="border border-dashed border-slate-300 bg-white px-4 py-5 text-sm font-semibold text-slate-500 dark:border-white/15 dark:bg-[#111] dark:text-slate-400">
         No teams match this view yet.
       </div>
     );
   }
 
   return (
-    <ul className={cn("divide-y divide-slate-100 overflow-x-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white/85 backdrop-blur-xl dark:divide-white/10 dark:border-white/10 dark:bg-white/10", className)}>
+    <ul className={cn("divide-y divide-slate-100 overflow-x-hidden border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-[#111]", className)}>
       {teams.map((team) => (
         <li key={team.id}>
           <Link href={routes.team(team.id)} className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-red-50/60 dark:hover:bg-red-500/10">

@@ -75,10 +75,10 @@ function isRedirectError(err: unknown): boolean {
 // ─── Shared UI primitives ─────────────────────────────────────────────────────
 
 const inputClass =
-  "h-12 w-full rounded-2xl border border-slate-200 bg-white/85 px-4 text-sm font-semibold text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-slate-500 dark:focus:ring-red-500/20";
+  "h-11 w-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-[#111] dark:text-white dark:placeholder:text-white/25";
 
 const selectClass =
-  "h-12 w-full rounded-2xl border border-slate-200 bg-white/85 px-4 text-sm font-semibold text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:focus:ring-red-500/20";
+  "h-11 w-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-[#111] dark:text-white";
 
 function FieldLabel({ required, children }: { required?: boolean; children: ReactNode }) {
   return (
@@ -107,7 +107,7 @@ function CheckIcon() {
 function ToggleChip({ label, selected, onToggle }: { label: string; selected: boolean; onToggle: () => void }) {
   return (
     <button type="button" onClick={onToggle} className={cn(
-      "rounded-xl border px-3 py-1.5 text-xs font-bold transition",
+      "border px-3 py-1.5 text-xs font-bold transition",
       selected
         ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-300"
         : "border-slate-200 bg-white/70 text-slate-600 hover:border-red-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:border-red-500/30"
@@ -270,6 +270,7 @@ function PlayerStep(props: {
   currentTeamId:        string; setCurrentTeamId:        (v: string) => void;
   pipelineType:         string; setPipelineType:         (v: string) => void;
   availableForTransfer: boolean; setAvailableForTransfer: (v: boolean) => void;
+  careerTimeline:       string; setCareerTimeline:       (v: string) => void;
 }) {
   const age = calcAge(props.dob);
   const heightCm = feetInchesToCm(Number(props.heightFt) || 0, Number(props.heightIn) || 0);
@@ -318,8 +319,8 @@ function PlayerStep(props: {
           <FieldLabel>Passport eligible</FieldLabel>
           <div className="flex gap-3">
             {([{ val: true, label: "Yes" }, { val: false, label: "No" }, { val: null, label: "Not sure" }] as const).map(({ val, label }) => (
-              <button key={label} type="button" onClick={() => props.setPassportReady(val)}
-                className={cn("rounded-xl border px-4 py-2 text-sm font-bold transition",
+            <button key={label} type="button" onClick={() => props.setPassportReady(val)}
+                className={cn("border px-4 py-2 text-sm font-bold transition",
                   props.passportReady === val
                     ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-300"
                     : "border-slate-200 bg-white/70 text-slate-600 hover:border-red-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-400"
@@ -382,9 +383,18 @@ function PlayerStep(props: {
               {teams.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.country})</option>)}
             </select>
           </label>
+          <label className="block sm:col-span-2">
+            <FieldLabel>Career timeline</FieldLabel>
+            <textarea
+              value={props.careerTimeline}
+              onChange={(e) => props.setCareerTimeline(e.target.value)}
+              placeholder={"Team | League | Country | Position | 2024 | 2026 | current\nTeam | League | Country | Position | 2022 | 2024"}
+              className="min-h-28 w-full border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-[#111] dark:text-white dark:placeholder:text-white/25"
+            />
+          </label>
         </div>
 
-        <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3.5 transition hover:border-red-200 dark:border-white/10 dark:bg-white/5 dark:hover:border-red-500/30">
+        <label className="mt-4 flex cursor-pointer items-center gap-3 border border-slate-200 bg-white px-4 py-3.5 transition hover:border-red-200 dark:border-white/10 dark:bg-[#111] dark:hover:border-red-500/30">
           <span className={cn(
             "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition",
             props.availableForTransfer ? "border-red-600 bg-red-600" : "border-slate-300 dark:border-white/30"
@@ -657,6 +667,7 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
   const [currentTeamId,        setCurrentTeamId]        = useState("");
   const [pipelineType,         setPipelineType]         = useState("");
   const [availableForTransfer, setAvailableForTransfer] = useState(false);
+  const [careerTimeline,       setCareerTimeline]       = useState("");
 
   // Step 3 – club
   const [teamSearch,     setTeamSearch]     = useState("");
@@ -715,6 +726,7 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     fd.append("weight_kg",         weightKg);
     fd.append("current_team_id",   currentTeamId);
     fd.append("pipeline_type",     pipelineType);
+    fd.append("career_timeline_json", careerTimeline);
     if (availableForTransfer) fd.append("available_for_transfer", "on");
 
     // Club fields
@@ -762,7 +774,7 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
         </div>
 
         {currentError && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-300">
+          <div className="mb-6 border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-300">
             {currentError}
           </div>
         )}
@@ -792,6 +804,7 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
               currentTeamId={currentTeamId}               setCurrentTeamId={setCurrentTeamId}
               pipelineType={pipelineType}                 setPipelineType={setPipelineType}
               availableForTransfer={availableForTransfer} setAvailableForTransfer={setAvailableForTransfer}
+              careerTimeline={careerTimeline}             setCareerTimeline={setCareerTimeline}
             />
           )}
           {step === roleStepNum && role === "club" && (
@@ -820,7 +833,7 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
           {step > 1 ? (
             <button
               type="button" onClick={() => setStep((s) => Math.max(s - 1, 1))} disabled={isPending}
-              className="inline-flex h-11 items-center rounded-2xl border border-slate-200 bg-white/80 px-5 text-sm font-bold text-slate-700 transition hover:border-red-200 hover:text-red-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-red-500/30 dark:hover:text-red-300"
+              className="inline-flex h-11 items-center border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-red-200 hover:text-red-700 dark:border-white/10 dark:bg-[#111] dark:text-slate-300 dark:hover:border-red-500/30 dark:hover:text-red-300"
             >
               ← Back
             </button>
@@ -830,14 +843,14 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
             <button
               type="button" onClick={() => { if (canAdvance) setStep((s) => Math.min(s + 1, totalSteps)); }}
               disabled={!canAdvance}
-              className="inline-flex h-11 items-center rounded-2xl bg-red-600 px-6 text-sm font-black text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-11 items-center bg-red-600 px-6 text-sm font-black text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Continue →
             </button>
           ) : (
             <button
               type="button" onClick={handleSubmit} disabled={isPending}
-              className="inline-flex h-11 items-center rounded-2xl bg-red-600 px-6 text-sm font-black text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center bg-red-600 px-6 text-sm font-black text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPending ? "Setting up your profile…" : "Complete onboarding"}
             </button>

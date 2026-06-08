@@ -27,15 +27,15 @@ export default function ClubProfileHealthCard({
   ];
 
   return (
-    <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
-      <p className="text-sm font-black uppercase text-red-500">Profile Health</p>
+    <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
+      <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Profile Health</p>
       <div className="mt-5">
         <div className="mb-4 flex items-center justify-between text-sm">
-          <span className="font-bold text-white/55">Completeness</span>
-          <span className="font-black text-white">{completeness}%</span>
+          <span className="font-bold text-slate-500 dark:text-white/55">Completeness</span>
+          <span className="font-black text-slate-950 dark:text-white">{completeness}%</span>
         </div>
-        <div className="mb-5 h-2 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-red-500" style={{ width: `${completeness}%` }} />
+        <div className="mb-5 h-2 overflow-hidden bg-slate-200 dark:bg-white/10">
+          <div className="h-full bg-red-500" style={{ width: `${completeness}%` }} />
         </div>
       </div>
       <div className="space-y-3">
@@ -45,14 +45,14 @@ export default function ClubProfileHealthCard({
             key={label}
             className="flex items-center justify-between text-sm"
           >
-            <span className="font-bold text-white/55">{label}</span>
+            <span className="font-bold text-slate-500 dark:text-white/55">{label}</span>
             <span
               className={`font-black ${
                 status === "good"
                   ? "text-emerald-400"
                   : status === "bad"
-                    ? "text-white/30"
-                    : "text-white"
+                    ? "text-slate-400 dark:text-white/30"
+                    : "text-slate-950 dark:text-white"
               }`}
             >
               {value}

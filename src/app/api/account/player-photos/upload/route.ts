@@ -3,6 +3,7 @@ import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/l
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
 const MAX_PROFILE_IMAGE_BYTES = 7 * 1024 * 1024;
+const MAX_PLAYER_PHOTOS = 4;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 function accountRedirect(request: NextRequest, params: Record<string, string>) {
@@ -71,8 +72,8 @@ export async function POST(request: NextRequest) {
   }
 
   const currentPhotos = playerProfile.photo_urls ?? [];
-  if (currentPhotos.length >= 5) {
-    return accountRedirect(request, { error: "Maximum of 5 profile pictures reached." });
+  if (currentPhotos.length >= MAX_PLAYER_PHOTOS) {
+    return accountRedirect(request, { error: "Maximum of 4 profile pictures reached." });
   }
 
   const extension = safeFileName(photo.name).split(".").pop() || "jpg";
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data } = serviceClient.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
-  const photos = [...currentPhotos, data.publicUrl].slice(0, 5);
+  const photos = [...currentPhotos, data.publicUrl].slice(0, MAX_PLAYER_PHOTOS);
   const { error: updateError } = await serviceClient
     .from("player_profiles")
     .update({ photo_urls: photos, updated_at: new Date().toISOString() })

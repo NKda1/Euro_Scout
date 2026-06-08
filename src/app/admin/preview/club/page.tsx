@@ -184,23 +184,18 @@ export default function MockClubProfilePreviewPage() {
             <ClubMediaSection scoutId={MOCK_SCOUT_ID} teamId={MOCK_TEAM_ID} media={MOCK_MEDIA} isMember={false} />
 
             <ClubPipelineSection
-              teamId={MOCK_TEAM_ID}
-              isOwner={false}
-              pipelineNamesPublic={MOCK_TEAM.pipeline_names_public}
+              scoutId={MOCK_SCOUT_ID}
+              canView={false}
+              watchlisted={[]}
+              reachedOut={[]}
+              interested={[]}
             />
 
             <section>
               <p className="text-sm font-black uppercase text-red-500">Club Profile</p>
-              <div className="mt-5 flex gap-8 border-b border-white/10 text-sm font-black uppercase">
-                {["About", "Roster", "History", "News"].map((tab, index) => (
-                  <span key={tab} className={`pb-4 ${index === 0 ? "border-b-2 border-red-500 text-red-500" : "text-white/35"}`}>
-                    {tab}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-6 rounded-lg border border-white/15 bg-[#1a1a1a] p-7">
-                <p className="text-lg font-semibold leading-8 text-white/65">{MOCK_PROFILE.bio}</p>
-                <div className="mt-7 border-t border-white/10 text-sm">
+              <div className="mt-5 rounded-lg border border-white/15 bg-[#1a1a1a] p-7">
+                <p className="text-base font-semibold leading-7 text-white/65">{MOCK_PROFILE.bio}</p>
+                <div className="mt-5 border-t border-white/10 text-sm">
                   <div className="flex items-center justify-between border-b border-white/10 py-3">
                     <span className="text-white/35">Stadium</span>
                     <span className="font-bold text-white">{MOCK_TEAM.stadium}</span>

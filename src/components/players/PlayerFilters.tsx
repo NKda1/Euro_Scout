@@ -67,12 +67,12 @@ export default function PlayerFilters({ nationalities, activeFilters }: PlayerFi
   ].filter(Boolean).length;
 
   return (
-    <div className="mb-6 rounded-3xl glass-card p-5">
+    <div className="mb-5 border border-white/10 bg-[#111] p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="eyebrow-red">Filters</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-500">Filters</p>
           {activeCount > 0 && (
-            <p className="mt-1 text-xs font-bold text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs font-bold text-white/35">
               {activeCount} active filter{activeCount !== 1 ? "s" : ""}
             </p>
           )}
@@ -81,7 +81,7 @@ export default function PlayerFilters({ nationalities, activeFilters }: PlayerFi
           <button
             type="button"
             onClick={clearAll}
-            className="rounded-xl px-3 py-1.5 text-xs font-black text-slate-500 transition hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
+            className="px-3 py-1.5 text-xs font-black text-white/45 transition hover:text-red-300"
           >
             Clear all
           </button>
@@ -93,7 +93,7 @@ export default function PlayerFilters({ nationalities, activeFilters }: PlayerFi
         <select
           value={activeFilters.position ?? ""}
           onChange={(e) => setFilter("position", e.target.value || null)}
-          className="h-10 rounded-2xl border border-slate-200 bg-white/85 px-3 text-sm font-black text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:focus:ring-red-500/20"
+          className="h-10 border border-white/10 bg-black/35 px-3 text-sm font-black text-white outline-none transition focus:border-red-500"
         >
           <option value="">All positions</option>
           {POSITIONS.map((p) => (
@@ -105,7 +105,7 @@ export default function PlayerFilters({ nationalities, activeFilters }: PlayerFi
         <select
           value={activeFilters.nationality ?? ""}
           onChange={(e) => setFilter("nationality", e.target.value || null)}
-          className="h-10 rounded-2xl border border-slate-200 bg-white/85 px-3 text-sm font-black text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:focus:ring-red-500/20"
+          className="h-10 border border-white/10 bg-black/35 px-3 text-sm font-black text-white outline-none transition focus:border-red-500"
         >
           <option value="">All nationalities</option>
           {nationalities.map((n) => (
@@ -117,7 +117,7 @@ export default function PlayerFilters({ nationalities, activeFilters }: PlayerFi
         <select
           value={activeFilters.pipeline ?? ""}
           onChange={(e) => setFilter("pipeline", e.target.value || null)}
-          className="h-10 rounded-2xl border border-slate-200 bg-white/85 px-3 text-sm font-black text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:focus:ring-red-500/20"
+          className="h-10 border border-white/10 bg-black/35 px-3 text-sm font-black text-white outline-none transition focus:border-red-500"
         >
           <option value="">All pipelines</option>
           {PIPELINE_TYPES.map((pt) => (
@@ -129,7 +129,7 @@ export default function PlayerFilters({ nationalities, activeFilters }: PlayerFi
         <select
           value={activeFilters.tier ?? ""}
           onChange={(e) => setFilter("tier", e.target.value || null)}
-          className="h-10 rounded-2xl border border-slate-200 bg-white/85 px-3 text-sm font-black text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:focus:ring-red-500/20"
+          className="h-10 border border-white/10 bg-black/35 px-3 text-sm font-black text-white outline-none transition focus:border-red-500"
         >
           <option value="">All tiers</option>
           {TIERS.map((t) => (
@@ -141,10 +141,10 @@ export default function PlayerFilters({ nationalities, activeFilters }: PlayerFi
         <button
           type="button"
           onClick={() => setFilter("available", activeFilters.available === "1" ? null : "1")}
-          className={`h-10 rounded-2xl border px-4 text-sm font-black transition ${
+          className={`h-10 border px-4 text-sm font-black transition ${
             activeFilters.available === "1"
               ? "border-red-400 bg-red-600 text-white"
-              : "border-slate-200 bg-white/85 text-slate-900 hover:border-red-300 dark:border-white/10 dark:bg-white/10 dark:text-white"
+              : "border-white/10 bg-black/35 text-white hover:border-red-500/45"
           }`}
         >
           Available only
@@ -154,10 +154,10 @@ export default function PlayerFilters({ nationalities, activeFilters }: PlayerFi
         <button
           type="button"
           onClick={() => setFilter("passport_ready", activeFilters.passport_ready === "1" ? null : "1")}
-          className={`h-10 rounded-2xl border px-4 text-sm font-black transition ${
+          className={`h-10 border px-4 text-sm font-black transition ${
             activeFilters.passport_ready === "1"
               ? "border-red-400 bg-red-600 text-white"
-              : "border-slate-200 bg-white/85 text-slate-900 hover:border-red-300 dark:border-white/10 dark:bg-white/10 dark:text-white"
+              : "border-white/10 bg-black/35 text-white hover:border-red-500/45"
           }`}
         >
           Passport ready

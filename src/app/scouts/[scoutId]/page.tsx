@@ -6,7 +6,7 @@ import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/l
 import { getLeagueByIdOrSlug } from "@/lib/data";
 import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMediaSection";
 import ContactClubButton from "@/components/scouts/ContactClubButton";
-import ClubPipelineSection from "@/components/scouts/ClubPipelineSection";
+import ClubPipelineSection, { type PipelinePlayer } from "@/components/scouts/ClubPipelineSection";
 import ClubProfileHealthCard from "@/components/scouts/ClubProfileHealthCard";
 
 export const metadata: Metadata = {
@@ -16,6 +16,10 @@ export const metadata: Metadata = {
 interface ClubProfilePageProps {
   params: Promise<{
     scoutId: string;
+  }>;
+  searchParams: Promise<{
+    error?: string;
+    notice?: string;
   }>;
 }
 
@@ -63,7 +67,9 @@ interface ShortlistRow {
   watchlist_items: Array<{
     id: string;
     notes: string | null;
+    recruitment_status: string | null;
     player_profiles: {
+      id: string;
       profile_id: string;
       position: string | null;
       nationality: string | null;
@@ -71,9 +77,23 @@ interface ShortlistRow {
         display_name: string;
         headline: string | null;
         location: string | null;
+        avatar_url: string | null;
       } | null;
     } | null;
   }> | null;
+}
+
+interface InterestPipelineRow {
+  id: string;
+  player_profile_id: string;
+  created_at: string;
+}
+
+interface ConversationPipelineRow {
+  id: string;
+  created_at: string;
+  conversation_participants: Array<{ profile_id: string; profiles: Profile | null }> | null;
+  messages: Array<{ sender_profile_id: string; created_at: string }> | null;
 }
 
 function initials(name: string) {
@@ -86,8 +106,9 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-export default async function ClubProfilePage({ params }: ClubProfilePageProps) {
+export default async function ClubProfilePage({ params, searchParams }: ClubProfilePageProps) {
   const { scoutId } = await params;
+  const { error, notice } = await searchParams;
   const authClient = await createSupabaseServerClient();
   const supabase = createSupabaseServiceRoleClient();
   const {
@@ -199,17 +220,17 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
         .returns<StaffMemberRow[]>()
     : { data: [] as StaffMemberRow[] };
 
-  const { data: shortlistRows } = teamId && isMember
+  const { data: shortlistRows } = teamId && isOwner
     ? await supabase
         .from("watchlists")
         .select(
           `
             id, name, is_shared,
             watchlist_items (
-              id, notes,
+              id, notes, recruitment_status,
               player_profiles!player_id (
-                profile_id, position, nationality,
-                profiles!profile_id ( display_name, headline, location )
+                id, profile_id, position, nationality,
+                profiles!profile_id ( display_name, headline, location, avatar_url )
               )
             )
           `
@@ -219,12 +240,108 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
         .returns<ShortlistRow[]>()
     : { data: [] as ShortlistRow[] };
 
+  const { data: interestRows } = teamId && isOwner
+    ? await supabase
+        .from("club_interest_notifications")
+        .select("id, player_profile_id, created_at")
+        .eq("team_id", teamId)
+        .order("created_at", { ascending: false })
+        .limit(20)
+        .returns<InterestPipelineRow[]>()
+    : { data: [] as InterestPipelineRow[] };
+
+  const interestProfileIds = Array.from(new Set((interestRows ?? []).map((row) => row.player_profile_id)));
+  const { data: interestProfiles } = interestProfileIds.length
+    ? await supabase
+        .from("player_profiles")
+        .select(
+          `
+            id, profile_id, position, nationality,
+            profiles!profile_id ( id, role, display_name, headline, bio, location, avatar_url, is_public, onboarding_complete, created_at, updated_at )
+          `
+        )
+        .in("profile_id", interestProfileIds)
+        .returns<Array<{ id: string; profile_id: string; position: string | null; nationality: string | null; profiles: Profile | null }>>()
+    : { data: [] as Array<{ id: string; profile_id: string; position: string | null; nationality: string | null; profiles: Profile | null }> };
+
+  const interestProfileById = new Map((interestProfiles ?? []).map((row) => [row.profile_id, row]));
+
+  const { data: reachedOutConversations } = teamId && isOwner
+    ? await supabase
+        .from("conversations")
+        .select(
+          `
+            id,
+            created_at,
+            conversation_participants (
+              profile_id,
+              profiles!profile_id ( id, role, display_name, headline, bio, location, avatar_url, is_public, onboarding_complete, created_at, updated_at )
+            ),
+            messages ( sender_profile_id, created_at )
+          `
+        )
+        .eq("team_id", teamId)
+        .returns<ConversationPipelineRow[]>()
+    : { data: [] as ConversationPipelineRow[] };
+
   const isVerified = team?.claim_status === "verified";
   const pipelineNamesPublic = team?.pipeline_names_public ?? false;
   const isAuthenticated = Boolean(user);
   const canContact = isAuthenticated && viewerRole === "player" && !isMember;
   const staff = staffRows ?? [];
   const shortlists = shortlistRows ?? [];
+  const clubStaffIds = new Set(staff.map((staffMember) => staffMember.profile_id));
+  const watchlistedPlayers: PipelinePlayer[] = shortlists.flatMap((shortlist) =>
+    (shortlist.watchlist_items ?? []).flatMap((item) => {
+      const playerProfile = item.player_profiles;
+      const publicProfile = playerProfile?.profiles;
+      if (!playerProfile || !publicProfile) return [];
+      return [{
+        id: item.id,
+        profileId: playerProfile.profile_id,
+        watchlistId: shortlist.id,
+        watchlistName: shortlist.name,
+        name: publicProfile.display_name,
+        headline: publicProfile.headline,
+        position: playerProfile.position,
+        nationality: playerProfile.nationality,
+        avatarUrl: publicProfile.avatar_url,
+        notes: item.notes,
+        recruitmentStatus: item.recruitment_status ?? "watchlisted"
+      }];
+    })
+  );
+  const interestedPlayers: PipelinePlayer[] = (interestRows ?? []).flatMap((interest) => {
+    const playerProfile = interestProfileById.get(interest.player_profile_id);
+    const publicProfile = playerProfile?.profiles;
+    if (!playerProfile || !publicProfile) return [];
+    return [{
+      id: interest.id,
+      profileId: playerProfile.profile_id,
+      name: publicProfile.display_name,
+      headline: publicProfile.headline,
+      position: playerProfile.position,
+      nationality: playerProfile.nationality,
+      avatarUrl: publicProfile.avatar_url,
+      createdAt: interest.created_at
+    }];
+  });
+  const reachedOutPlayers: PipelinePlayer[] = (reachedOutConversations ?? []).flatMap((conversation) => {
+    const messages = [...(conversation.messages ?? [])].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+    const firstMessage = messages[0];
+    if (!firstMessage || !clubStaffIds.has(firstMessage.sender_profile_id)) return [];
+    const playerParticipant = (conversation.conversation_participants ?? []).find((participant) => participant.profiles?.role === "player");
+    const publicProfile = playerParticipant?.profiles;
+    if (!publicProfile) return [];
+    return [{
+      id: conversation.id,
+      profileId: publicProfile.id,
+      name: publicProfile.display_name,
+      headline: publicProfile.headline,
+      avatarUrl: publicProfile.avatar_url,
+      createdAt: conversation.created_at
+    }];
+  });
   const league = team?.league_id ? getLeagueByIdOrSlug(team.league_id) : null;
   const leagueLabel = league?.shortName ?? league?.name ?? "League";
   const teamName = team?.name ?? resolvedProfile.display_name;
@@ -247,12 +364,12 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
   ] as [string, string][];
 
   return (
-    <main className="min-h-screen bg-[#090909] text-white">
-      <section className="border-b border-white/10 bg-[#101010]">
+    <main className="app-surface min-h-screen">
+      <section className="border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#101010]">
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
           <Link
             href="/scouts"
-            className="inline-flex h-11 items-center rounded-lg border border-white/10 bg-white/[0.02] px-4 text-sm font-semibold text-white/30 transition hover:border-red-500/50 hover:text-white"
+            className="inline-flex h-11 items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/30 dark:hover:border-red-500/50 dark:hover:text-white"
           >
             ← Back to clubs
           </Link>
@@ -260,32 +377,32 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
       </section>
 
       <article>
-        <header className="border-b border-white/10 bg-[#120807]">
+        <header className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#120807]">
           <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
               <div>
                 <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
                   <div
-                    className="flex h-32 w-32 shrink-0 items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-5xl font-black text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+                    className="flex h-32 w-32 shrink-0 items-center justify-center border-2 border-red-500 bg-slate-200 bg-cover bg-center text-5xl font-black text-slate-900 dark:bg-[#202020] dark:text-white"
                     style={team?.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,.62)), url(${team.logo_url})` } : undefined}
                   >
                     {team?.logo_url ? "" : initials(teamName)}
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap gap-2">
-                      <span className="rounded border border-indigo-400/60 bg-indigo-500/15 px-3 py-1 text-xs font-bold uppercase text-indigo-200">
+                      <span className="border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-bold uppercase text-indigo-700 dark:border-indigo-400/60 dark:bg-indigo-500/15 dark:text-indigo-200">
                         Club
                       </span>
-                      <span className="rounded border border-green-500/50 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase text-green-400">
+                      <span className="border border-green-300 bg-green-50 px-3 py-1 text-xs font-bold uppercase text-green-700 dark:border-green-500/50 dark:bg-green-500/10 dark:text-green-400">
                         <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-green-400 align-middle" />
                         {isVerified ? "Verified" : "Pending"}
                       </span>
-                      <span className="rounded border border-blue-500/60 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase text-blue-300">
+                      <span className="border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-blue-700 dark:border-blue-500/60 dark:bg-blue-500/10 dark:text-blue-300">
                         {leagueLabel} {team?.tier ? `- Tier ${team.tier}` : ""}
                       </span>
                     </div>
-                    <h1 className="mt-4 text-5xl font-black leading-none text-white sm:text-6xl">{teamName}</h1>
-                    {location && <p className="mt-3 text-lg font-bold text-white/45">{location}</p>}
+                    <h1 className="mt-4 text-4xl font-black leading-none text-slate-950 dark:text-white sm:text-5xl">{teamName}</h1>
+                    {location && <p className="mt-3 text-lg font-bold text-slate-500 dark:text-white/45">{location}</p>}
                   </div>
                 </div>
 
@@ -296,27 +413,27 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
                     ["Market", league?.marketTier ?? "—"],
                     ["Pipeline", pipelineNamesPublic ? "Public" : "Open"]
                   ].map(([label, value]) => (
-                    <div key={label} className="min-h-9 rounded border border-white/20 bg-black/20 px-4 py-2 text-sm">
-                      <span className="mr-1.5 uppercase text-white/35">{label}</span>
-                      <span className="font-bold capitalize text-white/75">{value}</span>
+                    <div key={label} className="min-h-9 border border-slate-200 bg-white px-4 py-2 text-sm dark:border-white/20 dark:bg-black/20">
+                      <span className="mr-1.5 uppercase text-slate-500 dark:text-white/35">{label}</span>
+                      <span className="font-bold capitalize text-slate-800 dark:text-white/75">{value}</span>
                     </div>
                   ))}
-                  <span className="min-h-9 px-2 py-2 text-sm font-black uppercase text-red-500">
+                  <span className="min-h-9 px-2 py-2 text-sm font-black uppercase text-red-600 dark:text-red-400">
                     {resolvedProfile.is_public ? "Public Profile" : "Private Profile"}
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-white/15 bg-[#1a1a1a]">
+              <div className="grid grid-cols-2 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a]">
                 {([
                   ["League", leagueLabel],
                   ["Pass Play", formatPercent(team?.pass_run_percentage)],
                   ["Open Spots", String(openSpots || "—")],
                   ["Staff", String(staff.length || "—")]
                 ] as [string, string][]).map(([label, value], index) => (
-                  <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-white/10" : ""} ${index < 2 ? "border-b border-white/10" : ""}`}>
-                    <p className="text-xs font-bold uppercase text-white/35">{label}</p>
-                    <p className={`mt-2 text-2xl font-black ${label === "Open Spots" ? "text-green-400" : "text-white"}`}>{value}</p>
+                  <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
+                    <p className="text-xs font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
+                    <p className={`mt-2 text-2xl font-black ${label === "Open Spots" ? "text-green-600 dark:text-green-400" : "text-slate-950 dark:text-white"}`}>{value}</p>
                   </div>
                 ))}
               </div>
@@ -325,7 +442,29 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
         </header>
 
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-8">
-          <div className="space-y-8 lg:border-r lg:border-white/10 lg:pr-10">
+          <div className="space-y-8 lg:border-r lg:border-slate-200 lg:pr-10 dark:lg:border-white/10">
+            {error ? <p className="border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">{error}</p> : null}
+            {notice ? <p className="border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</p> : null}
+
+            <section>
+              <p className="text-sm font-black uppercase text-red-500">Club Profile</p>
+              <div className="mt-5 border border-slate-200 bg-white p-5 dark:border-white/15 dark:bg-[#1a1a1a]">
+                <p className="text-base font-semibold leading-7 text-slate-600 dark:text-white/65">{profileText}</p>
+                <div className="mt-5 grid gap-px overflow-hidden border border-slate-200 bg-slate-200 text-sm dark:border-white/10 dark:bg-white/10 sm:grid-cols-3">
+                  {[
+                    ["Stadium", team?.stadium ?? "—"],
+                    ["Website", team?.website ? team.website.replace(/^https?:\/\//, "") : "—"],
+                    ["Contact", team?.contact_email ?? "—"]
+                  ].map(([label, value]) => (
+                    <div key={label} className="bg-white p-4 dark:bg-[#111]">
+                      <p className="text-xs font-black uppercase text-slate-500 dark:text-white/35">{label}</p>
+                      <p className="mt-2 truncate font-black text-slate-950 dark:text-white">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
             {teamId && (
               <ClubMediaSection
                 scoutId={scoutId}
@@ -337,125 +476,21 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
 
             {teamId && (
               <ClubPipelineSection
-                teamId={teamId}
-                isOwner={isOwner}
-                pipelineNamesPublic={pipelineNamesPublic}
+                scoutId={scoutId}
+                canView={isOwner}
+                watchlisted={watchlistedPlayers}
+                reachedOut={reachedOutPlayers}
+                interested={interestedPlayers}
               />
             )}
-
-            {isMember && teamId && (
-              <section className="space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm font-black uppercase text-red-500">Player Shortlists</p>
-                  <Link
-                    href="/watchlists"
-                    className="inline-flex h-10 items-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-xs font-black uppercase text-white/50 transition hover:border-red-500/40 hover:text-white"
-                  >
-                    Manage shortlists
-                  </Link>
-                </div>
-                {shortlists.length ? (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {shortlists.map((shortlist) => {
-                      const items = shortlist.watchlist_items ?? [];
-                      return (
-                        <div key={shortlist.id} className="rounded-lg border border-white/10 bg-[#1a1a1a] p-5">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-lg font-black text-white">{shortlist.name}</p>
-                              <p className="mt-1 text-xs font-bold uppercase text-white/35">
-                                {items.length} player{items.length !== 1 ? "s" : ""} · {shortlist.is_shared ? "Shared" : "Personal"}
-                              </p>
-                            </div>
-                            <Link
-                              href={`/watchlists/${shortlist.id}`}
-                              className="shrink-0 rounded border border-white/10 px-3 py-1.5 text-xs font-black uppercase text-white/45 transition hover:border-red-500/40 hover:text-white"
-                            >
-                              Open
-                            </Link>
-                          </div>
-                          <div className="mt-4 divide-y divide-white/10">
-                            {items.slice(0, 4).map((item) => {
-                              const playerProfile = item.player_profiles;
-                              const profile = playerProfile?.profiles;
-                              const playerHref = playerProfile?.profile_id ? `/players/${playerProfile.profile_id}` : "/players";
-                              return (
-                                <Link
-                                  key={item.id}
-                                  href={playerHref}
-                                  className="block py-3 first:pt-0 last:pb-0"
-                                >
-                                  <p className="font-black text-white transition hover:text-red-300">{profile?.display_name ?? "Unknown player"}</p>
-                                  <p className="mt-1 text-xs font-bold uppercase text-white/35">
-                                    {[playerProfile?.position, playerProfile?.nationality, profile?.location].filter(Boolean).join(" · ") || "Player profile"}
-                                  </p>
-                                  {item.notes && <p className="mt-1 line-clamp-1 text-xs font-semibold text-white/35">{item.notes}</p>}
-                                </Link>
-                              );
-                            })}
-                            {!items.length && (
-                              <p className="py-3 text-sm font-semibold text-white/35">No players added yet.</p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-white/10 bg-[#1a1a1a] p-5">
-                    <p className="text-sm font-semibold text-white/35">No player shortlists have been created for this club yet.</p>
-                  </div>
-                )}
-              </section>
-            )}
-
-            <section>
-              <p className="text-sm font-black uppercase text-red-500">Club Profile</p>
-              <div className="mt-5 flex gap-8 border-b border-white/10 text-sm font-black uppercase">
-                {["About", "Roster", "History", "News"].map((tab, index) => (
-                  <span key={tab} className={`pb-4 ${index === 0 ? "border-b-2 border-red-500 text-red-500" : "text-white/35"}`}>
-                    {tab}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-6 rounded-lg border border-white/15 bg-[#1a1a1a] p-7">
-                <p className="text-lg font-semibold leading-8 text-white/65">{profileText}</p>
-                <div className="mt-7 space-y-0 border-t border-white/10 text-sm">
-                  <div className="flex items-center justify-between border-b border-white/10 py-3">
-                    <span className="text-white/35">Stadium</span>
-                    <span className="font-bold text-white">{team?.stadium ?? "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between border-b border-white/10 py-3">
-                    <span className="text-white/35">Website</span>
-                    {team?.website ? (
-                      <a href={team.website} target="_blank" rel="noopener noreferrer" className="font-bold text-blue-400 hover:text-blue-300">
-                        {team.website.replace(/^https?:\/\//, "")}
-                      </a>
-                    ) : (
-                      <span className="font-bold text-white">—</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between py-3">
-                    <span className="text-white/35">Contact</span>
-                    {team?.contact_email ? (
-                      <a href={`mailto:${team.contact_email}`} className="font-bold text-blue-400 hover:text-blue-300">
-                        {team.contact_email}
-                      </a>
-                    ) : (
-                      <span className="font-bold text-white">—</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </section>
 
             <section>
               <p className="text-sm font-black uppercase text-red-500">Team Stats</p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {teamStats.map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-white/10 bg-[#1a1a1a] p-5">
-                    <p className="text-xs font-black uppercase text-white/35">{label}</p>
-                    <p className="mt-2 text-2xl font-black text-white">{value}</p>
+                  <div key={label} className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#1a1a1a]">
+                    <p className="text-xs font-black uppercase text-slate-500 dark:text-white/35">{label}</p>
+                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{value}</p>
                   </div>
                 ))}
               </div>
@@ -464,7 +499,7 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
           </div>
 
           <aside className="space-y-6">
-            <section className="rounded-lg border border-red-500/25 bg-[#1a1a1a] p-7">
+            <section className="border border-red-200 bg-white p-7 dark:border-red-500/25 dark:bg-[#1a1a1a]">
               <p className="mb-5 text-sm font-black uppercase text-red-500">Contact Club</p>
                 {canContact && teamId ? (
                   <ContactClubButton
@@ -475,44 +510,36 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
                 ) : isOwner ? (
                   <Link
                     href="/account"
-                    className="inline-flex h-14 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
+                    className="inline-flex h-14 w-full items-center justify-center bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Edit profile
                   </Link>
                 ) : isMember && !isOwner ? (
                   <Link
                     href="/messages"
-                    className="inline-flex h-14 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
+                    className="inline-flex h-14 w-full items-center justify-center bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Club inbox
                   </Link>
                 ) : !isAuthenticated ? (
                   <Link
                     href={`/auth/sign-in?return_url=/scouts/${scoutId}`}
-                    className="inline-flex h-16 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
+                    className="inline-flex h-16 w-full items-center justify-center bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Sign in to message
                   </Link>
                 ) : (
-                  <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm font-semibold text-white/35">
+                  <p className="border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-black/20 dark:text-white/35">
                     Club messaging is available between player accounts and this club.
                   </p>
                 )}
 
-                {isAuthenticated && (
-                  <Link
-                    href="/messages"
-                    className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-5 text-sm font-black uppercase text-white/50 transition hover:border-red-500/40 hover:text-white"
-                  >
-                    Messages
-                  </Link>
-                )}
               </section>
 
               {team && (
-                <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+                <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
                   <p className="text-sm font-black uppercase text-red-500">Recruiting Status</p>
-                  <div className="mt-5 flex items-center gap-3 text-lg font-black text-white">
+                  <div className="mt-5 flex items-center gap-3 text-lg font-black text-slate-950 dark:text-white">
                     <span
                       className={`h-3 w-3 rounded-full ${
                         team.recruiting_active ? "bg-emerald-500" : "bg-slate-300"
@@ -523,13 +550,13 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
                 </section>
               )}
 
-              <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+              <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
                 <p className="text-sm font-black uppercase text-red-500">Roster Specifications</p>
                 <div className="mt-5 space-y-3">
                   {(rosterNeeds.length ? rosterNeeds : openSpots > 0 ? Array.from({ length: openSpots }).map((_, index) => `Roster Spot ${index + 1}`) : ["No open spots listed"]).map((need, index) => (
-                    <div key={index} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-b-0 last:pb-0">
-                      <span className="font-bold text-white">{need}</span>
-                      <span className={`rounded border px-3 py-1 text-xs font-bold ${rosterNeeds.length || openSpots > 0 ? "border-green-500/60 text-green-400" : "border-white/15 text-white/25"}`}>
+                    <div key={index} className="flex items-center justify-between border-b border-slate-200 pb-3 last:border-b-0 last:pb-0 dark:border-white/5">
+                      <span className="font-bold text-slate-950 dark:text-white">{need}</span>
+                      <span className={`border px-3 py-1 text-xs font-bold ${rosterNeeds.length || openSpots > 0 ? "border-green-500/60 text-green-600 dark:text-green-400" : "border-slate-200 text-slate-400 dark:border-white/15 dark:text-white/25"}`}>
                         {rosterNeeds.length ? "Needed" : openSpots > 0 ? "Open" : "Filled"}
                       </span>
                     </div>
@@ -537,28 +564,28 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
                 </div>
               </section>
 
-              <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-7">
+              <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
                 <p className="text-sm font-black uppercase text-red-500">Staff Directory</p>
-                <div className="mt-5 divide-y divide-white/10">
+                <div className="mt-5 divide-y divide-slate-200 dark:divide-white/10">
                   {staff.length ? (
                     staff.map((staffMember) => (
                       <div key={staffMember.profile_id} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
                         <div className="flex min-w-0 items-center gap-4">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-black text-white/50">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center border border-slate-200 bg-slate-50 text-sm font-black text-slate-500 dark:border-white/10 dark:bg-white/10 dark:text-white/50">
                             {initials(staffMember.profiles.display_name)}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate font-black text-white">{staffMember.profiles.display_name}</p>
-                            <p className="text-sm capitalize text-white/35">{staffMember.profiles.headline ?? staffMember.club_role.replace("_", " ")}</p>
+                            <p className="truncate font-black text-slate-950 dark:text-white">{staffMember.profiles.display_name}</p>
+                            <p className="text-sm capitalize text-slate-500 dark:text-white/35">{staffMember.profiles.headline ?? staffMember.club_role.replace("_", " ")}</p>
                           </div>
                         </div>
-                        <span className="rounded border border-white/20 px-3 py-1 text-xs font-bold uppercase text-white/45">
+                        <span className="border border-slate-200 px-3 py-1 text-xs font-bold uppercase text-slate-500 dark:border-white/20 dark:text-white/45">
                           {staffMember.club_role}
                         </span>
                       </div>
                     ))
                   ) : (
-                    <p className="rounded-lg border border-white/10 bg-white/[0.03] p-5 text-sm font-semibold text-white/40">No staff members listed yet.</p>
+                    <p className="border border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/40">No staff members listed yet.</p>
                   )}
                 </div>
               </section>
@@ -571,14 +598,6 @@ export default async function ClubProfilePage({ params }: ClubProfilePageProps) 
                 isVerified={isVerified}
               />
 
-              {isOwner && (
-                <Link
-                  href="/account"
-                  className="inline-flex h-12 w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-5 text-sm font-black uppercase text-white/50 transition hover:border-red-500/40 hover:text-white"
-                >
-                  Edit profile
-                </Link>
-              )}
             </aside>
           </div>
         </article>

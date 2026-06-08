@@ -8,6 +8,7 @@ import {
   uploadClubLogoAction
 } from "@/app/actions/club";
 import { uploadAvatarAction } from "@/app/actions/media";
+import { reviewPlayerProfileNoteAction } from "@/app/actions/player-notes";
 import { updateAccountAction } from "@/app/actions/profile";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
 import PlayerPhotoManager from "@/components/account/PlayerPhotoManager";
@@ -72,9 +73,43 @@ interface PublicUserRow {
   email: string;
 }
 
+interface ClubInterestNotificationRow {
+  id: string;
+  player_profile_id: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+interface ClubInterestProfileRow {
+  id: string;
+  display_name: string;
+  headline: string | null;
+  avatar_url: string | null;
+  location: string | null;
+}
+
 interface AccountConversationParticipant {
   conversation_id: string;
   last_seen_at: string | null;
+}
+
+interface CareerTimelineRow {
+  id: string;
+  team_name: string;
+  league_name: string | null;
+  country: string | null;
+  position: string | null;
+  start_year: number | null;
+  end_year: number | null;
+  is_current: boolean | null;
+}
+
+interface PlayerNoteReviewRow {
+  id: string;
+  note: string;
+  status: string;
+  created_at: string;
+  teams: { name: string | null } | null;
 }
 
 function textValue(record: Record<string, unknown> | null | undefined, key: string) {
@@ -101,6 +136,62 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+const countryCodeByName: Record<string, string> = {
+  austria: "AT",
+  belgium: "BE",
+  canada: "CA",
+  croatia: "HR",
+  "czech republic": "CZ",
+  czechia: "CZ",
+  denmark: "DK",
+  finland: "FI",
+  france: "FR",
+  germany: "DE",
+  ireland: "IE",
+  italy: "IT",
+  netherlands: "NL",
+  norway: "NO",
+  poland: "PL",
+  portugal: "PT",
+  serbia: "RS",
+  spain: "ES",
+  sweden: "SE",
+  switzerland: "CH",
+  uk: "GB",
+  "united kingdom": "GB",
+  england: "GB",
+  scotland: "GB",
+  wales: "GB",
+  usa: "US",
+  "united states": "US",
+  "united states of america": "US"
+};
+
+function countryFlag(value: string) {
+  const normalized = value.trim().toLowerCase();
+  const code = /^[a-z]{2}$/i.test(value.trim()) ? value.trim().toUpperCase() : countryCodeByName[normalized];
+  if (!code) return "";
+
+  return code
+    .toUpperCase()
+    .split("")
+    .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+    .join("");
+}
+
+function formatNotificationTime(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function isRecentNotification(value: string) {
+  return Date.parse(value) >= Date.now() - 7 * 24 * 60 * 60 * 1000;
+}
+
 const inputClass = "h-11 w-full rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/25 focus:border-red-500";
 const textareaClass = "min-h-28 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/25 focus:border-red-500";
 const labelClass = "mb-2 block text-xs font-black uppercase text-white/35";
@@ -117,10 +208,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Panel({ eyebrow, title, children }: { eyebrow: string; title?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-6">
-      <p className="text-sm font-black uppercase text-red-500">{eyebrow}</p>
-      {title ? <h2 className="mt-3 text-2xl font-black tracking-tight text-white">{title}</h2> : null}
-      <div className="mt-5">{children}</div>
+    <section className="border-b border-white/10 bg-[#111] px-4 py-5 sm:px-5">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-500">{eyebrow}</p>
+          {title ? <h2 className="mt-1 text-xl font-black tracking-tight text-white">{title}</h2> : null}
+        </div>
+      </div>
+      {children}
     </section>
   );
 }
@@ -164,6 +259,34 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         .order("created_at", { ascending: false })
         .returns<FilmLink[]>()
     : { data: [] as FilmLink[] };
+  const { data: careerTimelineRows } = playerProfileId
+    ? await serviceClient
+        .from("player_career_entries")
+        .select("id, team_name, league_name, country, position, start_year, end_year, is_current")
+        .eq("player_profile_id", playerProfileId)
+        .order("start_year", { ascending: false, nullsFirst: false })
+        .returns<CareerTimelineRow[]>()
+    : { data: [] as CareerTimelineRow[] };
+  const careerTimelineValue = (careerTimelineRows ?? [])
+    .map((entry) => [
+      entry.team_name,
+      entry.league_name ?? "",
+      entry.country ?? "",
+      entry.position ?? "",
+      entry.start_year ?? "",
+      entry.end_year ?? "",
+      entry.is_current ? "current" : ""
+    ].join(" | "))
+    .join("\n");
+  const { data: playerNoteReviews } = playerProfileId
+    ? await serviceClient
+        .from("player_profile_notes")
+        .select("id, note, status, created_at, teams!team_id ( name )")
+        .eq("player_profile_id", playerProfileId)
+        .in("status", ["pending", "published"])
+        .order("created_at", { ascending: false })
+        .returns<PlayerNoteReviewRow[]>()
+    : { data: [] as PlayerNoteReviewRow[] };
 
   const { data: clubMembership } = profile.role === "club"
     ? await serviceClient
@@ -201,7 +324,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   const team = clubMembership?.teams ?? null;
   const publicHref = profile.role === "player" ? `/players/${profile.id}` : profile.role === "club" && team ? `/scouts/${team.id}` : `/profiles/${profile.id}`;
-  const playerPhotoUrls = Array.isArray(roleProfile?.photo_urls) ? roleProfile.photo_urls.slice(0, 5).map((item) => String(item)) : [];
+  const playerPhotoUrls = Array.isArray(roleProfile?.photo_urls) ? roleProfile.photo_urls.slice(0, 4).map((item) => String(item)) : [];
+  const playerNationality = profile.role === "player" ? textValue(roleProfile, "nationality") : "";
+  const playerNationalityFlag = playerNationality ? countryFlag(playerNationality) : "";
   const { data: clubMedia } = team
     ? await serviceClient
         .from("club_media")
@@ -243,19 +368,44 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const isClubOwner = clubMembership?.club_role === "owner";
   const nonOwnerStaff = staff.filter((staffMember) => staffMember.club_role !== "owner");
   const availableStaffSlots = Math.max(0, 3 - nonOwnerStaff.length);
+  const { count: clubWatchlistCount } = team
+    ? await serviceClient
+        .from("watchlists")
+        .select("id", { count: "exact", head: true })
+        .eq("team_id", team.id)
+    : { count: 0 };
+  const { data: clubInterestNotifications } = team
+    ? await serviceClient
+        .from("club_interest_notifications")
+        .select("id, player_profile_id, read_at, created_at")
+        .eq("team_id", team.id)
+        .order("created_at", { ascending: false })
+        .limit(6)
+        .returns<ClubInterestNotificationRow[]>()
+    : { data: [] as ClubInterestNotificationRow[] };
+  const interestProfileIds = Array.from(new Set((clubInterestNotifications ?? []).map((interest) => interest.player_profile_id)));
+  const { data: interestProfiles } = interestProfileIds.length
+    ? await serviceClient
+        .from("profiles")
+        .select("id, display_name, headline, avatar_url, location")
+        .in("id", interestProfileIds)
+        .returns<ClubInterestProfileRow[]>()
+    : { data: [] as ClubInterestProfileRow[] };
+  const interestProfileById = new Map((interestProfiles ?? []).map((interestProfile) => [interestProfile.id, interestProfile]));
+  const newInterestCount = (clubInterestNotifications ?? []).filter((interest) => isRecentNotification(interest.created_at)).length;
 
   return (
     <main className="min-h-screen bg-[#090909] text-white">
-      <section className="border-b border-white/10 bg-[#101010]">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-5">
+      <section className="border-b border-white/10 bg-[#111]">
+        <div className="mx-auto grid max-w-[92rem] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-8">
+          <div className="flex min-w-0 items-center gap-4">
             <div
-              className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-2xl font-black"
-              style={profile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.12), rgba(0,0,0,.55)), url(${profile.avatar_url})` } : undefined}
+              className="flex h-20 w-20 shrink-0 items-center justify-center border border-red-500 bg-[#202020] bg-cover bg-center text-2xl font-black"
+              style={(profile.role === "club" && team?.logo_url ? team.logo_url : profile.avatar_url) ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,.55)), url(${profile.role === "club" && team?.logo_url ? team.logo_url : profile.avatar_url})` } : undefined}
             >
-              {profile.avatar_url ? "" : initials(profile.display_name)}
+              {(profile.role === "club" && team?.logo_url) || profile.avatar_url ? "" : initials(profile.display_name)}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap gap-2">
                 <span className="rounded border border-indigo-400/60 bg-indigo-500/15 px-3 py-1 text-xs font-bold uppercase text-indigo-200">
                   {roleLabel(profile.role)}
@@ -263,19 +413,24 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <span className="rounded border border-green-500/50 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase text-green-400">
                   {profile.is_public ? "Public" : "Private"}
                 </span>
+                {playerNationalityFlag ? (
+                  <span aria-label={playerNationality} title={playerNationality} className="rounded border border-white/10 bg-black/25 px-3 py-1 text-lg leading-none">
+                    {playerNationalityFlag}
+                  </span>
+                ) : null}
               </div>
-              <h1 className="mt-3 text-4xl font-black leading-none">{profile.display_name}</h1>
-              <p className="mt-2 text-sm font-semibold text-white/45">{profile.headline ?? "Account control surface"}</p>
+              <h1 className="mt-2 truncate text-3xl font-black leading-none">{profile.display_name}</h1>
+              <p className="mt-1 text-sm font-semibold text-white/45">{profile.headline ?? (team ? team.name : "Account control surface")}</p>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Link href="/dashboard" className="inline-flex h-11 items-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
+          <div className="flex flex-wrap gap-3 lg:justify-end">
+            <Link href={publicHref} className="inline-flex h-10 items-center border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/65 transition hover:border-red-500/40 hover:text-white">
+              Public preview
+            </Link>
+            <Link href="/dashboard" className="inline-flex h-10 items-center border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
               Settings
             </Link>
-            <Link href={publicHref} className="inline-flex h-11 items-center rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
-              Public profile
-            </Link>
-            <Link href="/messages" className="relative inline-flex h-11 items-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
+            <Link href="/messages" className="relative inline-flex h-10 items-center bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
               Messages
               {unreadMessageCount ? (
                 <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-black text-red-600">
@@ -287,8 +442,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-8">
-        <div className="space-y-6">
+      <section className="mx-auto grid max-w-[92rem] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">
+        <div className="overflow-hidden border border-white/10 bg-[#111]">
           {error ? <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm font-bold text-red-200">{error}</p> : null}
           {notice ? <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm font-bold text-emerald-200">{notice}</p> : null}
           {unreadMessageCount ? (
@@ -297,8 +452,89 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </Link>
           ) : null}
 
+          {profile.role === "club" && team ? (
+            <Panel eyebrow="Club Workbench" title="Recruiting command center">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ["Watchlists", "/watchlists", `${clubWatchlistCount ?? 0} shortlist${clubWatchlistCount === 1 ? "" : "s"}`, "bg-red-600 text-white hover:bg-red-700"],
+                  ["Player directory", "/players", "Scout players", "border border-white/10 bg-black/20 text-white/65 hover:border-red-500/40 hover:text-white"],
+                  ["Club inbox", "/messages", unreadMessageCount ? `${unreadMessageCount} unread` : "Messages", "border border-white/10 bg-black/20 text-white/65 hover:border-red-500/40 hover:text-white"],
+                  ["Public preview", publicHref, "View as public", "border border-white/10 bg-black/20 text-white/65 hover:border-red-500/40 hover:text-white"]
+                ].map(([label, href, detail, classes]) => (
+                  <Link key={label} href={href} className={`px-4 py-3 transition ${classes}`}>
+                    <span className="block text-sm font-black">{label}</span>
+                    <span className="mt-1 block text-xs font-bold opacity-70">{detail}</span>
+                  </Link>
+                ))}
+              </div>
+            </Panel>
+          ) : null}
+
+          {profile.role === "club" && team ? (
+            <Panel eyebrow="Interest Notifications" title={newInterestCount ? `${newInterestCount} new player interest${newInterestCount === 1 ? "" : "s"}` : "Player interest"}>
+              {(clubInterestNotifications ?? []).length ? (
+                <div className="divide-y divide-white/10 rounded-lg border border-white/10 bg-black/20">
+                  {(clubInterestNotifications ?? []).map((interest) => {
+                    const interestProfile = interestProfileById.get(interest.player_profile_id);
+                    const displayName = interestProfile?.display_name ?? "Player";
+                    return (
+                      <Link
+                        key={interest.id}
+                        href={`/players/${interest.player_profile_id}`}
+                        className="flex items-center gap-3 p-4 transition hover:bg-white/[0.03]"
+                      >
+                        <div
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/10 bg-cover bg-center text-sm font-black text-white/55"
+                          style={interestProfile?.avatar_url ? { backgroundImage: `linear-gradient(180deg, transparent, rgba(0,0,0,.65)), url(${interestProfile.avatar_url})` } : undefined}
+                        >
+                          {interestProfile?.avatar_url ? "" : initials(displayName)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-black text-white">{displayName}</p>
+                            {isRecentNotification(interest.created_at) ? (
+                              <span className="rounded border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-300">
+                                New
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 truncate text-xs font-semibold text-white/40">
+                            {interestProfile?.headline ?? interestProfile?.location ?? "Expressed interest in your club"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs font-bold text-white/30">{formatNotificationTime(interest.created_at)}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+                  <p className="text-sm font-semibold text-white/40">No player interest notifications yet.</p>
+                </div>
+              )}
+            </Panel>
+          ) : null}
+
+          {profile.role === "player" ? (
+            <Panel eyebrow="Player Workbench" title="Profile command center">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ["Public preview", publicHref, "View as public", "bg-red-600 text-white hover:bg-red-700"],
+                  ["Messages", "/messages", unreadMessageCount ? `${unreadMessageCount} unread` : "Inbox", "border border-white/10 bg-black/20 text-white/65 hover:border-red-500/40 hover:text-white"],
+                  ["Player directory", "/players", "Browse market", "border border-white/10 bg-black/20 text-white/65 hover:border-red-500/40 hover:text-white"],
+                  ["Settings", "/dashboard", "Account details", "border border-white/10 bg-black/20 text-white/65 hover:border-red-500/40 hover:text-white"]
+                ].map(([label, href, detail, classes]) => (
+                  <Link key={label} href={href} className={`px-4 py-3 transition ${classes}`}>
+                    <span className="block text-sm font-black">{label}</span>
+                    <span className="mt-1 block text-xs font-bold opacity-70">{detail}</span>
+                  </Link>
+                ))}
+              </div>
+            </Panel>
+          ) : null}
+
           <Panel eyebrow="Profile Photo" title="Upload profile picture">
-            <div className="grid gap-5 md:grid-cols-[140px_minmax(0,1fr)] md:items-center">
+            <div className="grid gap-4 md:grid-cols-[112px_minmax(0,1fr)] md:items-center">
               <div
                 className="flex aspect-square items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-4xl font-black"
                 style={profile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.58)), url(${profile.avatar_url})` } : undefined}
@@ -371,6 +607,16 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       <option value="na_import">North America import</option>
                     </select>
                   </Field>
+                  <div className="md:col-span-2">
+                    <Field label="Career timeline">
+                      <textarea
+                        name="career_timeline_json"
+                        defaultValue={careerTimelineValue}
+                        placeholder={"Team | League | Country | Position | 2024 | 2026 | current\nTeam | League | Country | Position | 2022 | 2024"}
+                        className={textareaClass}
+                      />
+                    </Field>
+                  </div>
                   <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
                     <input name="available_for_transfer" type="checkbox" defaultChecked={boolValue(roleProfile, "available_for_transfer")} className="h-4 w-4 rounded border-white/20 text-red-600" />
                     Available for transfer
@@ -390,6 +636,42 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           {profile.role === "player" ? (
             <>
+              <Panel eyebrow="Club Notes" title="Review notes before they appear publicly">
+                {(playerNoteReviews ?? []).length ? (
+                  <div className="divide-y divide-white/10 border border-white/10 bg-black/20">
+                    {(playerNoteReviews ?? []).map((note) => (
+                      <div key={note.id} className="p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-xs font-black uppercase text-red-300/80">{note.teams?.name ?? "Club note"} · {note.status}</p>
+                            <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-white/65">{note.note}</p>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            {note.status !== "published" ? (
+                              <form action={reviewPlayerProfileNoteAction}>
+                                <input type="hidden" name="note_id" value={note.id} />
+                                <input type="hidden" name="note_action" value="publish" />
+                                <button className="h-9 bg-emerald-600 px-3 text-xs font-black uppercase text-white transition hover:bg-emerald-700">Accept</button>
+                              </form>
+                            ) : null}
+                            <form action={reviewPlayerProfileNoteAction}>
+                              <input type="hidden" name="note_id" value={note.id} />
+                              <input type="hidden" name="note_action" value={note.status === "published" ? "remove" : "reject"} />
+                              <button className="h-9 border border-red-500/35 bg-red-500/10 px-3 text-xs font-black uppercase text-red-200 transition hover:bg-red-600 hover:text-white">
+                                {note.status === "published" ? "Remove" : "Delete"}
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border border-white/10 bg-black/20 p-4">
+                    <p className="text-sm font-semibold text-white/40">No club notes are waiting for review.</p>
+                  </div>
+                )}
+              </Panel>
               <PlayerPhotoManager photoUrls={playerPhotoUrls} />
               <FilmLinksManager filmLinks={filmLinks ?? []} />
             </>
@@ -571,7 +853,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
         </div>
 
-        <aside className="space-y-6">
+        <aside className="overflow-hidden border border-white/10 bg-[#111]">
           {profile.role === "club" ? (
             <Panel eyebrow="Club Access" title={team ? "Connected club" : "Claim or create"}>
               {team ? (
@@ -605,28 +887,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               )}
             </Panel>
           ) : null}
-
-          <Panel eyebrow="Quick Actions">
-            <div className="space-y-2">
-              {[
-                ["Messages", "/messages"],
-                [profile.role === "club" ? "Player directory" : "Player directory", "/players"],
-                [profile.role === "club" ? "Watchlists" : "News", profile.role === "club" ? "/watchlists" : "/"]
-              ].map(([label, href]) => (
-                <Link key={label} href={href} className="flex h-11 items-center justify-between rounded-lg border border-white/10 bg-black/20 px-4 text-sm font-black text-white/50 transition hover:border-red-500/40 hover:text-white">
-                  <span className="inline-flex items-center gap-2">
-                    {label}
-                    {label === "Messages" && unreadMessageCount ? (
-                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-black text-white">
-                        {unreadMessageCount}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span>→</span>
-                </Link>
-              ))}
-            </div>
-          </Panel>
         </aside>
       </section>
     </main>

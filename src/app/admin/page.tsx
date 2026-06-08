@@ -20,10 +20,11 @@ interface SampleClubRow {
 export default async function AdminDashboardPage() {
   const { supabase } = await requireAdminProfile();
 
-  const [{ count: profileCount }, { count: playerCount }, { count: clubCount }, { count: conversationCount }, { count: messageCount }, { count: filmCount }, { data: recentProfiles }, { data: samplePlayer }, { data: sampleClub }] = await Promise.all([
+  const [{ count: profileCount }, { count: playerCount }, { count: clubCount }, { count: pendingClubCount }, { count: conversationCount }, { count: messageCount }, { count: filmCount }, { data: recentProfiles }, { data: samplePlayer }, { data: sampleClub }] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "player"),
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "club"),
+    supabase.from("teams").select("id", { count: "exact", head: true }).eq("claim_status", "pending"),
     supabase.from("conversations").select("id", { count: "exact", head: true }),
     supabase.from("messages").select("id", { count: "exact", head: true }),
     supabase.from("film_links").select("id", { count: "exact", head: true }),
@@ -62,33 +63,33 @@ export default async function AdminDashboardPage() {
           <AdminStatCard label="Total profiles" value={profileCount ?? 0} detail="All onboarded and draft profile rows." />
           <AdminStatCard label="Players" value={playerCount ?? 0} detail="Player accounts in the network." />
           <AdminStatCard label="Club accounts" value={clubCount ?? 0} detail="Club / team representative accounts." />
-          <AdminStatCard label="Messages" value={messageCount ?? 0} detail={`${conversationCount ?? 0} active conversation records.`} />
+          <AdminStatCard label="Pending clubs" value={pendingClubCount ?? 0} detail="Club claims awaiting verification." />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-          <section className="rounded-3xl glass-card p-6">
+          <section className="glass-card p-6">
             <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">Role Mix</p>
             <div className="mt-5 space-y-3">
               {roleCounts.map((item) => (
-                <div key={item.role} className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/70 px-4 py-3 dark:border-white/10 dark:bg-white/10">
+                <div key={item.role} className="flex items-center justify-between border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#090909]">
                   <span className="text-sm font-black text-slate-800 dark:text-slate-100">{roleLabel(item.role)}</span>
-                  <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 dark:bg-red-500/15 dark:text-red-200">{item.count}</span>
+                  <span className="bg-red-50 px-3 py-1 text-xs font-black text-red-700 dark:bg-red-500/15 dark:text-red-200">{item.count}</span>
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="rounded-3xl glass-card p-6">
+          <section className="glass-card p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">Recent Users</p>
                 <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">Newest profile rows created.</p>
               </div>
-              <Link href="/admin/users" className="rounded-2xl bg-red-600 px-4 py-2 text-sm font-black text-white transition hover:bg-red-700">View all</Link>
+              <Link href="/admin/users" className="bg-red-600 px-4 py-2 text-sm font-black text-white transition hover:bg-red-700">View all</Link>
             </div>
             <div className="mt-5 space-y-3">
               {(recentProfiles ?? []).map((profile) => (
-                <Link key={profile.id} href={`/profiles/${profile.id}`} className="flex flex-col gap-2 rounded-2xl border border-white/70 bg-white/70 p-4 transition hover:border-red-200 dark:border-white/10 dark:bg-white/10 dark:hover:border-red-400/40 sm:flex-row sm:items-center sm:justify-between">
+                <Link key={profile.id} href={`/profiles/${profile.id}`} className="flex flex-col gap-2 border border-slate-200 bg-white p-4 transition hover:border-red-300 dark:border-white/10 dark:bg-[#090909] dark:hover:border-red-500/45 sm:flex-row sm:items-center sm:justify-between">
                   <span>
                     <span className="block text-sm font-black text-slate-950 dark:text-white">{profile.display_name}</span>
                     <span className="mt-1 block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{roleLabel(profile.role)} · {profile.is_public ? "Public" : "Private"}</span>
@@ -101,79 +102,83 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <Link href="/admin/players" className="rounded-3xl border border-red-100 bg-red-50/50 p-5 transition hover:border-red-300 dark:border-red-400/20 dark:bg-red-500/10">
+          <Link href="/admin/players" className="border border-red-100 bg-red-50 p-5 transition hover:border-red-300 dark:border-red-400/20 dark:bg-red-500/10">
             <p className="text-lg font-black text-slate-950 dark:text-white">Audit player profiles</p>
             <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{filmCount ?? 0} Hudl film links indexed.</p>
           </Link>
-          <Link href="/admin/profiles" className="rounded-3xl glass-card p-5 transition hover:border-red-200 dark:hover:border-red-400/40">
+          <Link href="/admin/profiles" className="glass-card p-5 transition hover:border-red-300 dark:hover:border-red-500/45">
             <p className="text-lg font-black text-slate-950 dark:text-white">Review all profiles</p>
             <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Visibility, onboarding state and role data.</p>
           </Link>
-          <Link href="/admin/messages" className="rounded-3xl glass-card p-5 transition hover:border-red-200 dark:hover:border-red-400/40">
+          <Link href="/admin/messages" className="glass-card p-5 transition hover:border-red-300 dark:hover:border-red-500/45">
             <p className="text-lg font-black text-slate-950 dark:text-white">Message activity</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Conversation records and latest updates.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{messageCount ?? 0} messages across {conversationCount ?? 0} conversations.</p>
           </Link>
-          <Link href="/admin/disputes" className="rounded-3xl border border-amber-100 bg-amber-50/50 p-5 transition hover:border-amber-300 dark:border-amber-400/20 dark:bg-amber-500/10">
+          <Link href="/admin/club-verification" className="border border-emerald-100 bg-emerald-50 p-5 transition hover:border-emerald-300 dark:border-emerald-400/20 dark:bg-emerald-500/10">
+            <p className="text-lg font-black text-slate-950 dark:text-white">Club verification</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{pendingClubCount ?? 0} pending claim{pendingClubCount === 1 ? "" : "s"} awaiting accept or decline.</p>
+          </Link>
+          <Link href="/admin/disputes" className="border border-amber-100 bg-amber-50 p-5 transition hover:border-amber-300 dark:border-amber-400/20 dark:bg-amber-500/10">
             <p className="text-lg font-black text-slate-950 dark:text-white">Club disputes</p>
             <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Review open club claim disputes and verification requests.</p>
           </Link>
         </div>
 
-        <section className="rounded-3xl glass-card p-6">
+        <section className="glass-card p-6">
           <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">Platform QA — Test User Journeys</p>
           <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
             Preview the platform from each user role&apos;s perspective. Onboarding links use preview mode and will not change your admin role.
           </p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Player */}
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
+            <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#090909]">
               <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Player</p>
               <p className="mt-1 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Athlete signing up and building a profile.</p>
               <div className="flex flex-col gap-2">
-                <Link href="/onboarding?preview=1" className="rounded-xl bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
-                <Link href="/players" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200">Player directory</Link>
-                <Link href="/account" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200">Account / profile</Link>
+                <Link href="/onboarding?preview=1" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
+                <Link href="/players" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Player directory</Link>
+                <Link href="/account" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Account / profile</Link>
               </div>
             </div>
 
             {/* Club */}
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
+            <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#090909]">
               <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Club</p>
               <p className="mt-1 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Club representative claiming and managing a team.</p>
               <div className="flex flex-col gap-2">
-                <Link href="/onboarding?preview=1" className="rounded-xl bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
-                <Link href="/watchlists" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200">Watchlists</Link>
-                <Link href="/players" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200">Player directory</Link>
-                <Link href="/messages" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200">Messages</Link>
+                <Link href="/onboarding?preview=1" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
+                <Link href="/watchlists" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Watchlists</Link>
+                <Link href="/players" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Player directory</Link>
+                <Link href="/messages" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Messages</Link>
               </div>
             </div>
 
             {/* Journalist */}
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
+            <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#090909]">
               <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Journalist</p>
               <p className="mt-1 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Media professional browsing leagues and profiles.</p>
               <div className="flex flex-col gap-2">
-                <Link href="/onboarding?preview=1" className="rounded-xl bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
-                <Link href="/leagues" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200">League directory</Link>
-                <Link href="/players" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200">Player directory</Link>
+                <Link href="/onboarding?preview=1" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
+                <Link href="/leagues" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">League directory</Link>
+                <Link href="/players" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Player directory</Link>
               </div>
             </div>
 
             {/* Fan */}
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/10">
+            <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#090909]">
               <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Fan</p>
               <p className="mt-1 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Public user exploring the European American football scene.</p>
               <div className="flex flex-col gap-2">
-                <Link href="/onboarding?preview=1" className="rounded-xl bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
-                <Link href="/" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200">Home page</Link>
-                <Link href="/teams" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200">Browse teams</Link>
+                <Link href="/onboarding?preview=1" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
+                <Link href="/" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Home page</Link>
+                <Link href="/teams" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Browse teams</Link>
               </div>
             </div>
           </div>
         </section>
 
         {/* Profile Page Previews */}
-        <section className="rounded-3xl glass-card p-6">
+        <section className="glass-card p-6">
           <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">Profile Page Previews</p>
           <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
             Jump directly to a live player or club profile page to QA the UI end-to-end.
@@ -181,7 +186,7 @@ export default async function AdminDashboardPage() {
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
 
             {/* Player profile preview */}
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-5 dark:border-white/10 dark:bg-white/10">
+            <div className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#090909]">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Player Profile</p>
@@ -205,19 +210,19 @@ export default async function AdminDashboardPage() {
                   <>
                     <Link
                       href={`/players/${samplePlayer.id}`}
-                      className="rounded-xl bg-red-600 px-3 py-2.5 text-center text-xs font-black text-white transition hover:bg-red-700"
+                      className="bg-red-600 px-3 py-2.5 text-center text-xs font-black text-white transition hover:bg-red-700"
                     >
                       Preview player profile
                     </Link>
                     <Link
                       href="/players"
-                      className="rounded-xl border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200"
+                      className="border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200"
                     >
                       Player directory
                     </Link>
                     <Link
                       href="/admin/players"
-                      className="rounded-xl border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200"
+                      className="border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200"
                     >
                       Admin: all player profiles
                     </Link>
@@ -225,7 +230,7 @@ export default async function AdminDashboardPage() {
                 ) : (
                   <Link
                     href="/players"
-                    className="rounded-xl border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200"
+                    className="border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200"
                   >
                     Player directory
                   </Link>
@@ -234,7 +239,7 @@ export default async function AdminDashboardPage() {
             </div>
 
             {/* Club profile preview */}
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-5 dark:border-white/10 dark:bg-white/10">
+            <div className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#090909]">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Club Profile</p>
@@ -259,26 +264,26 @@ export default async function AdminDashboardPage() {
                 {sampleClub && (
                   <Link
                     href={`/scouts/${sampleClub.id}`}
-                    className="rounded-xl bg-red-600 px-3 py-2.5 text-center text-xs font-black text-white transition hover:bg-red-700"
+                    className="bg-red-600 px-3 py-2.5 text-center text-xs font-black text-white transition hover:bg-red-700"
                   >
                     Preview club profile
                   </Link>
                 )}
                 <Link
                   href="/admin/preview/club"
-                  className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-center text-xs font-black text-amber-800 transition hover:border-amber-300 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+                  className="border border-amber-200 bg-amber-50 px-3 py-2.5 text-center text-xs font-black text-amber-800 transition hover:border-amber-300 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
                 >
                   Mock preview (no DB)
                 </Link>
                 <Link
                   href="/scouts"
-                  className="rounded-xl border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200"
+                  className="border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200"
                 >
                   Club directory
                 </Link>
                 <Link
                   href="/admin/profiles"
-                  className="rounded-xl border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-200 dark:border-white/10 dark:text-slate-200"
+                  className="border border-slate-200 px-3 py-2.5 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200"
                 >
                   Admin: all profiles
                 </Link>

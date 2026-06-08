@@ -1,97 +1,149 @@
-import PipelinePrivacyToggle from "./PipelinePrivacyToggle";
+import Link from "next/link";
+import { updateWatchlistItemRecruitmentStatusAction } from "@/app/actions/watchlist";
 
-interface ClubPipelineSectionProps {
-  teamId: string;
-  isOwner: boolean;
-  pipelineNamesPublic: boolean;
+export interface PipelinePlayer {
+  id: string;
+  profileId: string;
+  watchlistId?: string;
+  watchlistName?: string;
+  name: string;
+  headline?: string | null;
+  position?: string | null;
+  nationality?: string | null;
+  avatarUrl?: string | null;
+  notes?: string | null;
+  recruitmentStatus?: string | null;
+  createdAt?: string | null;
 }
 
-// TODO: Replace stub counts with real queries once club_pipeline_items table exists.
-// Each stage should query: SELECT stage, COUNT(*) FROM club_pipeline_items WHERE team_id = teamId GROUP BY stage
-const PIPELINE_STAGES = [
-  { key: "scouted", label: "Scouted" },
-  { key: "shortlisted", label: "Shortlisted" },
-  { key: "reached_out", label: "Reached Out" },
-  { key: "offer_extended", label: "Offer Extended" },
-  { key: "signed", label: "Signed" }
-] as const;
+interface ClubPipelineSectionProps {
+  scoutId: string;
+  canView: boolean;
+  watchlisted: PipelinePlayer[];
+  reachedOut: PipelinePlayer[];
+  interested: PipelinePlayer[];
+}
 
-export default function ClubPipelineSection({ teamId, isOwner, pipelineNamesPublic }: ClubPipelineSectionProps) {
-  // TODO: Query club_pipeline_items table when it exists
-  const stageCounts: Record<string, number> = {
-    scouted: 0,
-    shortlisted: 0,
-    reached_out: 0,
-    offer_extended: 0,
-    signed: 0
-  };
+const statusLabels: Record<string, string> = {
+  watchlisted: "Watchlisted",
+  in_negotiations: "In negotiations",
+  signed: "Signed",
+  archived: "Archived"
+};
 
-  // TODO: COUNT(*) FROM club_pipeline_items WHERE team_id = teamId AND stage = 'signed'
-  const totalSigned = 0;
+function initials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function PlayerRow({ player, scoutId, showStatusControl }: { player: PipelinePlayer; scoutId: string; showStatusControl?: boolean }) {
+  return (
+    <div className="grid gap-3 border-t border-white/10 py-4 first:border-t-0 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,1fr)_220px] md:items-center">
+      <Link href={`/players/${player.profileId}`} className="flex min-w-0 items-center gap-3">
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center border border-white/10 bg-white/10 bg-cover bg-center text-sm font-black text-white/55"
+          style={player.avatarUrl ? { backgroundImage: `linear-gradient(180deg, transparent, rgba(0,0,0,.65)), url(${player.avatarUrl})` } : undefined}
+        >
+          {player.avatarUrl ? "" : initials(player.name)}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-black text-white">{player.name}</span>
+          <span className="mt-1 block truncate text-xs font-semibold text-white/40">
+            {[player.position, player.nationality, player.headline].filter(Boolean).join(" · ") || "Player profile"}
+          </span>
+          {player.watchlistName ? <span className="mt-1 block text-[11px] font-bold uppercase text-red-300/80">{player.watchlistName}</span> : null}
+        </span>
+      </Link>
+
+      {showStatusControl && player.watchlistId ? (
+        <form action={updateWatchlistItemRecruitmentStatusAction} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <input type="hidden" name="watchlist_item_id" value={player.id} />
+          <input type="hidden" name="watchlist_id" value={player.watchlistId} />
+          <input type="hidden" name="return_path" value={`/scouts/${scoutId}`} />
+          <select name="recruitment_status" defaultValue={player.recruitmentStatus ?? "watchlisted"} className="h-10 border border-white/10 bg-black/35 px-3 text-xs font-bold text-white outline-none focus:border-red-500">
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <button className="h-10 bg-red-600 px-3 text-xs font-black uppercase text-white transition hover:bg-red-700">
+            Save
+          </button>
+        </form>
+      ) : (
+        <span className="w-fit border border-white/10 bg-black/20 px-3 py-2 text-xs font-black uppercase text-white/45">
+          {statusLabels[player.recruitmentStatus ?? ""] ?? "Active"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function PipelineList({ title, description, players, scoutId, showStatusControl }: { title: string; description: string; players: PipelinePlayer[]; scoutId: string; showStatusControl?: boolean }) {
+  return (
+    <div className="border border-white/10 bg-black/20 p-4">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-black text-white">{title}</h3>
+          <p className="mt-1 text-xs font-semibold text-white/40">{description}</p>
+        </div>
+        <span className="text-2xl font-black text-white">{players.length}</span>
+      </div>
+      {players.length ? (
+        <div>
+          {players.slice(0, 6).map((player) => (
+            <PlayerRow key={`${title}-${player.id}`} player={player} scoutId={scoutId} showStatusControl={showStatusControl} />
+          ))}
+        </div>
+      ) : (
+        <p className="border border-dashed border-white/10 p-4 text-sm font-semibold text-white/35">No players here yet.</p>
+      )}
+    </div>
+  );
+}
+
+export default function ClubPipelineSection({ scoutId, canView, watchlisted, reachedOut, interested }: ClubPipelineSectionProps) {
+  if (!canView) return null;
+
+  const inNegotiations = watchlisted.filter((player) => player.recruitmentStatus === "in_negotiations");
+  const signed = watchlisted.filter((player) => player.recruitmentStatus === "signed");
 
   return (
-    <section className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm font-black uppercase text-red-500">Recruitment Pipeline</p>
-        {!pipelineNamesPublic && (
-          <span className="rounded px-3 py-1 text-xs font-black uppercase text-white/30">
-            Owner View
-          </span>
-        )}
+    <section className="space-y-5 border border-slate-200 bg-slate-950 p-5 text-white dark:border-white/10 dark:bg-[#111]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-black uppercase text-red-500">Recruitment Pipeline</p>
+          <p className="mt-1 text-sm font-semibold text-white/40">Private owner/admin view for scouting activity, interest and shortlist status.</p>
+        </div>
+        <Link href="/watchlists" className="inline-flex h-10 items-center border border-white/10 bg-white/[0.03] px-4 text-xs font-black uppercase text-white/55 transition hover:border-red-500/40 hover:text-white">
+          Manage watchlists
+        </Link>
       </div>
 
-      {/* Owner: privacy toggle */}
-      {isOwner && <PipelinePrivacyToggle teamId={teamId} pipelineNamesPublic={pipelineNamesPublic} />}
-
-      {/* Stage count strip — always visible */}
-      <div className="grid grid-cols-5 gap-2">
-        {PIPELINE_STAGES.map(({ key, label }) => (
-          <div
-            key={key}
-            className={`rounded-lg border p-4 text-center ${
-              key === "reached_out"
-                ? "border-red-500/35 bg-red-500/10"
-                : "border-white/10 bg-[#1a1a1a]"
-            }`}
-          >
-            <p className={`text-[11px] font-black uppercase ${key === "reached_out" ? "text-red-500" : "text-white/35"}`}>{label}</p>
-            <p className="mt-2 text-3xl font-black text-white">{stageCounts[key]}</p>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Watchlisted", watchlisted.length],
+          ["Reached out", reachedOut.length],
+          ["Interested", interested.length],
+          ["Signed", signed.length]
+        ].map(([label, count]) => (
+          <div key={label} className="border border-white/10 bg-[#111] p-4">
+            <p className="text-xs font-black uppercase text-white/35">{label}</p>
+            <p className="mt-2 text-3xl font-black text-white">{count}</p>
           </div>
         ))}
       </div>
 
-      {pipelineNamesPublic ? (
-        /* Names-public view: show full Kanban — stub until club_pipeline_items exists */
-        <div className="rounded-lg border border-white/10 bg-[#111] p-5 text-center">
-          <p className="text-sm font-bold text-white/35">
-            Pipeline details will appear here once players are added to your roster.
-          </p>
-        </div>
-      ) : (
-        /* Privacy mode: signing stats + lock notice */
-        <>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-white/10 bg-[#111] p-5 text-center">
-              <p className="text-xs font-black uppercase text-white/35">Total Signed</p>
-              <p className="mt-2 text-3xl font-black text-white">{totalSigned}</p>
-              {/* TODO: Total Signed — count from club_pipeline_items WHERE stage = 'signed' */}
-            </div>
-            <div className="rounded-lg border border-white/10 bg-[#111] p-5 text-center">
-              <p className="text-xs font-black uppercase text-white/35">Int&apos;l Recruits</p>
-              {/* TODO: International Recruits — future field on club_pipeline_items */}
-              <p className="mt-2 text-3xl font-black text-white">0</p>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-[#111] p-5 text-center">
-              <p className="text-xs font-black uppercase text-white/35">From Pipeline</p>
-              {/* TODO: University Pipeline — future field on club_pipeline_items */}
-              <p className="mt-2 text-3xl font-black text-white">0</p>
-            </div>
-          </div>
-          <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm font-semibold text-white/35">
-            Player names are not publicly visible. Only club staff can see candidate identities.
-          </p>
-        </>
-      )}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <PipelineList title="Watchlists" description="Shortlisted players with negotiation and signing status." players={watchlisted} scoutId={scoutId} showStatusControl />
+        <PipelineList title="Reached out" description="Players this club contacted first." players={reachedOut} scoutId={scoutId} />
+        <PipelineList title="Expressed interest" description="Players who pressed express interest this week or earlier." players={interested} scoutId={scoutId} />
+        <PipelineList title="In negotiations" description="Shortlist players currently being pursued." players={inNegotiations} scoutId={scoutId} showStatusControl />
+      </div>
     </section>
   );
 }

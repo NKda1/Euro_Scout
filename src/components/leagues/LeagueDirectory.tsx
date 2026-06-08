@@ -35,7 +35,7 @@ export default function LeagueDirectory({ leagues, teams }: { leagues: League[];
           <select
             value={marketTier}
             onChange={(event) => setMarketTier(event.target.value as MarketTier | "all")}
-            className="h-12 w-full rounded-2xl border border-slate-200 bg-white/85 px-4 text-sm font-semibold text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:focus:ring-red-500/20"
+            className="h-12 w-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-[#111] dark:text-white dark:focus:ring-red-500/20"
           >
             <option value="all">All tiers</option>
             {(["gold", "silver", "bronze"] as MarketTier[]).map((tier) => (
@@ -62,7 +62,7 @@ export default function LeagueDirectory({ leagues, teams }: { leagues: League[];
             );
           })
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white/75 p-8 text-center backdrop-blur-xl dark:border-white/15 dark:bg-white/10 md:col-span-2 xl:col-span-3">
+          <div className="border border-dashed border-slate-300 bg-white p-8 text-center dark:border-white/15 dark:bg-[#111] md:col-span-2 xl:col-span-3">
             <h2 className="text-sm font-black text-slate-950 dark:text-white">No leagues found</h2>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Try a different league, country or tier.</p>
           </div>

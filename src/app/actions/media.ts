@@ -107,7 +107,7 @@ export async function uploadPlayerPhotoAction(formData: FormData) {
     redirect("/account?error=Save your player profile before adding pictures.");
   }
 
-  const photos = [...(playerProfile.photo_urls ?? []), publicUrl].slice(0, 5);
+  const photos = [...(playerProfile.photo_urls ?? []), publicUrl].slice(0, 4);
   const { error } = await supabase
     .from("player_profiles")
     .update({ photo_urls: photos, updated_at: new Date().toISOString() })

@@ -19,14 +19,14 @@ export default function PasswordInput({ name, required, minLength }: PasswordInp
         required={required}
         minLength={minLength}
         autoComplete={name === "password" ? "current-password" : "new-password"}
-        className="h-12 w-full rounded-2xl border border-slate-200 bg-white/85 px-4 pr-12 text-sm font-semibold text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:placeholder:text-slate-500 dark:focus:ring-red-500/20"
+        className="h-12 w-full border border-slate-200 bg-white px-4 pr-12 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-[#090909] dark:text-white dark:placeholder:text-slate-500 dark:focus:ring-red-500/20"
       />
       <button
         type="button"
         tabIndex={-1}
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? "Hide password" : "Show password"}
-        className="absolute right-3 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:text-red-600 dark:text-slate-500 dark:hover:text-red-300"
+        className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center text-slate-400 transition hover:text-red-600 dark:text-slate-500 dark:hover:text-red-300"
       >
         {visible ? (
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">

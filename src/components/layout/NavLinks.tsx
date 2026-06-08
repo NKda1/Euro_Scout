@@ -19,16 +19,16 @@ export default function NavLinks({ isSignedIn, isAdmin }: NavLinksProps) {
 
   function linkCls(href: string, extra?: string) {
     return cn(
-      "rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-all duration-150",
+      "px-3.5 py-1.5 text-[13px] font-bold transition-all duration-150",
       isActive(href)
-        ? "bg-white text-slate-950 shadow-sm dark:bg-white/[0.12] dark:text-white"
-        : "text-slate-600 hover:bg-white/80 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white",
+        ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+        : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-300",
       extra
     );
   }
 
   return (
-    <div className="flex items-center gap-0.5 rounded-full border border-slate-200/80 bg-slate-100/60 px-1.5 py-1.5 shadow-sm backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.04]">
+    <div className="flex items-center gap-0.5 border border-slate-200 bg-white px-1.5 py-1.5 dark:border-white/10 dark:bg-[#111]">
       <Link href={routes.home} className={linkCls(routes.home)}>Home</Link>
       <Link href={routes.leagues} className={linkCls(routes.leagues)}>Leagues</Link>
       <Link href={routes.teams} className={linkCls(routes.teams)}>Teams</Link>
