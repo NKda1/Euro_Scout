@@ -5,6 +5,7 @@ import HudlFilmViewer, { type FilmLink } from "@/components/players/HudlFilmView
 import PlayerPhotoGallery from "@/components/players/PlayerPhotoGallery";
 import PublicNotesPanel, { type PublicPlayerNote } from "@/components/players/PublicNotesPanel";
 import { roleLabel, type Profile } from "@/lib/auth";
+import { campusPipelines, getCampusTeam } from "@/lib/campus-to-pro";
 import { leagues, teams } from "@/lib/data";
 
 interface ProfileSummaryProps {
@@ -24,6 +25,7 @@ type SummaryField = [string, unknown];
 
 export interface CareerEntry {
   id: string;
+  team_id?: string | null;
   team_name: string;
   league_name?: string | null;
   country?: string | null;
@@ -92,8 +94,14 @@ export default function ProfileSummary({
   publicNotes = [],
   viewerTeamId = null
 }: ProfileSummaryProps) {
-  const currentTeam = teams.find((team) => team.id === roleProfile?.current_team_id || team.id === roleProfile?.team_id);
-  const currentLeague = currentTeam ? leagues.find((league) => league.id === currentTeam.leagueId) : null;
+  const currentTeamId = stringValue(roleProfile?.current_team_id || roleProfile?.team_id);
+  const campusTeam = getCampusTeam(currentTeamId);
+  const currentTeam = campusTeam ?? teams.find((team) => team.id === currentTeamId);
+  const currentLeagueName = campusTeam
+    ? campusPipelines[campusTeam.leagueId].label
+    : currentTeam
+      ? leagues.find((league) => league.id === currentTeam.leagueId)?.name
+      : null;
   const age = ageFromDob(roleProfile?.dob);
   const photoUrls = Array.isArray(roleProfile?.photo_urls) ? roleProfile.photo_urls.slice(0, 4).map((item) => String(item)) : [];
   const isPlayer = profile.role === "player";
@@ -102,6 +110,7 @@ export default function ProfileSummary({
   const availability = isPlayer && roleProfile?.available_for_transfer ? "Available" : "Open";
   const location = profile.location ?? currentTeam?.country ?? "Europe";
   const completion = Math.min(100, 35 + (profile.bio ? 15 : 0) + (profile.headline ? 10 : 0) + filmLinks.length * 10 + photoUrls.length * 5);
+  const sortedCareerEntries = [...careerEntries].sort((a, b) => (a.start_year ?? 0) - (b.start_year ?? 0));
 
   const stats: SummaryField[] = isPlayer
     ? [
@@ -203,7 +212,7 @@ export default function ProfileSummary({
               <div className="mt-5 grid gap-px overflow-hidden border border-slate-200 bg-slate-200 text-sm dark:border-white/10 dark:bg-white/10 sm:grid-cols-3">
                 {[
                   ["Current team", currentTeam?.name],
-                  ["Current league", currentLeague?.name],
+                  ["Current league", currentLeagueName],
                   ["Headline", profile.headline]
                 ].map(([label, item]) => (
                   <div key={label} className="bg-white p-4 dark:bg-[#111]">
@@ -215,23 +224,35 @@ export default function ProfileSummary({
             </div>
           </section>
 
-          {isPlayer && careerEntries.length ? (
+          {isPlayer && sortedCareerEntries.length ? (
             <section>
               <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Career Timeline</p>
-              <div className="mt-4 divide-y divide-slate-200 border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-[#111]">
-                {careerEntries.map((entry) => (
-                  <div key={entry.id} className="grid gap-3 p-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center">
-                    <p className="text-sm font-black text-slate-950 dark:text-white">
-                      {entry.start_year ?? "—"} - {entry.is_current ? "Present" : entry.end_year ?? "—"}
-                    </p>
-                    <div>
-                      <p className="text-base font-black text-slate-950 dark:text-white">{entry.team_name}</p>
-                      <p className="mt-1 text-xs font-bold uppercase text-slate-500 dark:text-white/35">
-                        {[entry.position, entry.league_name, entry.country].filter(Boolean).join(" · ") || "Career entry"}
-                      </p>
+              <div className="mt-5 overflow-x-auto border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#111]">
+                <div className="flex min-w-max items-start gap-4">
+                  {sortedCareerEntries.map((entry, index) => (
+                    <div key={entry.id} className="flex items-start gap-4">
+                      <div className="w-56">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-red-500 bg-red-600 text-xs font-black text-white">
+                            {index + 1}
+                          </span>
+                          <span className="text-xs font-black text-slate-500 dark:text-white/35">
+                            {entry.start_year ?? "----"} - {entry.is_current ? "Present" : entry.end_year ?? "----"}
+                          </span>
+                        </div>
+                        <div className="mt-4 border-l-2 border-red-500/50 pl-4">
+                          <p className="text-base font-black text-slate-950 dark:text-white">{entry.team_name}</p>
+                          <p className="mt-1 text-xs font-bold uppercase text-slate-500 dark:text-white/35">
+                            {[entry.position, entry.league_name, entry.country].filter(Boolean).join(" / ") || "Career entry"}
+                          </p>
+                        </div>
+                      </div>
+                      {index < sortedCareerEntries.length - 1 ? (
+                        <div className="mt-4 h-px w-16 bg-red-500/50" />
+                      ) : null}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </section>
           ) : null}

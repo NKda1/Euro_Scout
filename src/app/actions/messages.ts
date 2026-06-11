@@ -325,7 +325,16 @@ export async function startConversationAction(formData: FormData) {
   redirect(`/messages/${conversationId}`);
 }
 
-export async function sendMessageAction(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+interface SentMessage {
+  id: string;
+  sender_profile_id: string;
+  body: string;
+  created_at: string;
+}
+
+export async function sendMessageAction(
+  formData: FormData
+): Promise<{ ok: true; message: SentMessage } | { ok: false; error?: string }> {
   const { profile } = await getAuthenticatedProfile();
 
   if (!profile?.onboarding_complete) {
@@ -368,14 +377,18 @@ export async function sendMessageAction(formData: FormData): Promise<{ ok: boole
     return { ok: false, error: "Messages are only available between player and club accounts." };
   }
 
-  const { error } = await serviceClient.from("messages").insert({
-    conversation_id: conversationId,
-    sender_profile_id: profile.id,
-    body
-  });
+  const { data: message, error } = await serviceClient
+    .from("messages")
+    .insert({
+      conversation_id: conversationId,
+      sender_profile_id: profile.id,
+      body
+    })
+    .select("id, sender_profile_id, body, created_at")
+    .single<SentMessage>();
 
-  if (error) {
-    return { ok: false, error: error.message };
+  if (error || !message) {
+    return { ok: false, error: error?.message ?? "Could not send message." };
   }
 
   const now = new Date().toISOString();
@@ -389,7 +402,7 @@ export async function sendMessageAction(formData: FormData): Promise<{ ok: boole
   ]);
   revalidatePath("/messages");
   revalidatePath(`/messages/${conversationId}`);
-  return { ok: true };
+  return { ok: true, message };
 }
 
 export async function markConversationReadAction(conversationId: string) {

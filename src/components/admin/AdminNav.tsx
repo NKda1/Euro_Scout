@@ -6,6 +6,7 @@ const adminLinks = [
   { href: "/admin/profiles", label: "Profiles" },
   { href: "/admin/players", label: "Players" },
   { href: "/admin/club-verification", label: "Club Verification" },
+  { href: "/admin/news", label: "News" },
   { href: "/admin/messages", label: "Messages" },
   { href: "/admin/disputes", label: "Disputes" }
 ];

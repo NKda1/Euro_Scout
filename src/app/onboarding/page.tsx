@@ -27,29 +27,39 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
 
   return (
     <main className="app-surface min-h-screen">
-      <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-8">
+      <section className="mx-auto grid max-w-[92rem] gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(280px,0.48fr)_minmax(0,1fr)] lg:px-8">
+        <div className="lg:sticky lg:top-28 lg:self-start">
           <p className="eyebrow-red">Getting started</p>
-          <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+          <h1 className="mt-3 max-w-xl text-4xl font-black tracking-tight text-slate-950 dark:text-white sm:text-5xl">
             Set up your EuroScout identity.
           </h1>
-          <p className="mt-3 text-base leading-7 text-slate-500 dark:text-slate-400">
-            Takes under two minutes. You can edit everything later.
+          <p className="mt-4 max-w-lg text-base leading-7 text-slate-500 dark:text-slate-400">
+            Build your role, profile and football pathway in one focused setup flow.
           </p>
+          <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            {["Role", "Profile", "Pathway"].map((item) => (
+              <div key={item} className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600 dark:text-red-400">{item}</p>
+                <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">One clean record for discovery and messaging.</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {isAdminPreview ? (
-          <p className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
-            Admin preview mode — submitting will update your own admin profile.
-          </p>
-        ) : null}
+        <div>
+          {isAdminPreview ? (
+            <p className="mb-5 border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
+              Admin preview mode — submitting will update your own admin profile.
+            </p>
+          ) : null}
 
-        <div className="rounded-3xl glass-card p-6 sm:p-8">
+          <div className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#101010] sm:p-7">
           <OnboardingWizard
             action={completeOnboardingAction}
             allowAdminRole={isReservedAdminEmail(user.email)}
             error={error}
           />
+          </div>
         </div>
       </section>
     </main>

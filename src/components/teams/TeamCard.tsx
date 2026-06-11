@@ -5,7 +5,7 @@ import { routes } from "@/constants/routes";
 export default function TeamCard({ team }: { team: Team }) {
   return (
     <Link
-      href={routes.team(team.id)}
+      href={routes.scout(team.id)}
       className="group block border border-slate-200 bg-white p-4 transition hover:border-red-300 dark:border-white/10 dark:bg-[#111] dark:hover:border-red-500/45"
     >
       <div className="flex items-center gap-3">

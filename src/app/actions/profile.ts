@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { getAuthenticatedUser, isReservedAdminEmail, isUserRole, splitName, type UserRole } from "@/lib/auth";
+import { getCampusConference, getCampusTeam, isCampusPipeline, type CampusPipeline } from "@/lib/campus-to-pro";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 function text(formData: FormData, key: string) {
@@ -39,6 +40,7 @@ function parseCareerTimeline(formData: FormData) {
     return entries
       .map((entry) => ({
         team_name: String(entry.team_name ?? "").trim(),
+        team_id: String(entry.team_id ?? "").trim() || null,
         league_name: String(entry.league_name ?? "").trim() || null,
         country: String(entry.country ?? "").trim() || null,
         position: String(entry.position ?? "").trim() || null,
@@ -57,6 +59,7 @@ function parseCareerTimeline(formData: FormData) {
         const [teamName, leagueName, country, position, startYear, endYear, current] = line.split("|").map((part) => part.trim());
         return {
           team_name: teamName,
+          team_id: null,
           league_name: leagueName || null,
           country: country || null,
           position: position || null,
@@ -84,9 +87,89 @@ function requireAllowedRole(role: UserRole, email?: string | null, redirectPath 
   }
 }
 
-async function upsertPlayerProfile(supabase: Awaited<ReturnType<typeof getAuthenticatedUser>>["supabase"], userId: string, formData: FormData) {
+async function resolvePlayerPipeline(
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>,
+  currentTeamId: string | null,
+  submittedPipeline: string | null
+) {
+  if (currentTeamId) {
+    const campusTeam = getCampusTeam(currentTeamId);
+    if (campusTeam) return campusTeam.leagueId;
+
+    const { data: team } = await serviceClient
+      .from("teams")
+      .select("league_id, pipeline_type")
+      .eq("id", currentTeamId)
+      .maybeSingle<{ league_id: string | null; pipeline_type: string | null }>();
+
+    if (isCampusPipeline(team?.pipeline_type)) return team.pipeline_type;
+    if (isCampusPipeline(team?.league_id)) return team.league_id;
+  }
+
+  return isCampusPipeline(submittedPipeline) ? submittedPipeline : submittedPipeline;
+}
+
+async function upsertCampusBackground(
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>,
+  playerProfileId: string | null,
+  currentTeamId: string | null,
+  pipelineType: string | null,
+  startYear?: number | null,
+  endYear?: number | null
+) {
+  if (!playerProfileId || !currentTeamId || !isCampusPipeline(pipelineType)) return;
+
+  const localTeam = getCampusTeam(currentTeamId);
+  const { data: dbTeam } = localTeam
+    ? { data: null }
+    : await serviceClient
+        .from("teams")
+        .select("id, name, league_id, country")
+        .eq("id", currentTeamId)
+        .maybeSingle<{ id: string; name: string; league_id: CampusPipeline | string | null; country: string | null }>();
+
+  const team = localTeam
+    ? {
+        name: localTeam.name,
+        leagueId: localTeam.leagueId,
+        country: localTeam.country,
+        conference: localTeam.conference ?? null
+      }
+    : dbTeam && isCampusPipeline(dbTeam.league_id)
+      ? {
+          name: dbTeam.name,
+          leagueId: dbTeam.league_id,
+          country: dbTeam.country ?? (dbTeam.league_id === "bucs" ? "United Kingdom" : "Canada"),
+          conference: getCampusConference(currentTeamId)
+        }
+      : null;
+
+  if (!team) return;
+
+  await serviceClient.from("na_background").delete().eq("player_id", playerProfileId).eq("team_id", currentTeamId);
+  await serviceClient.from("na_background").insert({
+    player_id: playerProfileId,
+    team_id: currentTeamId,
+    league_id: team.leagueId,
+    level: team.leagueId === "usports" ? "USPORTS" : team.leagueId.toUpperCase(),
+    institution: team.name,
+    conference: team.conference,
+    country: team.country,
+    year_start: startYear ?? null,
+    year_end: endYear ?? null
+  });
+}
+
+async function upsertPlayerProfile(
+  supabase: Awaited<ReturnType<typeof getAuthenticatedUser>>["supabase"],
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>,
+  userId: string,
+  formData: FormData
+) {
   const displayName = requiredText(formData, "display_name");
   const name = splitName(displayName);
+  const currentTeamId = text(formData, "current_team_id");
+  const pipelineType = await resolvePlayerPipeline(serviceClient, currentTeamId, text(formData, "pipeline_type"));
   const payload: Record<string, unknown> = {
     profile_id: userId,
     first_name: text(formData, "first_name") ?? name.firstName,
@@ -98,8 +181,8 @@ async function upsertPlayerProfile(supabase: Awaited<ReturnType<typeof getAuthen
     position: text(formData, "position"),
     height_cm: numberOrNull(formData, "height_cm"),
     weight_kg: numberOrNull(formData, "weight_kg"),
-    current_team_id: text(formData, "current_team_id"),
-    pipeline_type: text(formData, "pipeline_type"),
+    current_team_id: currentTeamId,
+    pipeline_type: pipelineType,
     available_for_transfer: boolValue(formData, "available_for_transfer"),
     updated_at: new Date().toISOString()
   };
@@ -114,7 +197,17 @@ async function upsertPlayerProfile(supabase: Awaited<ReturnType<typeof getAuthen
     .select("id")
     .single<{ id: string }>();
 
-  return playerProfile?.id ?? null;
+  const playerProfileId = playerProfile?.id ?? null;
+  await upsertCampusBackground(
+    serviceClient,
+    playerProfileId,
+    currentTeamId,
+    pipelineType,
+    numberOrNull(formData, "campus_year_start"),
+    numberOrNull(formData, "campus_year_end")
+  );
+
+  return playerProfileId;
 }
 
 async function replaceCareerTimeline(
@@ -247,7 +340,7 @@ export async function completeOnboardingAction(formData: FormData) {
   }
 
   if (roleValue === "player") {
-    const playerProfileId = await upsertPlayerProfile(supabase, user.id, formData);
+    const playerProfileId = await upsertPlayerProfile(supabase, serviceClient, user.id, formData);
     await replaceCareerTimeline(serviceClient, playerProfileId, formData);
   }
 
@@ -409,7 +502,7 @@ export async function updateAccountAction(formData: FormData) {
 
   if (roleValue === "player") {
     const serviceClient = createSupabaseServiceRoleClient();
-    const playerProfileId = await upsertPlayerProfile(supabase, user.id, formData);
+    const playerProfileId = await upsertPlayerProfile(supabase, serviceClient, user.id, formData);
     await replaceCareerTimeline(serviceClient, playerProfileId, formData);
   }
 

@@ -130,6 +130,24 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     redirect(`/profiles/${player.profile_id}`);
   }
 
+  if (user && user.id !== player.profile_id) {
+    await serviceClient
+      .from("player_profile_views")
+      .upsert(
+        {
+          player_profile_id: player.id,
+          viewed_profile_id: user.id,
+          viewer_role: currentProfile?.role ?? null,
+          viewer_team_id: viewerMembership?.team_id ?? null,
+          view_date: new Date().toISOString().slice(0, 10)
+        },
+        {
+          onConflict: "player_profile_id,viewed_profile_id,view_date",
+          ignoreDuplicates: true
+        }
+      );
+  }
+
   const { data: filmLinks } = await serviceClient
     .from("film_links")
     .select("id, url, provider, film_type, label, is_default")

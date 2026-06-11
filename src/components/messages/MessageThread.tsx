@@ -26,6 +26,23 @@ interface MessageThreadProps {
   flagged?: boolean;
 }
 
+function sortMessages(items: Message[]) {
+  return [...items].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+}
+
+function formatMessageTime(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "UTC"
+  }).format(new Date(value));
+}
+
 export default function MessageThread({
   conversationId,
   conversationTeamId,
@@ -37,7 +54,7 @@ export default function MessageThread({
   isAdminAudit,
   flagged
 }: MessageThreadProps) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>(sortMessages(initialMessages));
   const [profileMap] = useState<Map<string, Profile>>(new Map(profiles.map((p) => [p.id, p])));
   const [readStates, setReadStates] = useState<ParticipantReadState[]>(participantReadStates);
   const [body, setBody] = useState("");
@@ -86,7 +103,7 @@ export default function MessageThread({
           const newMsg = payload.new as Message;
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
+            return sortMessages([...prev, newMsg]);
           });
 
           if (newMsg.sender_profile_id !== currentProfileId && !isAdminAudit) {
@@ -132,15 +149,34 @@ export default function MessageThread({
     formData.set("conversation_id", conversationId);
     formData.set("body", trimmed);
 
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticMessage: Message = {
+      id: optimisticId,
+      sender_profile_id: currentProfileId,
+      body: trimmed,
+      created_at: new Date().toISOString()
+    };
+
+    setBody("");
+    setMessages((prev) => sortMessages([...prev, optimisticMessage]));
+
     const result = await sendMessageAction(formData);
     if (result.ok) {
-      setBody("");
+      setMessages((prev) => {
+        const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
+        if (withoutOptimistic.some((message) => message.id === result.message.id)) {
+          return sortMessages(withoutOptimistic);
+        }
+        return sortMessages([...withoutOptimistic, result.message]);
+      });
       setReadStates((prev) =>
         prev.map((state) =>
           state.profile_id === currentProfileId ? { ...state, last_seen_at: new Date().toISOString() } : state
         )
       );
     } else {
+      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+      setBody(trimmed);
       setSendError(result.error ?? "Could not send message.");
     }
     setSending(false);
@@ -218,7 +254,7 @@ export default function MessageThread({
                   <p className="mt-1 whitespace-pre-wrap break-words text-sm font-semibold leading-6">{message.body}</p>
                 </div>
                 <div className={`mt-1 flex flex-wrap items-center gap-2 text-[11px] font-bold ${isMine ? "justify-end text-slate-400" : "text-slate-400"}`}>
-                  <span>{new Date(message.created_at).toLocaleString()}</span>
+                  <span>{formatMessageTime(message.created_at)}</span>
                   {readReceipt ? <span>{readReceipt}</span> : null}
                 </div>
                 {/* Flag button — only for player viewing a message from a club account */}

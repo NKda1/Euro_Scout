@@ -21,7 +21,7 @@ export default function TeamList({ teams, className }: TeamListProps) {
     <ul className={cn("divide-y divide-slate-100 overflow-x-hidden border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-[#111]", className)}>
       {teams.map((team) => (
         <li key={team.id}>
-          <Link href={routes.team(team.id)} className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-red-50/60 dark:hover:bg-red-500/10">
+          <Link href={routes.scout(team.id)} className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-red-50/60 dark:hover:bg-red-500/10">
             <span className="min-w-0">
               <span className="block text-sm font-bold text-slate-900 dark:text-white">{team.name}</span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">

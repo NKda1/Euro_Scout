@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Profile } from "@/lib/auth";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getLeagueByIdOrSlug } from "@/lib/data";
+import { campusPipelines, isCampusPipeline } from "@/lib/campus-to-pro";
 import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMediaSection";
 import ContactClubButton from "@/components/scouts/ContactClubButton";
 import ClubPipelineSection, { type PipelinePlayer } from "@/components/scouts/ClubPipelineSection";
@@ -44,6 +45,8 @@ interface ClubTeam {
   website: string | null;
   contact_email: string | null;
   pipeline_names_public: boolean;
+  claimed_by: string | null;
+  updated_at: string;
 }
 
 interface ClubMemberRow {
@@ -115,16 +118,18 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     data: { user }
   } = await authClient.auth.getUser();
 
+  const teamSelect = `
+    id, name, city, country, league_id, stadium, tier, claim_status,
+    logo_url, recruiting_active, open_roster_spots, roster_needs,
+    pass_run_percentage, passing_yards, rushing_yards, touchdowns_scored,
+    league_position, website, contact_email, pipeline_names_public,
+    claimed_by, updated_at
+  `;
   const memberSelect = `
     profile_id,
     club_role,
     team_id,
-    teams!team_id (
-      id, name, city, country, league_id, stadium, tier, claim_status,
-      logo_url, recruiting_active, open_roster_spots, roster_needs,
-      pass_run_percentage, passing_yards, rushing_yards, touchdowns_scored,
-      league_position, website, contact_email, pipeline_names_public
-    ),
+    teams!team_id (${teamSelect}),
     profiles!profile_id (
       id, role, display_name, headline, bio, location,
       avatar_url, is_public, onboarding_complete, created_at, updated_at
@@ -158,10 +163,11 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
         .maybeSingle<Profile>()
     : { data: null };
 
+  const team = member?.teams ?? null;
+  const campusPipeline = team?.league_id && isCampusPipeline(team.league_id) ? campusPipelines[team.league_id] : null;
   const resolvedProfile = member?.profiles ?? profileFallback;
   if (!resolvedProfile) notFound();
 
-  const team = member?.teams ?? null;
   const teamId = team?.id ?? null;
 
   // Viewer context
@@ -287,8 +293,10 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
   const isVerified = team?.claim_status === "verified";
   const pipelineNamesPublic = team?.pipeline_names_public ?? false;
   const isAuthenticated = Boolean(user);
-  const canContact = isAuthenticated && viewerRole === "player" && !isMember;
   const staff = staffRows ?? [];
+  const hasClubInbox = staff.length > 0;
+  const canContact = isAuthenticated && viewerRole === "player" && !isMember && Boolean(teamId);
+  const canMessageClub = canContact && hasClubInbox;
   const shortlists = shortlistRows ?? [];
   const clubStaffIds = new Set(staff.map((staffMember) => staffMember.profile_id));
   const watchlistedPlayers: PipelinePlayer[] = shortlists.flatMap((shortlist) =>
@@ -343,7 +351,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     }];
   });
   const league = team?.league_id ? getLeagueByIdOrSlug(team.league_id) : null;
-  const leagueLabel = league?.shortName ?? league?.name ?? "League";
+  const leagueLabel = campusPipeline?.shortLabel ?? league?.shortName ?? league?.name ?? "League";
   const teamName = team?.name ?? resolvedProfile.display_name;
   const location = [team?.city, team?.country].filter(Boolean).join(", ");
   const profileText =
@@ -409,7 +417,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                 <div className="mt-9 flex flex-wrap gap-3">
                   {[
                     ["Region", team?.country ?? "Europe"],
-                    ["Type", league?.tier ?? "Club"],
+                    ["Type", campusPipeline?.label ?? league?.tier ?? "Club"],
                     ["Market", league?.marketTier ?? "—"],
                     ["Pipeline", pipelineNamesPublic ? "Public" : "Open"]
                   ].map(([label, value]) => (
@@ -506,6 +514,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                     scoutId={scoutId}
                     teamId={teamId}
                     teamName={teamName}
+                    canMessage={canMessageClub}
                   />
                 ) : isOwner ? (
                   <Link

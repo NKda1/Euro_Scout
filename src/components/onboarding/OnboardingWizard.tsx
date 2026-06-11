@@ -2,7 +2,17 @@
 
 import { useTransition, useState, useMemo } from "react";
 import type { ReactNode } from "react";
+import CareerTimelineBuilder, { type CareerTimelineDraft } from "@/components/account/CareerTimelineBuilder";
 import { leagues, regions, teams } from "@/lib/data";
+import {
+  campusPipelines,
+  campusTeams,
+  getCampusTeam,
+  getCampusTeamsForPipeline,
+  isCampusPipeline,
+  isFrenchCanadianCampusTeam,
+  type CampusPipeline
+} from "@/lib/campus-to-pro";
 import { countries } from "@/constants/countries";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/auth";
@@ -34,6 +44,9 @@ const PIPELINES = [
   { value: "semi_pro",  label: "Semi-pro" },
   { value: "clubs",     label: "Clubs" },
   { value: "na_import", label: "North America import" },
+  { value: "usports",   label: "U Sports" },
+  { value: "cjfl",      label: "CJFL" },
+  { value: "bucs",      label: "BUCS" },
 ] as const;
 
 const LANGUAGES = [
@@ -75,10 +88,10 @@ function isRedirectError(err: unknown): boolean {
 // ─── Shared UI primitives ─────────────────────────────────────────────────────
 
 const inputClass =
-  "h-11 w-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-[#111] dark:text-white dark:placeholder:text-white/25";
+  "h-11 w-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white dark:placeholder:text-white/25";
 
 const selectClass =
-  "h-11 w-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-[#111] dark:text-white";
+  "h-11 w-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white";
 
 function FieldLabel({ required, children }: { required?: boolean; children: ReactNode }) {
   return (
@@ -256,6 +269,8 @@ function IdentityStep(props: {
 
 // ─── Step 3a: Player ──────────────────────────────────────────────────────────
 
+type PlayerPipelineOrigin = "europe" | CampusPipeline | "other";
+
 function PlayerStep(props: {
   firstName:            string; setFirstName:            (v: string) => void;
   lastName:             string; setLastName:             (v: string) => void;
@@ -269,11 +284,33 @@ function PlayerStep(props: {
   weightKg:             string; setWeightKg:             (v: string) => void;
   currentTeamId:        string; setCurrentTeamId:        (v: string) => void;
   pipelineType:         string; setPipelineType:         (v: string) => void;
+  pipelineOrigin:       PlayerPipelineOrigin; setPipelineOrigin: (v: PlayerPipelineOrigin) => void;
+  campusYearStart:      string; setCampusYearStart:      (v: string) => void;
+  campusYearEnd:        string; setCampusYearEnd:        (v: string) => void;
   availableForTransfer: boolean; setAvailableForTransfer: (v: boolean) => void;
-  careerTimeline:       string; setCareerTimeline:       (v: string) => void;
+  careerTimeline:       CareerTimelineDraft[]; setCareerTimeline: (v: CareerTimelineDraft[]) => void;
 }) {
   const age = calcAge(props.dob);
   const heightCm = feetInchesToCm(Number(props.heightFt) || 0, Number(props.heightIn) || 0);
+  const campusTeamsForOrigin = isCampusPipeline(props.pipelineOrigin) ? getCampusTeamsForPipeline(props.pipelineOrigin) : [];
+  const selectedCampusTeam = getCampusTeam(props.currentTeamId);
+  const showFrenchSuggestion = isFrenchCanadianCampusTeam(props.currentTeamId) && !props.languages.includes("French");
+
+  const originOptions: Array<{ value: PlayerPipelineOrigin; label: string; detail: string }> = [
+    { value: "europe", label: "European club", detail: "Playing or recently played for a European team" },
+    { value: "usports", label: "U Sports", detail: "Canadian university football" },
+    { value: "cjfl", label: "CJFL", detail: "Canadian junior football" },
+    { value: "bucs", label: "BUCS", detail: "UK university football" },
+    { value: "other", label: "Other", detail: "Independent, academy or mixed background" }
+  ];
+
+  function selectOrigin(value: PlayerPipelineOrigin) {
+    props.setPipelineOrigin(value);
+    props.setCurrentTeamId("");
+    props.setPipelineType(isCampusPipeline(value) ? value : "");
+    props.setCampusYearStart("");
+    props.setCampusYearEnd("");
+  }
 
   return (
     <div className="space-y-8">
@@ -334,6 +371,30 @@ function PlayerStep(props: {
 
       <div>
         <SectionHeading>On the field</SectionHeading>
+        <div className="mb-4">
+          <FieldLabel>Where did you play most recently?</FieldLabel>
+          <div className="grid gap-2 sm:grid-cols-5">
+            {originOptions.map((option) => {
+              const selected = props.pipelineOrigin === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => selectOrigin(option.value)}
+                  className={cn(
+                    "border p-3 text-left transition",
+                    selected
+                      ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/50 dark:bg-red-500/15 dark:text-red-200"
+                      : "border-slate-200 bg-white/70 text-slate-600 hover:border-red-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-red-500/30"
+                  )}
+                >
+                  <span className="block text-sm font-black">{option.label}</span>
+                  <span className="mt-1 block text-[11px] leading-snug text-slate-500 dark:text-slate-400">{option.detail}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <FieldLabel>Primary position</FieldLabel>
@@ -344,7 +405,12 @@ function PlayerStep(props: {
           </label>
           <label className="block">
             <FieldLabel>Pipeline level</FieldLabel>
-            <select value={props.pipelineType} onChange={(e) => props.setPipelineType(e.target.value)} className={selectClass}>
+            <select
+              value={props.pipelineType}
+              onChange={(e) => props.setPipelineType(e.target.value)}
+              disabled={isCampusPipeline(props.pipelineOrigin)}
+              className={selectClass}
+            >
               <option value="">Select level</option>
               {PIPELINES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
@@ -376,22 +442,53 @@ function PlayerStep(props: {
             )}
           </div>
 
-          <label className="block sm:col-span-2">
-            <FieldLabel>Current team</FieldLabel>
-            <select value={props.currentTeamId} onChange={(e) => props.setCurrentTeamId(e.target.value)} className={selectClass}>
-              <option value="">No current team / unattached</option>
-              {teams.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.country})</option>)}
-            </select>
-          </label>
-          <label className="block sm:col-span-2">
+          {isCampusPipeline(props.pipelineOrigin) ? (
+            <div className="sm:col-span-2">
+              <FieldLabel>{campusPipelines[props.pipelineOrigin].label} team</FieldLabel>
+              <select value={props.currentTeamId} onChange={(e) => props.setCurrentTeamId(e.target.value)} className={selectClass}>
+                <option value="">Select your recent campus team</option>
+                {campusTeamsForOrigin.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.conference ?? t.country})</option>
+                ))}
+              </select>
+              {selectedCampusTeam && (
+                <div className="mt-3 border border-slate-200 bg-white/70 p-3 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                  <span className="font-black text-slate-900 dark:text-white">{selectedCampusTeam.name}</span>
+                  <span className="ml-2">{selectedCampusTeam.conference ?? campusPipelines[selectedCampusTeam.leagueId].label} · {selectedCampusTeam.country}</span>
+                </div>
+              )}
+              {showFrenchSuggestion && (
+                <div className="mt-3 flex flex-col gap-3 border border-red-200 bg-red-50/70 p-3 text-xs text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-200 sm:flex-row sm:items-center sm:justify-between">
+                  <span>RSEQ and Quebec programs often value French. Add French if you speak it.</span>
+                  <button type="button" onClick={() => props.toggleLanguage("French")} className="self-start border border-red-300 bg-white px-3 py-1.5 font-black text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
+                    Add French
+                  </button>
+                </div>
+              )}
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <FieldLabel>Started</FieldLabel>
+                  <input type="number" min="2010" max="2035" value={props.campusYearStart} onChange={(e) => props.setCampusYearStart(e.target.value)} placeholder="2024" className={inputClass} />
+                </label>
+                <label className="block">
+                  <FieldLabel>Finished / expected</FieldLabel>
+                  <input type="number" min="2010" max="2035" value={props.campusYearEnd} onChange={(e) => props.setCampusYearEnd(e.target.value)} placeholder="2026" className={inputClass} />
+                </label>
+              </div>
+            </div>
+          ) : (
+            <label className="block sm:col-span-2">
+              <FieldLabel>Current team</FieldLabel>
+              <select value={props.currentTeamId} onChange={(e) => props.setCurrentTeamId(e.target.value)} className={selectClass}>
+                <option value="">No current team / unattached</option>
+                {teams.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.country})</option>)}
+              </select>
+            </label>
+          )}
+          <div className="sm:col-span-2">
             <FieldLabel>Career timeline</FieldLabel>
-            <textarea
-              value={props.careerTimeline}
-              onChange={(e) => props.setCareerTimeline(e.target.value)}
-              placeholder={"Team | League | Country | Position | 2024 | 2026 | current\nTeam | League | Country | Position | 2022 | 2024"}
-              className="min-h-28 w-full border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-[#111] dark:text-white dark:placeholder:text-white/25"
-            />
-          </label>
+            <CareerTimelineBuilder entries={props.careerTimeline} onChange={props.setCareerTimeline} />
+          </div>
         </div>
 
         <label className="mt-4 flex cursor-pointer items-center gap-3 border border-slate-200 bg-white px-4 py-3.5 transition hover:border-red-200 dark:border-white/10 dark:bg-[#111] dark:hover:border-red-500/30">
@@ -427,17 +524,34 @@ function ClubStep(props: {
   newTeamRegionId: string; setNewTeamRegionId: (v: string) => void;
   newTeamStadium:  string; setNewTeamStadium:  (v: string) => void;
 }) {
+  const claimableTeams = useMemo(() => [
+    ...campusTeams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      city: team.city,
+      country: team.country,
+      label: `${team.name} (${campusPipelines[team.leagueId].label})`
+    })),
+    ...teams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      city: team.city,
+      country: team.country,
+      label: `${team.name} (${team.country})`
+    }))
+  ], []);
+
   const filtered = useMemo(() => {
     const q = props.teamSearch.toLowerCase().trim();
     if (!q) return [];
-    return teams.filter((t) =>
+    return claimableTeams.filter((t) =>
       t.name.toLowerCase().includes(q) ||
       (t.city ?? "").toLowerCase().includes(q) ||
       (t.country ?? "").toLowerCase().includes(q)
     ).slice(0, 8);
-  }, [props.teamSearch]);
+  }, [claimableTeams, props.teamSearch]);
 
-  const selectedTeam = teams.find((t) => t.id === props.selectedTeamId);
+  const selectedTeam = claimableTeams.find((t) => t.id === props.selectedTeamId);
   const noResults = props.teamSearch.trim().length >= 2 && filtered.length === 0;
 
   function selectTeam(id: string) {
@@ -666,8 +780,11 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
   const [weightKg,             setWeightKg]             = useState("");
   const [currentTeamId,        setCurrentTeamId]        = useState("");
   const [pipelineType,         setPipelineType]         = useState("");
+  const [pipelineOrigin,       setPipelineOrigin]       = useState<PlayerPipelineOrigin>("europe");
+  const [campusYearStart,      setCampusYearStart]      = useState("");
+  const [campusYearEnd,        setCampusYearEnd]        = useState("");
   const [availableForTransfer, setAvailableForTransfer] = useState(false);
-  const [careerTimeline,       setCareerTimeline]       = useState("");
+  const [careerTimeline,       setCareerTimeline]       = useState<CareerTimelineDraft[]>([]);
 
   // Step 3 – club
   const [teamSearch,     setTeamSearch]     = useState("");
@@ -725,8 +842,11 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     fd.append("height_cm",         heightCm > 0 ? String(heightCm) : "");
     fd.append("weight_kg",         weightKg);
     fd.append("current_team_id",   currentTeamId);
-    fd.append("pipeline_type",     pipelineType);
-    fd.append("career_timeline_json", careerTimeline);
+    fd.append("campus_pipeline_origin", pipelineOrigin);
+    fd.append("pipeline_type",     isCampusPipeline(pipelineOrigin) ? pipelineOrigin : pipelineType);
+    fd.append("campus_year_start", campusYearStart);
+    fd.append("campus_year_end",   campusYearEnd);
+    fd.append("career_timeline_json", JSON.stringify(careerTimeline));
     if (availableForTransfer) fd.append("available_for_transfer", "on");
 
     // Club fields
@@ -752,9 +872,9 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
 
   // Confirm step subtitle
   const confirmSubtitle = role === "player"
-    ? [position, pipelineType].filter(Boolean).join(" · ")
+    ? [position, isCampusPipeline(pipelineOrigin) ? campusPipelines[pipelineOrigin].label : pipelineType].filter(Boolean).join(" · ")
     : role === "club" && selectedTeamId
-      ? teams.find((t) => t.id === selectedTeamId)?.name ?? ""
+      ? getCampusTeam(selectedTeamId)?.name ?? teams.find((t) => t.id === selectedTeamId)?.name ?? ""
       : "";
 
   const currentError = submitError ?? error;
@@ -803,6 +923,9 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
               weightKg={weightKg}                         setWeightKg={setWeightKg}
               currentTeamId={currentTeamId}               setCurrentTeamId={setCurrentTeamId}
               pipelineType={pipelineType}                 setPipelineType={setPipelineType}
+              pipelineOrigin={pipelineOrigin}             setPipelineOrigin={setPipelineOrigin}
+              campusYearStart={campusYearStart}           setCampusYearStart={setCampusYearStart}
+              campusYearEnd={campusYearEnd}               setCampusYearEnd={setCampusYearEnd}
               availableForTransfer={availableForTransfer} setAvailableForTransfer={setAvailableForTransfer}
               careerTimeline={careerTimeline}             setCareerTimeline={setCareerTimeline}
             />

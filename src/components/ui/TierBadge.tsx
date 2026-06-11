@@ -3,7 +3,9 @@ import type { League } from "@/types";
 const tierLabel: Record<League["tier"], string> = {
   continental: "Continental",
   national: "National",
-  premier: "Premier"
+  premier: "Premier",
+  university: "University",
+  junior: "Junior"
 };
 
 export default function TierBadge({ tier }: { tier: League["tier"] }) {

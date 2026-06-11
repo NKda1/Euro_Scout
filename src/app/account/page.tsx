@@ -7,14 +7,18 @@ import {
   updateClubProfileFromAccountAction,
   uploadClubLogoAction
 } from "@/app/actions/club";
+import { deleteJournalistArticleAction, publishJournalistArticleAction } from "@/app/actions/journalist";
 import { uploadAvatarAction } from "@/app/actions/media";
 import { reviewPlayerProfileNoteAction } from "@/app/actions/player-notes";
 import { updateAccountAction } from "@/app/actions/profile";
+import CareerTimelineBuilder from "@/components/account/CareerTimelineBuilder";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
 import PlayerPhotoManager from "@/components/account/PlayerPhotoManager";
 import type { FilmLink } from "@/components/players/HudlFilmViewer";
 import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMediaSection";
 import { requireOnboardedProfile, roleLabel } from "@/lib/auth";
+import { campusPipelines, campusTeams } from "@/lib/campus-to-pro";
+import { leagues, teams } from "@/lib/data";
 import { countUnreadMessages, type MessageRow } from "@/lib/messaging";
 import { getRoleProfile } from "@/lib/profile-data";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -95,6 +99,7 @@ interface AccountConversationParticipant {
 
 interface CareerTimelineRow {
   id: string;
+  team_id: string | null;
   team_name: string;
   league_name: string | null;
   country: string | null;
@@ -110,6 +115,35 @@ interface PlayerNoteReviewRow {
   status: string;
   created_at: string;
   teams: { name: string | null } | null;
+}
+
+interface PlayerProfileViewRow {
+  id: string;
+  viewed_profile_id: string;
+  viewer_role: string | null;
+  viewer_team_id: string | null;
+  viewed_at: string;
+  view_date: string;
+  profiles: {
+    id: string;
+    display_name: string;
+    headline: string | null;
+    avatar_url: string | null;
+    location: string | null;
+    role: string | null;
+  } | null;
+}
+
+interface JournalistArticleRow {
+  id: string;
+  title: string;
+  article_url: string;
+  thumbnail_url: string | null;
+  excerpt: string | null;
+  league_ids: string[] | null;
+  status: string;
+  published_at: string | null;
+  created_at: string;
 }
 
 function textValue(record: Record<string, unknown> | null | undefined, key: string) {
@@ -262,22 +296,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const { data: careerTimelineRows } = playerProfileId
     ? await serviceClient
         .from("player_career_entries")
-        .select("id, team_name, league_name, country, position, start_year, end_year, is_current")
+        .select("id, team_id, team_name, league_name, country, position, start_year, end_year, is_current")
         .eq("player_profile_id", playerProfileId)
         .order("start_year", { ascending: false, nullsFirst: false })
         .returns<CareerTimelineRow[]>()
     : { data: [] as CareerTimelineRow[] };
-  const careerTimelineValue = (careerTimelineRows ?? [])
-    .map((entry) => [
-      entry.team_name,
-      entry.league_name ?? "",
-      entry.country ?? "",
-      entry.position ?? "",
-      entry.start_year ?? "",
-      entry.end_year ?? "",
-      entry.is_current ? "current" : ""
-    ].join(" | "))
-    .join("\n");
   const { data: playerNoteReviews } = playerProfileId
     ? await serviceClient
         .from("player_profile_notes")
@@ -287,6 +310,50 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         .order("created_at", { ascending: false })
         .returns<PlayerNoteReviewRow[]>()
     : { data: [] as PlayerNoteReviewRow[] };
+  const profileViewWeekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: profileViews, count: profileViewTotalCount, error: profileViewsError } = playerProfileId
+    ? await serviceClient
+        .from("player_profile_views")
+        .select(
+          `
+            id,
+            viewed_profile_id,
+            viewer_role,
+            viewer_team_id,
+            viewed_at,
+            view_date,
+            profiles!viewed_profile_id (
+              id,
+              display_name,
+              headline,
+              avatar_url,
+              location,
+              role
+            )
+          `,
+          { count: "exact" }
+        )
+        .eq("player_profile_id", playerProfileId)
+        .order("viewed_at", { ascending: false })
+        .limit(30)
+        .returns<PlayerProfileViewRow[]>()
+    : { data: [] as PlayerProfileViewRow[], count: 0, error: null };
+  const { count: profileViewWeekCount } = playerProfileId
+    ? await serviceClient
+        .from("player_profile_views")
+        .select("id", { count: "exact", head: true })
+        .eq("player_profile_id", playerProfileId)
+        .gte("viewed_at", profileViewWeekStart)
+    : { count: 0 };
+  const { data: journalistArticles, error: journalistArticlesError } = profile.role === "journalist"
+    ? await serviceClient
+        .from("journalist_articles")
+        .select("id, title, article_url, thumbnail_url, excerpt, league_ids, status, published_at, created_at")
+        .eq("journalist_profile_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(12)
+        .returns<JournalistArticleRow[]>()
+    : { data: [] as JournalistArticleRow[], error: null };
 
   const { data: clubMembership } = profile.role === "club"
     ? await serviceClient
@@ -327,6 +394,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const playerPhotoUrls = Array.isArray(roleProfile?.photo_urls) ? roleProfile.photo_urls.slice(0, 4).map((item) => String(item)) : [];
   const playerNationality = profile.role === "player" ? textValue(roleProfile, "nationality") : "";
   const playerNationalityFlag = playerNationality ? countryFlag(playerNationality) : "";
+  const profileViewRows = profileViews ?? [];
+  const uniqueProfileViewerCount = new Set(profileViewRows.map((view) => view.viewed_profile_id)).size;
+  const latestProfileView = profileViewRows[0] ?? null;
   const { data: clubMedia } = team
     ? await serviceClient
         .from("club_media")
@@ -533,6 +603,70 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </Panel>
           ) : null}
 
+          {profile.role === "player" ? (
+            <Panel eyebrow="Profile Views" title="Who has viewed your account">
+              {profileViewsError ? (
+                <div className="mb-4 rounded-lg border border-amber-500/35 bg-amber-500/10 p-4 text-sm font-bold text-amber-200">
+                  Profile view tracking needs the `src/db/013_player_profile_views.sql` Supabase migration.
+                </div>
+              ) : null}
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  ["Total views", String(profileViewTotalCount ?? 0)],
+                  ["Recent viewers", uniqueProfileViewerCount.toString()],
+                  ["Last 7 days", String(profileViewWeekCount ?? 0)]
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-white/10 bg-black/25 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">{label}</p>
+                    <p className="mt-2 text-3xl font-black text-white">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {latestProfileView ? (
+                <p className="mt-4 text-xs font-bold uppercase tracking-[0.14em] text-white/35">
+                  Latest view {formatNotificationTime(latestProfileView.viewed_at)}
+                </p>
+              ) : null}
+
+              {profileViewRows.length ? (
+                <div className="mt-4 divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10 bg-black/20">
+                  {profileViewRows.slice(0, 8).map((view) => {
+                    const viewer = view.profiles;
+                    const displayName = viewer?.display_name ?? "EuroScout member";
+                    return (
+                      <Link key={view.id} href={viewer ? `/profiles/${viewer.id}` : "#"} className="flex items-center gap-3 p-4 transition hover:bg-white/[0.03]">
+                        <div
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/10 bg-cover bg-center text-sm font-black text-white/55"
+                          style={viewer?.avatar_url ? { backgroundImage: `linear-gradient(180deg, transparent, rgba(0,0,0,.65)), url(${viewer.avatar_url})` } : undefined}
+                        >
+                          {viewer?.avatar_url ? "" : initials(displayName)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-black text-white">{displayName}</p>
+                            <span className="rounded border border-indigo-400/35 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-black uppercase text-indigo-200">
+                              {viewer?.role ?? view.viewer_role ?? "member"}
+                            </span>
+                          </div>
+                          <p className="mt-1 truncate text-xs font-semibold text-white/40">
+                            {viewer?.headline ?? viewer?.location ?? "Viewed your public player profile"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs font-bold text-white/30">{formatNotificationTime(view.viewed_at)}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-4">
+                  <p className="text-sm font-semibold text-white/40">No tracked views yet. Authenticated club, journalist, admin and player visits will appear here.</p>
+                </div>
+              )}
+            </Panel>
+          ) : null}
+
           <Panel eyebrow="Profile Photo" title="Upload profile picture">
             <div className="grid gap-4 md:grid-cols-[112px_minmax(0,1fr)] md:items-center">
               <div
@@ -598,6 +732,25 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   <Field label="Weight kg">
                     <input name="weight_kg" type="number" step="0.01" defaultValue={numberValue(roleProfile, "weight_kg")} className={inputClass} />
                   </Field>
+                  <Field label="Current / recent team">
+                    <select name="current_team_id" defaultValue={textValue(roleProfile, "current_team_id")} className={inputClass}>
+                      <option value="">No current team / unattached</option>
+                      <optgroup label="Campus to Pro">
+                        {campusTeams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name} · {campusPipelines[team.leagueId].label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="European clubs">
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name} ({team.country})
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </Field>
                   <Field label="Pipeline type">
                     <select name="pipeline_type" defaultValue={textValue(roleProfile, "pipeline_type")} className={inputClass}>
                       <option value="">Select pipeline</option>
@@ -605,15 +758,16 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       <option value="semi_pro">Semi-pro</option>
                       <option value="clubs">Clubs</option>
                       <option value="na_import">North America import</option>
+                      <option value="usports">U Sports</option>
+                      <option value="cjfl">CJFL</option>
+                      <option value="bucs">BUCS</option>
                     </select>
                   </Field>
                   <div className="md:col-span-2">
                     <Field label="Career timeline">
-                      <textarea
+                      <CareerTimelineBuilder
                         name="career_timeline_json"
-                        defaultValue={careerTimelineValue}
-                        placeholder={"Team | League | Country | Position | 2024 | 2026 | current\nTeam | League | Country | Position | 2022 | 2024"}
-                        className={textareaClass}
+                        entries={careerTimelineRows ?? []}
                       />
                     </Field>
                   </div>
@@ -633,6 +787,104 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               </button>
             </form>
           </Panel>
+
+          {profile.role === "journalist" ? (
+            <Panel eyebrow="Journalist Desk" title="Publish article links">
+              {journalistArticlesError ? (
+                <div className="mb-5 rounded-lg border border-amber-500/35 bg-amber-500/10 p-4 text-sm font-bold text-amber-200">
+                  Journalist publishing needs the `src/db/012_journalist_articles.sql` Supabase migration.
+                </div>
+              ) : null}
+              <form action={publishJournalistArticleAction} className="grid gap-4">
+                <Field label="Article title">
+                  <input name="title" required minLength={4} maxLength={180} placeholder="e.g. Vienna Vikings reload ahead of CEFL matchup" className={inputClass} />
+                </Field>
+                <Field label="Article link">
+                  <input name="article_url" required type="url" placeholder="https://your-publication.com/article" className={inputClass} />
+                </Field>
+                <Field label="Thumbnail image link">
+                  <input name="thumbnail_url" type="url" placeholder="https://your-publication.com/image.jpg" className={inputClass} />
+                </Field>
+                <Field label="Short preview">
+                  <textarea
+                    name="excerpt"
+                    required
+                    minLength={20}
+                    maxLength={360}
+                    placeholder="Write the short bio/preview that should appear on EuroScout before readers open the article."
+                    className={textareaClass}
+                  />
+                </Field>
+                <div>
+                  <span className={labelClass}>Leagues covered</span>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {leagues.map((league) => (
+                      <label key={league.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-xs font-bold text-white/60">
+                        <input name="league_ids" value={league.id} type="checkbox" className="h-4 w-4 rounded border-white/20 text-red-600" />
+                        <span>{league.shortName}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
+                  <input name="save_as_draft" type="checkbox" className="h-4 w-4 rounded border-white/20 text-red-600" />
+                  Save as draft instead of publishing
+                </label>
+                <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 md:w-fit">
+                  Add article link
+                </button>
+              </form>
+
+              <div className="mt-6 border-t border-white/10 pt-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-black uppercase tracking-[0.14em] text-white/60">Your links</h3>
+                  <Link href="/news" className="text-xs font-black uppercase text-red-300 transition hover:text-red-200">
+                    View news page
+                  </Link>
+                </div>
+                {(journalistArticles ?? []).length ? (
+                  <div className="divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10 bg-black/20">
+                    {(journalistArticles ?? []).map((article) => (
+                      <div key={article.id} className="grid gap-4 p-4 md:grid-cols-[72px_minmax(0,1fr)_auto] md:items-center">
+                        <div
+                          className="flex aspect-video h-16 items-center justify-center rounded-md bg-white/10 bg-cover bg-center text-xs font-black text-white/35"
+                          style={article.thumbnail_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.58)), url(${article.thumbnail_url})` } : undefined}
+                        >
+                          {article.thumbnail_url ? "" : "NEWS"}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded border px-2 py-0.5 text-[10px] font-black uppercase ${article.status === "published" ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300" : "border-amber-500/35 bg-amber-500/10 text-amber-200"}`}>
+                              {article.status}
+                            </span>
+                            <span className="text-[10px] font-bold uppercase text-white/30">
+                              {formatNotificationTime(article.published_at ?? article.created_at)}
+                            </span>
+                          </div>
+                          <a href={article.article_url} target="_blank" rel="noopener noreferrer" className="mt-2 block truncate text-sm font-black text-white transition hover:text-red-300">
+                            {article.title}
+                          </a>
+                          <p className="mt-1 line-clamp-1 text-xs font-semibold text-white/40">
+                            {article.excerpt ?? "No preview added."}
+                          </p>
+                        </div>
+                        <form action={deleteJournalistArticleAction}>
+                          <input type="hidden" name="article_id" value={article.id} />
+                          <button className="h-9 rounded-lg border border-red-500/30 bg-red-500/10 px-3 text-xs font-black uppercase text-red-200 transition hover:bg-red-600 hover:text-white">
+                            Delete
+                          </button>
+                        </form>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+                    <p className="text-sm font-semibold text-white/40">No journalist links submitted yet.</p>
+                  </div>
+                )}
+              </div>
+            </Panel>
+          ) : null}
 
           {profile.role === "player" ? (
             <>

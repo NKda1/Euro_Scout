@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { declineAndDeleteClubClaimAction, verifyClubClaimAction } from "@/app/actions/admin";
+import { declineAndDeleteClubClaimAction, deleteCampusClubAction, verifyClubClaimAction } from "@/app/actions/admin";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { requireAdminProfile } from "@/lib/auth";
+import { campusPipelines } from "@/lib/campus-to-pro";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -26,6 +27,18 @@ interface PendingClubRow {
   claimed_by: string | null;
   claimed_at: string | null;
   claim_expires_at: string | null;
+  updated_at: string;
+  logo_url: string | null;
+}
+
+interface CampusClubRow {
+  id: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  league_id: string | null;
+  claim_status: string | null;
+  verified: boolean | null;
   updated_at: string;
   logo_url: string | null;
 }
@@ -75,6 +88,14 @@ export default async function AdminClubVerificationPage({ searchParams }: AdminC
     .order("updated_at", { ascending: false })
     .returns<PendingClubRow[]>();
 
+  const { data: campusClubs, error: campusError } = await serviceClient
+    .from("teams")
+    .select("id, name, city, country, league_id, claim_status, verified, updated_at, logo_url")
+    .in("league_id", Object.keys(campusPipelines))
+    .order("league_id", { ascending: true })
+    .order("name", { ascending: true })
+    .returns<CampusClubRow[]>();
+
   const claimantIds = Array.from(new Set((pendingClubs ?? []).map((club) => club.claimed_by).filter(Boolean) as string[]));
   const [{ data: claimantProfiles }, { data: claimantUsers }] = claimantIds.length
     ? await Promise.all([
@@ -102,6 +123,7 @@ export default async function AdminClubVerificationPage({ searchParams }: AdminC
         {error ? <p className="border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">{error}</p> : null}
         {notice ? <p className="border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</p> : null}
         {pendingError ? <p className="border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">{pendingError.message}</p> : null}
+        {campusError ? <p className="border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">{campusError.message}</p> : null}
 
         <section className="overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
           <div className="border-b border-slate-200/80 px-5 py-4 dark:border-white/10">
@@ -185,6 +207,79 @@ export default async function AdminClubVerificationPage({ searchParams }: AdminC
           ) : (
             <div className="px-5 py-10 text-center">
               <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No club verification requests are pending.</p>
+            </div>
+          )}
+        </section>
+
+        <section className="overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
+          <div className="flex flex-col gap-3 border-b border-slate-200/80 px-5 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Campus to Pro seeded teams</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                {(campusClubs ?? []).length} seeded team{(campusClubs ?? []).length === 1 ? "" : "s"} can be previewed or deleted for testing.
+              </p>
+            </div>
+            <Link href="/admin/preview/campus-club" className="inline-flex h-10 items-center justify-center border border-amber-200 bg-amber-50 px-4 text-xs font-black uppercase tracking-wide text-amber-800 transition hover:border-amber-300 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+              Campus club preview
+            </Link>
+          </div>
+
+          {(campusClubs ?? []).length ? (
+            <div className="divide-y divide-slate-200/80 dark:divide-white/10">
+              {(campusClubs ?? []).map((club) => {
+                const pipeline = club.league_id && club.league_id in campusPipelines
+                  ? campusPipelines[club.league_id as keyof typeof campusPipelines]
+                  : null;
+
+                return (
+                  <div key={club.id} className="grid gap-5 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+                    <div className="flex min-w-0 gap-4">
+                      <div
+                        className="flex h-14 w-14 shrink-0 items-center justify-center border border-slate-200 bg-slate-100 bg-cover bg-center text-sm font-black text-slate-500 dark:border-white/10 dark:bg-white/10 dark:text-white/50"
+                        style={club.logo_url ? { backgroundImage: `linear-gradient(180deg, transparent, rgba(0,0,0,.55)), url(${club.logo_url})` } : undefined}
+                      >
+                        {club.logo_url ? "" : initials(club.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="truncate text-lg font-black text-slate-950 dark:text-white">{club.name}</h2>
+                          <span className="border border-slate-200 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-white/45">
+                            {pipeline?.shortLabel ?? club.league_id ?? "Campus"}
+                          </span>
+                          <span className={club.verified ? "bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase text-slate-500 dark:bg-white/10 dark:text-white/40"}>
+                            {club.verified ? "Verified" : club.claim_status ?? "Unclaimed"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                          {[club.city, club.country, pipeline?.label].filter(Boolean).join(" · ")}
+                        </p>
+                        <p className="mt-2 text-xs font-bold text-slate-400 dark:text-slate-500">Updated: {formatDate(club.updated_at)}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-white/10 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                      <Link href={`/scouts/${club.id}`} className="flex h-10 w-full items-center justify-center border border-slate-200 px-4 text-xs font-black uppercase text-slate-600 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:text-slate-300">
+                        Preview live profile
+                      </Link>
+                      <form action={deleteCampusClubAction} className="space-y-2">
+                        <input type="hidden" name="team_id" value={club.id} />
+                        <input
+                          name="confirmation"
+                          placeholder="DELETE CLUB"
+                          className="h-10 w-full border border-red-200 bg-red-50/50 px-3 text-xs font-black text-slate-900 outline-none transition placeholder:text-red-300 focus:border-red-400 dark:border-red-500/30 dark:bg-red-500/10 dark:text-white"
+                        />
+                        <button className="h-11 w-full border border-red-500 bg-transparent px-4 text-sm font-black text-red-600 transition hover:bg-red-600 hover:text-white dark:text-red-300">
+                          Delete seeded club
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="px-5 py-10 text-center">
+              <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No Campus to Pro teams found. Run the seed SQL to populate this control.</p>
             </div>
           )}
         </section>

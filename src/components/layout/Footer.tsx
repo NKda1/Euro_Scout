@@ -14,10 +14,16 @@ export default function Footer() {
             Home
           </Link>
           <Link href={routes.leagues} className="hover:text-red-700 dark:hover:text-red-300">
-            Leagues
+            League directories
           </Link>
           <Link href={routes.teams} className="hover:text-red-700 dark:hover:text-red-300">
-            Teams
+            Team directories
+          </Link>
+          <Link href={routes.campusToPro} className="hover:text-red-700 dark:hover:text-red-300">
+            Campus to Pro
+          </Link>
+          <Link href={routes.news} className="hover:text-red-700 dark:hover:text-red-300">
+            News
           </Link>
         </div>
       </div>

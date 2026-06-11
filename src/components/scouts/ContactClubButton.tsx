@@ -7,9 +7,10 @@ interface ContactClubButtonProps {
   scoutId: string;
   teamId: string;
   teamName: string;
+  canMessage?: boolean;
 }
 
-export default function ContactClubButton({ scoutId, teamId, teamName }: ContactClubButtonProps) {
+export default function ContactClubButton({ scoutId, teamId, teamName, canMessage = true }: ContactClubButtonProps) {
   const [open, setOpen] = useState(false);
 
   if (!open) {
@@ -25,12 +26,18 @@ export default function ContactClubButton({ scoutId, teamId, teamName }: Contact
             Express interest
           </button>
         </form>
-        <button
-          onClick={() => setOpen(true)}
-          className="h-12 w-full border border-slate-200 bg-white px-5 text-sm font-black text-slate-600 transition hover:border-red-300 hover:text-red-700 active:scale-[0.98] dark:border-white/10 dark:bg-black/20 dark:text-white/45 dark:hover:border-red-500/45 dark:hover:bg-red-500/10 dark:hover:text-white"
-        >
-          Message {teamName}
-        </button>
+        {canMessage ? (
+          <button
+            onClick={() => setOpen(true)}
+            className="h-12 w-full border border-slate-200 bg-white px-5 text-sm font-black text-slate-600 transition hover:border-red-300 hover:text-red-700 active:scale-[0.98] dark:border-white/10 dark:bg-black/20 dark:text-white/45 dark:hover:border-red-500/45 dark:hover:bg-red-500/10 dark:hover:text-white"
+          >
+            Message {teamName}
+          </button>
+        ) : (
+          <p className="border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-black/20 dark:text-white/35">
+            Direct messages open once this club account has verified staff.
+          </p>
+        )}
       </div>
     );
   }

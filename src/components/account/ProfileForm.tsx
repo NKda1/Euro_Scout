@@ -1,4 +1,5 @@
 import { teams } from "@/lib/data";
+import { campusPipelines, campusTeams } from "@/lib/campus-to-pro";
 import { publicUserRoles, roleLabel, userRoles, type Profile, type UserRole } from "@/lib/auth";
 
 interface RoleProfileData {
@@ -76,11 +77,20 @@ export default function ProfileForm({ action, profile, roleProfile, submitLabel,
           <input name="weight_kg" type="number" step="0.01" placeholder="Weight kg" defaultValue={roleProfile?.weight_kg ?? ""} className={inputClass} />
           <select name="current_team_id" defaultValue={roleProfile?.current_team_id ?? ""} className={inputClass}>
             <option value="">Current team</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
+            <optgroup label="Campus to Pro">
+              {campusTeams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name} · {campusPipelines[team.leagueId].label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="European clubs">
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </optgroup>
           </select>
           <select name="pipeline_type" defaultValue={roleProfile?.pipeline_type ?? ""} className={inputClass}>
             <option value="">Pipeline</option>
@@ -88,6 +98,9 @@ export default function ProfileForm({ action, profile, roleProfile, submitLabel,
             <option value="semi_pro">Semi-pro</option>
             <option value="clubs">Clubs</option>
             <option value="na_import">North America import</option>
+            <option value="usports">U Sports</option>
+            <option value="cjfl">CJFL</option>
+            <option value="bucs">BUCS</option>
           </select>
           <label className="flex items-center gap-3 rounded-2xl border border-red-100 bg-white/80 px-4 py-3 text-sm font-bold text-slate-700 backdrop-blur-xl dark:border-red-400/20 dark:bg-white/10 dark:text-slate-200 md:col-span-2">
             <input name="available_for_transfer" type="checkbox" defaultChecked={Boolean(roleProfile?.available_for_transfer)} className="h-4 w-4 rounded border-slate-300 text-red-600" />
