@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { trackFilmClickAction } from "@/app/actions/film";
 import { detectVideoProvider, getEmbeddableVideoUrl, getVideoProviderLabel, normalizeVideoUrl } from "@/lib/video";
 
 export interface FilmLink {
@@ -67,14 +68,13 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
               <p className="mt-3 text-sm leading-6 text-slate-400">
                 This provider does not allow reliable in-page playback, so EuroScout opens the saved film link in a new tab.
               </p>
-              <a
-                href={activeUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-red-50"
-              >
-                Watch on {providerLabel}
-              </a>
+              <form action={trackFilmClickAction} target="_blank">
+                <input type="hidden" name="film_id" value={activeFilm.id} />
+                <input type="hidden" name="fallback_url" value={activeUrl} />
+                <button className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-red-50">
+                  Watch on {providerLabel}
+                </button>
+              </form>
             </div>
           </div>
         ) : (
@@ -94,9 +94,13 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
           <p className="mt-1 text-lg font-black text-white">{activeFilm?.label ?? "Hudl film placeholder"}</p>
         </div>
         {activeFilm ? (
-          <a href={activeUrl} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-red-50">
-            Open on {providerLabel}
-          </a>
+          <form action={trackFilmClickAction} target="_blank">
+            <input type="hidden" name="film_id" value={activeFilm.id} />
+            <input type="hidden" name="fallback_url" value={activeUrl} />
+            <button className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-red-50">
+              Open on {providerLabel}
+            </button>
+          </form>
         ) : null}
       </div>
     </section>

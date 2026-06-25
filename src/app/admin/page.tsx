@@ -21,12 +21,13 @@ interface SampleClubRow {
 export default async function AdminDashboardPage() {
   const { supabase } = await requireAdminProfile();
 
-  const [{ count: profileCount }, { count: playerCount }, { count: clubCount }, { count: pendingClubCount }, { count: campusClubCount }, { count: conversationCount }, { count: messageCount }, { count: filmCount }, { count: newsCount }, { data: recentProfiles }, { data: samplePlayer }, { data: sampleClub }] = await Promise.all([
+  const [{ count: profileCount }, { count: playerCount }, { count: clubCount }, { count: pendingClubCount }, { count: campusClubCount }, { count: openDisputeCount }, { count: conversationCount }, { count: messageCount }, { count: filmCount }, { count: newsCount }, { data: recentProfiles }, { data: samplePlayer }, { data: sampleClub }] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "player"),
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "club"),
     supabase.from("teams").select("id", { count: "exact", head: true }).eq("claim_status", "pending"),
     supabase.from("teams").select("id", { count: "exact", head: true }).in("league_id", Object.keys(campusPipelines)),
+    supabase.from("club_disputes").select("id", { count: "exact", head: true }).eq("status", "open"),
     supabase.from("conversations").select("id", { count: "exact", head: true }),
     supabase.from("messages").select("id", { count: "exact", head: true }),
     supabase.from("film_links").select("id", { count: "exact", head: true }),
@@ -124,7 +125,7 @@ export default async function AdminDashboardPage() {
           </Link>
           <Link href="/admin/disputes" className="border border-amber-100 bg-amber-50 p-5 transition hover:border-amber-300 dark:border-amber-400/20 dark:bg-amber-500/10">
             <p className="text-lg font-black text-slate-950 dark:text-white">Club disputes</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">Review open club claim disputes and verification requests.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{openDisputeCount ?? 0} open club dispute{openDisputeCount === 1 ? "" : "s"}, including account flags.</p>
           </Link>
           <Link href="/admin/news" className="border border-blue-100 bg-blue-50 p-5 transition hover:border-blue-300 dark:border-blue-400/20 dark:bg-blue-500/10">
             <p className="text-lg font-black text-slate-950 dark:text-white">News feed control</p>
@@ -143,18 +144,20 @@ export default async function AdminDashboardPage() {
               <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Player</p>
               <p className="mt-1 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Athlete signing up and building a profile.</p>
               <div className="flex flex-col gap-2">
-                <Link href="/onboarding?preview=1" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
+                <Link href="/admin/preview/onboarding-demo/player" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Demo tour</Link>
+                <Link href="/onboarding?preview=1&role=player" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Form preview</Link>
                 <Link href="/players" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Player directory</Link>
                 <Link href="/account" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Account / profile</Link>
               </div>
             </div>
 
-            {/* Club */}
+            {/* Coach / Club */}
             <div className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#090909]">
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Club</p>
-              <p className="mt-1 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Club representative claiming and managing a team.</p>
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Coach / Club</p>
+              <p className="mt-1 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Coach or club representative claiming and managing a team.</p>
               <div className="flex flex-col gap-2">
-                <Link href="/onboarding?preview=1" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
+                <Link href="/admin/preview/onboarding-demo/club" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Demo tour</Link>
+                <Link href="/onboarding?preview=1&role=club" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Form preview</Link>
                 <Link href="/watchlists" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Watchlists</Link>
                 <Link href="/players" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Player directory</Link>
                 <Link href="/messages" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Messages</Link>
@@ -166,7 +169,8 @@ export default async function AdminDashboardPage() {
               <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Journalist</p>
               <p className="mt-1 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Media professional browsing leagues and profiles.</p>
               <div className="flex flex-col gap-2">
-                <Link href="/onboarding?preview=1" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
+                <Link href="/admin/preview/onboarding-demo/journalist" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Demo tour</Link>
+                <Link href="/onboarding?preview=1&role=journalist" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Form preview</Link>
                 <Link href="/leagues" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">League directories</Link>
                 <Link href="/players" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Player directory</Link>
                 <Link href="/admin/preview/journalist" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Journalist preview</Link>
@@ -179,7 +183,8 @@ export default async function AdminDashboardPage() {
               <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">Fan</p>
               <p className="mt-1 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Public user exploring the European American football scene.</p>
               <div className="flex flex-col gap-2">
-                <Link href="/onboarding?preview=1" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Preview onboarding</Link>
+                <Link href="/admin/preview/onboarding-demo/fan" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Demo tour</Link>
+                <Link href="/onboarding?preview=1&role=fan" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Form preview</Link>
                 <Link href="/" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Home page</Link>
                 <Link href="/teams" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Team directories</Link>
               </div>

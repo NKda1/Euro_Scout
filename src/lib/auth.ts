@@ -27,10 +27,7 @@ export function isUserRole(value: string): value is UserRole {
 export function isReservedAdminEmail(email?: string | null) {
   // Support both singular and plural env var names
   const raw = process.env.EUROSCOUT_SUPER_ADMIN_EMAILS ?? process.env.EUROSCOUT_SUPER_ADMIN_EMAIL ?? "";
-  const allowedEmails = raw
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
+  const allowedEmails = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)?.map((item) => item.toLowerCase()) ?? [];
 
   return Boolean(email && allowedEmails.includes(email.toLowerCase()));
 }
@@ -88,7 +85,7 @@ export async function requireOnboardedProfile() {
   const context = await getAuthenticatedProfile();
 
   if (!context.profile?.onboarding_complete) {
-    redirect("/onboarding");
+    redirect("/welcome");
   }
 
   return context as typeof context & { profile: Profile };
@@ -97,7 +94,7 @@ export async function requireOnboardedProfile() {
 export async function requireAdminProfile() {
   const context = await requireOnboardedProfile();
 
-  if (context.profile.role !== "admin") {
+  if (context.profile.role !== "admin" || !isReservedAdminEmail(context.user.email)) {
     redirect("/dashboard?error=Admin access is required.");
   }
 

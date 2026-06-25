@@ -123,7 +123,7 @@ export default function CareerTimelineBuilder({ entries, onChange, name }: Caree
     <div className="space-y-4">
       {name ? <input type="hidden" name={name} value={jsonValue} /> : null}
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.35fr)_repeat(3,minmax(120px,0.7fr))_auto]">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.35fr)_repeat(3,minmax(110px,0.7fr))_auto]">
         <label className="block">
           <span className={labelClass}>Team</span>
           <select value={selectedTeamId} onChange={(event) => setSelectedTeamId(event.target.value)} className={inputClass}>
@@ -153,7 +153,7 @@ export default function CareerTimelineBuilder({ entries, onChange, name }: Caree
           <span className={labelClass}>To</span>
           <input type="number" min="2000" max="2035" value={endYear} onChange={(event) => setEndYear(event.target.value)} placeholder="2026" disabled={isCurrent} className={inputClass} />
         </label>
-        <button type="button" onClick={addEntry} className="mt-5 h-11 bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
+        <button type="button" onClick={addEntry} className="h-11 bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 md:col-span-2 xl:col-span-1 xl:mt-5">
           Add
         </button>
       </div>

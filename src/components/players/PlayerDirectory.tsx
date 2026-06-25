@@ -7,6 +7,7 @@ import { getCampusTeam } from "@/lib/campus-to-pro";
 import { teams } from "@/lib/data";
 import type { Profile } from "@/lib/auth";
 import AddToWatchlistButton from "@/components/players/AddToWatchlistButton";
+import { EmptyState } from "@/components/ui/StateDisplay";
 
 export interface PlayerDirectoryItem {
   id: string;
@@ -102,9 +103,9 @@ export default function PlayerDirectory({ players, watchlists, userRole }: Playe
             return (
               <div key={player.id} className="group border border-slate-200 bg-white shadow-sm transition hover:border-red-500/45 hover:bg-slate-50 dark:border-white/10 dark:bg-[#111] dark:hover:bg-[#151515]">
                 <Link href={routes.player(profile.id)} className="block">
-                  <div className="grid grid-cols-[112px_minmax(0,1fr)]">
+                  <div className="grid sm:grid-cols-[112px_minmax(0,1fr)]">
                     <div
-                      className="flex min-h-36 items-center justify-center border-r border-slate-200 bg-slate-100 bg-cover bg-center text-2xl font-black text-slate-900 dark:border-white/10 dark:bg-[#1b1b1b] dark:text-white"
+                      className="flex min-h-44 items-center justify-center border-b border-slate-200 bg-slate-100 bg-cover bg-center text-2xl font-black text-slate-900 dark:border-white/10 dark:bg-[#1b1b1b] dark:text-white sm:min-h-36 sm:border-b-0 sm:border-r"
                       style={profile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.62)), url(${profile.avatar_url})` } : undefined}
                     >
                       {profile.avatar_url ? "" : initials}
@@ -123,19 +124,19 @@ export default function PlayerDirectory({ players, watchlists, userRole }: Playe
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 border-t border-slate-200 dark:border-white/10">
+                  <div className="grid grid-cols-1 border-t border-slate-200 dark:border-white/10 sm:grid-cols-2">
                     <div className="border-r border-slate-200 px-4 py-3 dark:border-white/10">
                       <p className="text-[11px] font-black uppercase tracking-wide text-slate-400 dark:text-white/30">Team</p>
                       <p className="mt-1 truncate text-sm font-black text-slate-950 dark:text-white">{currentTeam?.name ?? "Unlisted"}</p>
                     </div>
-                    <div className="px-4 py-3">
+                    <div className="border-t border-slate-200 px-4 py-3 dark:border-white/10 sm:border-t-0">
                       <p className="text-[11px] font-black uppercase tracking-wide text-slate-400 dark:text-white/30">Pipeline</p>
                       <p className="mt-1 truncate text-sm font-black capitalize text-slate-950 dark:text-white">{normalize(player.pipeline_type?.replace("_", " ") ?? null)}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-white/10">
-                    <span className="bg-red-500/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-red-700 dark:bg-red-500/15 dark:text-red-200">
+                  <div className="flex items-center justify-between border-t border-slate-200 px-4 py-4 dark:border-white/10">
+                    <span className="border border-red-300 bg-red-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-red-950 shadow-sm dark:border-red-400/35 dark:bg-red-500/15 dark:text-red-100">
                       {player.available_for_transfer ? "Available" : "Open profile"}
                     </span>
                     <span className="text-xs font-black uppercase tracking-wide text-red-600 dark:text-red-400">View</span>
@@ -154,10 +155,12 @@ export default function PlayerDirectory({ players, watchlists, userRole }: Playe
           })}
         </div>
       ) : (
-        <div className="border border-dashed border-slate-300 bg-white p-8 text-center dark:border-white/15 dark:bg-[#111]">
-          <h2 className="text-sm font-black text-slate-950 dark:text-white">No players found</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-white/45">Try adjusting your filters.</p>
-        </div>
+        <EmptyState
+          title="No players match this view"
+          description="Try clearing filters or broadening your search. New public player profiles will appear here after onboarding."
+          actionHref={routes.players}
+          actionLabel="Reset search"
+        />
       )}
     </section>
   );

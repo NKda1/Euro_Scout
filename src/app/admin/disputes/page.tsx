@@ -16,6 +16,10 @@ interface DisputeRow extends ClubDispute {
 
 type DisputeStatus = "open" | "reviewed" | "dismissed" | "upheld";
 
+function isAccountFlagReason(reason: string | null | undefined) {
+  return reason?.startsWith("Club account flag:") ?? false;
+}
+
 async function resolveDisputeAction(formData: FormData) {
   "use server";
   const { supabase } = await requireAdminProfile();
@@ -72,7 +76,7 @@ export default async function AdminDisputesPage() {
         <AdminPageHeader
           eyebrow="Admin · Disputes"
           title="Club disputes."
-          description="Review open club claim disputes and decide their outcome. Upholding marks the team as disputed."
+          description="Review club claim disputes and public account flags from one queue. Upholding marks the team as disputed."
         />
 
         {error && (
@@ -91,7 +95,9 @@ export default async function AdminDisputesPage() {
                 <div key={d.id} className="rounded-3xl glass-card p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">Open dispute</p>
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
+                        {isAccountFlagReason(d.reason) ? "Open account flag" : "Open dispute"}
+                      </p>
                       <p className="mt-1 text-lg font-black text-slate-950 dark:text-white">{d.teams?.name ?? d.team_id}</p>
                       <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                         Raised by <span className="font-bold text-slate-800 dark:text-slate-200">{d.profiles?.display_name ?? d.raised_by}</span>
@@ -122,7 +128,7 @@ export default async function AdminDisputesPage() {
                         Dismiss
                       </button>
                       <button name="status" value="upheld" className="h-10 rounded-2xl bg-red-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-red-700">
-                        Uphold (dispute claim)
+                        {isAccountFlagReason(d.reason) ? "Uphold flag" : "Uphold dispute"}
                       </button>
                     </div>
                   </form>

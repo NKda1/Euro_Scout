@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { requireOnboardedProfile, roleLabel, type Profile } from "@/lib/auth";
 import { countUnreadMessages, getDisplayProfile, profileInitials, type MessageRow } from "@/lib/messaging";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { EmptyState, Notice } from "@/components/ui/StateDisplay";
 
 export const metadata: Metadata = {
   title: "Messages | EuroScout Pro",
@@ -183,7 +184,13 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
             </div>
           ) : null}
         </div>
-        {error ? <p className="mt-6 border border-red-500/40 bg-red-500/10 p-4 text-sm font-bold text-red-200">{error}</p> : null}
+        {error ? (
+          <div className="mt-6">
+            <Notice tone="danger" title="Messages could not update." actionHref="/messages" actionLabel="Retry">
+              {error}
+            </Notice>
+          </div>
+        ) : null}
         <div className="mt-8 overflow-hidden border border-white/10 bg-[#111]">
           {visibleConversationGroups.map((group, index) => {
             const conversation = group.conversation;
@@ -243,12 +250,15 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
           })}
         </div>
         {!visibleConversationGroups.length ? (
-          <div className="mt-8 border border-white/10 bg-[#111] p-6">
-            <p className="text-lg font-black text-white">No conversations yet.</p>
-            <p className="mt-2 text-sm leading-6 text-white/50">Browse public profiles and start a conversation when you find someone relevant.</p>
-            <Link href="/profiles" className="mt-5 inline-flex h-11 items-center bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
-              Browse profiles
-            </Link>
+          <div className="mt-8">
+            <EmptyState
+              title="No conversations yet"
+              description="When a club or player starts a conversation, the thread appears here with unread counts and the latest reply."
+              actionHref="/players"
+              actionLabel="Browse players"
+              secondaryHref="/clubs"
+              secondaryLabel="Browse clubs"
+            />
           </div>
         ) : null}
       </section>

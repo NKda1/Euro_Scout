@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import type { NewsArticle } from "@/app/api/news/route";
+import { EmptyState, Notice, SkeletonBlock } from "@/components/ui/StateDisplay";
 
 const SOURCE_STYLES: Record<string, { label: string; bg: string; text: string }> = {
   AFLE: { label: "AFLE", bg: "bg-blue-600",   text: "text-white" },
@@ -68,6 +69,7 @@ function NewsCard({ article }: { article: NewsArticle }) {
 export default function EuroNewsSection() {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
   const rafRef = useRef<number | null>(null);
@@ -75,9 +77,12 @@ export default function EuroNewsSection() {
 
   useEffect(() => {
     fetch("/api/news")
-      .then((r) => r.json())
-      .then((data: NewsArticle[]) => { setArticles(data); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then((r) => {
+        if (!r.ok) throw new Error("News request failed");
+        return r.json();
+      })
+      .then((data: NewsArticle[]) => { setArticles(data); setFetchError(false); setLoading(false); })
+      .catch(() => { setFetchError(true); setLoading(false); });
   }, []);
 
   useEffect(() => {
@@ -161,11 +166,26 @@ export default function EuroNewsSection() {
       {loading ? (
         <div className="flex gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-52 w-64 flex-shrink-0 animate-pulse bg-slate-100 dark:bg-[#111]" />
+            <div key={i} className="w-64 flex-shrink-0 border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-[#111]">
+              <SkeletonBlock className="h-28 w-full" />
+              <SkeletonBlock className="mt-4 h-4 w-3/4" />
+              <SkeletonBlock className="mt-3 h-4 w-full" />
+              <SkeletonBlock className="mt-2 h-4 w-1/2" />
+            </div>
           ))}
         </div>
+      ) : fetchError ? (
+        <Notice tone="warning" title="Live headlines could not load." actionHref="/news" actionLabel="Retry">
+          Check your connection and try again. Journalist articles above are still available when published.
+        </Notice>
       ) : articles.length === 0 ? (
-        <p className="text-sm text-slate-400">No news available right now. Check back soon.</p>
+        <EmptyState
+          title="No live headlines right now"
+          description="The external news feeds did not return stories. Try again shortly or check the source sites directly."
+          actionHref="/news"
+          actionLabel="Retry"
+          className="p-6"
+        />
       ) : (
         <div
           ref={scrollRef}

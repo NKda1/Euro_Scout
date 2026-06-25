@@ -297,7 +297,7 @@ export default function MessageThread({
               {sendError}
             </p>
           )}
-          <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-white/[0.04] sm:flex-row sm:items-end">
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -309,12 +309,12 @@ export default function MessageThread({
               }}
               placeholder="Write a message..."
               rows={2}
-              className="min-h-[48px] flex-1 resize-none border-0 bg-transparent px-3 py-3 text-sm font-semibold text-slate-900 outline-none dark:text-white dark:placeholder:text-slate-500"
+              className="min-h-[56px] w-full flex-1 resize-none border-0 bg-transparent px-3 py-3 text-base font-semibold text-slate-900 outline-none dark:text-white dark:placeholder:text-slate-500 sm:text-sm"
             />
             <button
               type="submit"
               disabled={sending || !body.trim()}
-              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 disabled:opacity-50"
+              className="inline-flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 disabled:opacity-50 sm:h-11 sm:w-auto"
             >
               <SendHorizontal className="h-4 w-4" aria-hidden />
               {sending ? "Sending" : "Send"}

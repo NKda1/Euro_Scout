@@ -153,6 +153,32 @@
     border-radius: 999px;
     background: rgba(248, 113, 113, 0.82);
   }
+
+  .es-carousel-frame {
+    opacity: 0;
+    transform: scale(1.04);
+    animation: esCarouselFade 25s infinite ease-in-out;
+    will-change: opacity, transform;
+  }
+}
+
+.app-surface > section:first-child > .mx-auto,
+.app-surface > section:first-child.mx-auto {
+  padding-top: clamp(1rem, 2vw, 1.5rem);
+}
+
+.app-surface > section > .mx-auto,
+.app-surface > section.mx-auto {
+  padding-bottom: clamp(1.25rem, 2.5vw, 2rem);
+}
+
+.app-surface > section + section > .mx-auto,
+.app-surface > section + section.mx-auto {
+  padding-top: clamp(1rem, 2vw, 1.75rem);
+}
+
+.app-surface > section + section {
+  margin-top: 0;
 }
 
 @layer utilities {
@@ -230,12 +256,43 @@
   100% { opacity: 0; transform: scale(1.08); }
 }
 
+@keyframes esCarouselFade {
+  0% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  4% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.01);
+  }
+  22% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-cinematic-frame {
     animation: none;
   }
 
+  .es-carousel-frame {
+    animation: none;
+  }
+
   .hero-cinematic-frame-1 {
+    opacity: 1;
+  }
+
+  .es-carousel-frame:first-child {
     opacity: 1;
   }
 
@@ -268,4 +325,61 @@
     transform: none;
     transition: none;
   }
+}
+
+html:not(.dark) .theme-private {
+  background: #ffffff !important;
+  color: #020617 !important;
+}
+
+html:not(.dark) .theme-private [class*="bg-[#090909]"],
+html:not(.dark) .theme-private [class*="bg-[#101010]"],
+html:not(.dark) .theme-private [class*="bg-[#111]"],
+html:not(.dark) .theme-private [class*="bg-[#1a1a1a]"],
+html:not(.dark) .theme-private [class*="bg-[#202020]"],
+html:not(.dark) .theme-private [class*="bg-slate-950"],
+html:not(.dark) .theme-private [class*="bg-black"] {
+  background-color: #ffffff !important;
+}
+
+html:not(.dark) .theme-private [class*="bg-white/"],
+html:not(.dark) .theme-private [class*="bg-white["] {
+  background-color: #f8fafc !important;
+}
+
+html:not(.dark) .theme-private [class*="text-white"]:not([class*="bg-red"]):not([class*="bg-emerald"]):not([class*="bg-amber"]) {
+  color: #020617 !important;
+}
+
+html:not(.dark) .theme-private [class*="text-white/"]:not([class*="bg-red"]):not([class*="bg-emerald"]):not([class*="bg-amber"]) {
+  color: #64748b !important;
+}
+
+html:not(.dark) .theme-private [class*="border-white"],
+html:not(.dark) .theme-private [class*="border-white/"] {
+  border-color: #e2e8f0 !important;
+}
+
+html:not(.dark) .theme-private [class*="divide-white"] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+html:not(.dark) .theme-private input,
+html:not(.dark) .theme-private textarea,
+html:not(.dark) .theme-private select {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #020617 !important;
+}
+
+html:not(.dark) .theme-private input::placeholder,
+html:not(.dark) .theme-private textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html:not(.dark) .theme-private button[class*="bg-red-600"],
+html:not(.dark) .theme-private a[class*="bg-red-600"],
+html:not(.dark) .theme-private button[class*="bg-emerald-600"],
+html:not(.dark) .theme-private a[class*="bg-emerald-600"] {
+  color: #ffffff !important;
 }

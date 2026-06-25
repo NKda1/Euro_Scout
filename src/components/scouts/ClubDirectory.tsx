@@ -40,7 +40,7 @@ export default function ClubDirectory({ clubs }: { clubs: ClubDirectoryItem[] })
               {club.teams.claim_status === "verified" ? "Verified Club" : "Club"}
             </p>
             {club.teams.recruiting_active && (
-              <span className="rounded-full bg-green-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-green-700 dark:bg-green-500/15 dark:text-green-300">
+              <span className="rounded-full border border-green-300 bg-green-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-green-950 shadow-sm dark:border-green-400/35 dark:bg-green-500/15 dark:text-green-100">
                 Recruiting
               </span>
             )}
@@ -54,7 +54,7 @@ export default function ClubDirectory({ clubs }: { clubs: ClubDirectoryItem[] })
           <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{club.profiles.headline ?? club.profiles.display_name}</p>
           {club.teams.open_roster_spots != null && club.teams.open_roster_spots > 0 && (
             <div className="mt-4">
-              <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-black text-red-700 dark:bg-red-500/15 dark:text-red-300">
+              <span className="rounded-full border border-red-300 bg-red-100 px-2.5 py-1 text-xs font-black text-red-950 shadow-sm dark:border-red-400/35 dark:bg-red-500/15 dark:text-red-100">
                 {club.teams.open_roster_spots} open spot{club.teams.open_roster_spots !== 1 ? "s" : ""}
               </span>
             </div>

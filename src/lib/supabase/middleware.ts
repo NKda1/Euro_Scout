@@ -21,7 +21,7 @@ function requireSupabasePublicKey() {
   return value;
 }
 
-const protectedPrefixes = ["/dashboard", "/account", "/messages", "/onboarding", "/profiles"];
+const protectedPrefixes = ["/dashboard", "/account", "/analytics", "/messages", "/notifications", "/onboarding", "/profiles", "/admin", "/watchlists", "/welcome"];
 
 export async function updateSupabaseSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -60,7 +60,7 @@ export async function updateSupabaseSession(request: NextRequest) {
   if (isProtectedRoute && !user) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/auth/sign-in";
-    redirectUrl.searchParams.set("next", request.nextUrl.pathname);
+    redirectUrl.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(redirectUrl);
   }
 

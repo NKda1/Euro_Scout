@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthenticatedProfile } from "@/lib/auth";
-import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -122,4 +122,55 @@ export async function deleteFilmLinkAction(formData: FormData) {
   revalidatePath("/account/edit");
   revalidatePath(`/players/${profile.id}`);
   redirect("/account?notice=Film link removed.");
+}
+
+export async function trackFilmClickAction(formData: FormData) {
+  const filmId = text(formData, "film_id");
+  const fallbackUrl = text(formData, "fallback_url");
+
+  if (!filmId) {
+    redirect(fallbackUrl || "/players");
+  }
+
+  const authClient = await createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await authClient.auth.getUser();
+  const serviceClient = createSupabaseServiceRoleClient();
+
+  const { data: film } = await serviceClient
+    .from("film_links")
+    .select("id, url, player_profile_id, player_profiles!player_profile_id ( profile_id )")
+    .eq("id", filmId)
+    .maybeSingle<{
+      id: string;
+      url: string;
+      player_profile_id: string;
+      player_profiles: { profile_id: string } | null;
+    }>();
+
+  if (!film?.url) {
+    redirect(fallbackUrl || "/players");
+  }
+
+  let viewerRole: string | null = null;
+  if (user) {
+    const { data: viewerProfile } = await serviceClient
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle<{ role: string }>();
+    viewerRole = viewerProfile?.role ?? null;
+  }
+
+  if (!user || user.id !== film.player_profiles?.profile_id) {
+    await serviceClient.from("film_clicks").insert({
+      film_link_id: film.id,
+      player_profile_id: film.player_profile_id,
+      viewer_profile_id: user?.id ?? null,
+      viewer_role: viewerRole
+    });
+  }
+
+  redirect(normalizeFilmUrl(film.url));
 }

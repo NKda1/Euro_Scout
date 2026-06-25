@@ -1,12 +1,23 @@
 import type { Metadata } from "next";
 import EuroNewsSection from "@/components/news/EuroNewsSection";
 import JournalistArticleCard, { type JournalistArticleCardData } from "@/components/news/JournalistArticleCard";
+import { EmptyState, Notice } from "@/components/ui/StateDisplay";
 import { leagues } from "@/lib/data";
+import { absoluteUrl } from "@/lib/seo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "News | EuroScout Pro",
-  description: "Read EuroScout journalist links and live European American football headlines."
+  description: "Read EuroScout journalist links and live European American football headlines.",
+  alternates: {
+    canonical: "/news"
+  },
+  openGraph: {
+    title: "News | EuroScout Pro",
+    description: "Read EuroScout journalist links and live European American football headlines.",
+    url: absoluteUrl("/news"),
+    type: "website"
+  }
 };
 
 export default async function NewsPage() {
@@ -70,9 +81,9 @@ export default async function NewsPage() {
         </div>
 
         {error ? (
-          <div className="border border-amber-400/40 bg-amber-500/10 p-5 text-sm font-bold text-amber-700 dark:text-amber-200">
-            Journalist articles are not available yet. Run `src/db/012_journalist_articles.sql` in Supabase to enable this feed.
-          </div>
+          <Notice tone="warning" title="Journalist articles are not available." actionHref="/news" actionLabel="Retry">
+            The article feed could not load. If this is a new environment, run `src/db/012_journalist_articles.sql` in Supabase.
+          </Notice>
         ) : articles?.length ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {articles.map((article) => (
@@ -80,12 +91,12 @@ export default async function NewsPage() {
             ))}
           </div>
         ) : (
-          <div className="border border-dashed border-slate-300 bg-white p-8 text-center dark:border-white/15 dark:bg-[#111]">
-            <h3 className="text-sm font-black text-slate-950 dark:text-white">No journalist articles yet</h3>
-            <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-              Published journalist links will appear here as thumbnails with short previews.
-            </p>
-          </div>
+          <EmptyState
+            title="No journalist articles yet"
+            description="Published links will appear here with thumbnails, bylines, league tags and short previews."
+            actionHref="/dashboard"
+            actionLabel="Open dashboard"
+          />
         )}
       </section>
 

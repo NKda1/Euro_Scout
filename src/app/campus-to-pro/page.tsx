@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { routes } from "@/constants/routes";
+import EuroScoutImageCarousel from "@/components/ui/EuroScoutImageCarousel";
 import {
   campusPipelines,
   getCampusTeam,
@@ -173,48 +174,52 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
   return (
     <main className="app-surface min-h-screen">
       <section className="border-b border-slate-200 dark:border-white/10">
-        <div className="mx-auto grid max-w-[92rem] gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.6fr)] lg:px-8">
-          <div>
-            <p className={labelClass}>Campus to Pro</p>
-            <h1 className="mt-3 max-w-4xl text-4xl font-black tracking-tight text-slate-950 dark:text-white sm:text-5xl">
-              North American and UK campus talent, ready for European clubs.
-            </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600 dark:text-white/55">
-              Browse U Sports, CJFL and BUCS programs, then filter public player profiles by position,
-              conference, eligibility year, passport readiness and transfer availability.
-            </p>
-          </div>
-          <div className={`${panelClass} self-end p-5`}>
-            <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center border border-slate-200 bg-white p-2 dark:border-white/10">
-                <Image src={pipeline.logoPath} alt={`${pipeline.label} logo`} width={56} height={56} className="max-h-full max-w-full object-contain" />
+        <div className="mx-auto grid max-w-[92rem] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(460px,0.65fr)] lg:px-8">
+          <EuroScoutImageCarousel
+            label="Campus to Pro"
+            title="North American and UK campus talent, ready for European clubs."
+            className="min-h-[28rem] lg:min-h-[31rem]"
+          />
+          <div className="grid gap-4 self-stretch">
+            <div className={`${panelClass} p-5`}>
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center border border-slate-200 bg-white p-2 dark:border-white/10">
+                  <Image src={pipeline.logoPath} alt={`${pipeline.label} logo`} width={56} height={56} className="max-h-full max-w-full object-contain" />
+                </div>
+                <div>
+                  <p className={labelClass}>League brief</p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{pipeline.label}</h2>
+                </div>
               </div>
-              <div>
-                <p className={labelClass}>League brief</p>
-                <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{pipeline.label}</h2>
+              <p className="mt-4 text-sm font-semibold leading-6 text-slate-600 dark:text-white/55">
+                {pipeline.about}
+              </p>
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                {Object.values(campusPipelines).map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/campus-to-pro${buildQuery(baseFilters, { pipeline: item.id, position: undefined, conference: undefined, eligibility: undefined })}`}
+                    className={`border p-3 text-center transition ${activePipeline === item.id ? "border-red-400 bg-red-500/15 text-red-700 dark:text-red-100" : "border-slate-200 bg-white text-slate-950 hover:border-red-400/40 dark:border-white/10 dark:bg-black/30 dark:text-white"}`}
+                  >
+                    <span className="block text-xl font-black">{item.teamCount}</span>
+                    <span className="mt-1 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-white/45">{item.shortLabel}</span>
+                  </Link>
+                ))}
               </div>
             </div>
-            <p className="mt-4 text-sm font-semibold leading-6 text-slate-600 dark:text-white/55">
-              {pipeline.about}
-            </p>
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              {Object.values(campusPipelines).map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/campus-to-pro${buildQuery(baseFilters, { pipeline: item.id, position: undefined, conference: undefined, eligibility: undefined })}`}
-                  className={`border p-3 text-center transition ${activePipeline === item.id ? "border-red-400 bg-red-500/15 text-red-700 dark:text-red-100" : "border-slate-200 bg-white text-slate-950 hover:border-red-400/40 dark:border-white/10 dark:bg-black/30 dark:text-white"}`}
-                >
-                  <span className="block text-xl font-black">{item.teamCount}</span>
-                  <span className="mt-1 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-white/45">{item.shortLabel}</span>
-                </Link>
-              ))}
+            <div className={`${panelClass} p-5`}>
+              <p className={labelClass}>Campus pipeline</p>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-white/55">
+                Browse U Sports, CJFL and BUCS programs, then filter public player profiles by position,
+                conference, eligibility year, passport readiness and transfer availability.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[92rem] px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-wrap gap-2">
+      <section className="mx-auto max-w-[92rem] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-5 flex flex-wrap gap-2">
           {Object.values(campusPipelines).map((item) => (
             <Link
               key={item.id}
@@ -229,7 +234,7 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
           ))}
         </div>
 
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <section>
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
@@ -261,8 +266,8 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
                       <span className="border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-700 dark:border-white/10 dark:bg-black/30 dark:text-white">{flagForCountry(team.country)}</span>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
-                      <span className="border border-slate-200 px-2 py-1 text-slate-500 dark:border-white/10 dark:text-white/45">{team.claim_status === "verified" ? "Verified" : "Available"}</span>
-                      {localTeam?.bilingual ? <span className="border border-red-400/30 bg-red-500/10 px-2 py-1 text-red-200">French useful</span> : null}
+                      <span className="border border-emerald-300 bg-emerald-100 px-2 py-1 text-emerald-950 shadow-sm dark:border-emerald-400/35 dark:bg-emerald-500/15 dark:text-emerald-100">{team.claim_status === "verified" ? "Verified" : "Available"}</span>
+                      {localTeam?.bilingual ? <span className="border border-red-300 bg-red-100 px-2 py-1 text-red-950 shadow-sm dark:border-red-400/35 dark:bg-red-500/15 dark:text-red-100">French useful</span> : null}
                     </div>
                   </Link>
                 );
@@ -326,8 +331,8 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
                       <div className="min-w-0 p-4">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs font-black uppercase tracking-[0.16em] text-red-300">{player.position ?? "ATH"}</span>
-                          {player.passport_ready ? <span className="border border-green-400/25 bg-green-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-green-200">Passport</span> : null}
-                          {player.available_for_transfer ? <span className="border border-red-400/25 bg-red-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-200">Available</span> : null}
+                          {player.passport_ready ? <span className="border border-green-300 bg-green-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-green-950 shadow-sm dark:border-green-400/35 dark:bg-green-500/15 dark:text-green-100">Passport</span> : null}
+                          {player.available_for_transfer ? <span className="border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-950 shadow-sm dark:border-red-400/35 dark:bg-red-500/15 dark:text-red-100">Available</span> : null}
                         </div>
                         <h3 className="mt-2 truncate text-xl font-black text-slate-950 dark:text-white">{profile.display_name}</h3>
                         <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-white/45">

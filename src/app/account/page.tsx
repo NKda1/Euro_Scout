@@ -11,9 +11,12 @@ import { deleteJournalistArticleAction, publishJournalistArticleAction } from "@
 import { uploadAvatarAction } from "@/app/actions/media";
 import { reviewPlayerProfileNoteAction } from "@/app/actions/player-notes";
 import { updateAccountAction } from "@/app/actions/profile";
+import CareerStatsBuilder from "@/components/account/CareerStatsBuilder";
 import CareerTimelineBuilder from "@/components/account/CareerTimelineBuilder";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
+import MetricNumberControl from "@/components/account/MetricNumberControl";
 import PlayerPhotoManager from "@/components/account/PlayerPhotoManager";
+import RosterNeedsBuilder from "@/components/account/RosterNeedsBuilder";
 import type { FilmLink } from "@/components/players/HudlFilmViewer";
 import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMediaSection";
 import { requireOnboardedProfile, roleLabel } from "@/lib/auth";
@@ -465,9 +468,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const newInterestCount = (clubInterestNotifications ?? []).filter((interest) => isRecentNotification(interest.created_at)).length;
 
   return (
-    <main className="min-h-screen bg-[#090909] text-white">
+    <main className="theme-private min-h-screen bg-white text-slate-950 dark:bg-[#090909] dark:text-white">
       <section className="border-b border-white/10 bg-[#111]">
-        <div className="mx-auto grid max-w-[92rem] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-8">
+        <div className="mx-auto grid max-w-[110rem] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
             <div
               className="flex h-20 w-20 shrink-0 items-center justify-center border border-red-500 bg-[#202020] bg-cover bg-center text-2xl font-black"
@@ -512,8 +515,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-[92rem] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">
-        <div className="overflow-hidden border border-white/10 bg-[#111]">
+      <section className="mx-auto grid max-w-[110rem] gap-5 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="order-2 overflow-hidden border border-white/10 bg-[#111]">
           {error ? <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm font-bold text-red-200">{error}</p> : null}
           {notice ? <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm font-bold text-emerald-200">{notice}</p> : null}
           {unreadMessageCount ? (
@@ -693,16 +696,29 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               <Field label="Location">
                 <input name="location" defaultValue={profile.location ?? ""} className={inputClass} />
               </Field>
-              <Field label="Headline">
-                <input name="headline" defaultValue={profile.headline ?? ""} className={inputClass} />
-              </Field>
+              {profile.role !== "player" && profile.role !== "club" ? (
+                <Field label="Headline">
+                  <input name="headline" defaultValue={profile.headline ?? ""} className={inputClass} />
+                </Field>
+              ) : null}
               <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
                 <input name="is_public" type="checkbox" defaultChecked={profile.is_public} className="h-4 w-4 rounded border-white/20 text-red-600" />
                 Public profile
               </label>
               <div className="md:col-span-2">
-                <Field label="Bio / About">
-                  <textarea name="bio" defaultValue={profile.bio ?? ""} className={textareaClass} />
+                <Field label={profile.role === "player" ? "Player bio" : profile.role === "club" ? "Club bio" : "Bio / About"}>
+                  <textarea
+                    name="bio"
+                    defaultValue={profile.bio ?? ""}
+                    placeholder={
+                      profile.role === "player"
+                        ? "Two or three sharp sentences: your position, style of play, current level and what you want next."
+                        : profile.role === "club"
+                          ? "A simple club snapshot: who you are, where you play, your culture and the kind of players you recruit."
+                          : "Write a short, clear profile introduction."
+                    }
+                    className={textareaClass}
+                  />
                 </Field>
               </div>
 
@@ -726,12 +742,13 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   <Field label="Position">
                     <input name="position" defaultValue={textValue(roleProfile, "position")} className={inputClass} />
                   </Field>
-                  <Field label="Height cm">
-                    <input name="height_cm" type="number" step="0.01" defaultValue={numberValue(roleProfile, "height_cm")} className={inputClass} />
-                  </Field>
-                  <Field label="Weight kg">
-                    <input name="weight_kg" type="number" step="0.01" defaultValue={numberValue(roleProfile, "weight_kg")} className={inputClass} />
-                  </Field>
+                  <MetricNumberControl name="height_cm" label="Height" defaultValue={numberValue(roleProfile, "height_cm")} min={140} max={220} step={1} unit="cm" helper="Use the slider or type an exact value." />
+                  <MetricNumberControl name="weight_kg" label="Weight" defaultValue={numberValue(roleProfile, "weight_kg")} min={55} max={180} step={1} unit="kg" helper="Stored in metric, shown publicly with a metric/imperial toggle." />
+                  <MetricNumberControl name="forty_yard_dash" label="40 yard dash" defaultValue={numberValue(roleProfile, "forty_yard_dash")} min={3.5} max={8} step={0.01} unit="sec" />
+                  <MetricNumberControl name="shuttle_seconds" label="Shuttle" defaultValue={numberValue(roleProfile, "shuttle_seconds")} min={3} max={8} step={0.01} unit="sec" />
+                  <MetricNumberControl name="vertical_jump_cm" label="Vertical jump" defaultValue={numberValue(roleProfile, "vertical_jump_cm")} min={15} max={50} step={0.5} unit="in" helper="Football combine vertical jumps are tracked in inches." />
+                  <MetricNumberControl name="broad_jump_cm" label="Broad jump" defaultValue={numberValue(roleProfile, "broad_jump_cm")} min={4} max={14} step={0.1} unit="ft" helper="Football combine broad jumps are tracked in feet." />
+                  <MetricNumberControl name="bench_reps" label="Bench reps" defaultValue={numberValue(roleProfile, "bench_reps")} min={0} max={60} step={1} unit="reps" />
                   <Field label="Current / recent team">
                     <select name="current_team_id" defaultValue={textValue(roleProfile, "current_team_id")} className={inputClass}>
                       <option value="">No current team / unattached</option>
@@ -768,6 +785,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       <CareerTimelineBuilder
                         name="career_timeline_json"
                         entries={careerTimelineRows ?? []}
+                      />
+                    </Field>
+                  </div>
+                  <div className="md:col-span-2">
+                    <Field label="Career stats">
+                      <CareerStatsBuilder
+                        name="career_stats_json"
+                        position={textValue(roleProfile, "position")}
+                        defaultValue={(roleProfile?.career_stats as Record<string, number | string> | null) ?? null}
                       />
                     </Field>
                   </div>
@@ -975,24 +1001,12 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <Field label="Contact email">
                   <input name="contact_email" type="email" defaultValue={team.contact_email ?? ""} className={inputClass} />
                 </Field>
-                <Field label="Open roster spots">
-                  <input name="open_roster_spots" type="number" min="0" defaultValue={team.open_roster_spots ?? 0} className={inputClass} />
-                </Field>
-                <Field label="Pass play percentage">
-                  <input name="pass_run_percentage" type="number" min="0" max="100" step="0.1" defaultValue={team.pass_run_percentage ?? ""} placeholder="64" className={inputClass} />
-                </Field>
-                <Field label="Passing yards">
-                  <input name="passing_yards" type="number" min="0" defaultValue={team.passing_yards ?? ""} placeholder="3120" className={inputClass} />
-                </Field>
-                <Field label="Rushing yards">
-                  <input name="rushing_yards" type="number" min="0" defaultValue={team.rushing_yards ?? ""} placeholder="1840" className={inputClass} />
-                </Field>
-                <Field label="Touchdowns scored">
-                  <input name="touchdowns_scored" type="number" min="0" defaultValue={team.touchdowns_scored ?? ""} placeholder="42" className={inputClass} />
-                </Field>
-                <Field label="League position">
-                  <input name="league_position" type="number" min="1" defaultValue={team.league_position ?? ""} placeholder="3" className={inputClass} />
-                </Field>
+                <MetricNumberControl name="open_roster_spots" label="Open roster spots" defaultValue={team.open_roster_spots ?? 0} min={0} max={30} step={1} unit="spots" />
+                <MetricNumberControl name="pass_run_percentage" label="Pass play percentage" defaultValue={team.pass_run_percentage ?? ""} min={0} max={100} step={0.1} unit="%" />
+                <MetricNumberControl name="passing_yards" label="Passing yards" defaultValue={team.passing_yards ?? ""} min={0} max={7000} step={50} unit="yds" />
+                <MetricNumberControl name="rushing_yards" label="Rushing yards" defaultValue={team.rushing_yards ?? ""} min={0} max={7000} step={50} unit="yds" />
+                <MetricNumberControl name="touchdowns_scored" label="Touchdowns scored" defaultValue={team.touchdowns_scored ?? ""} min={0} max={100} step={1} unit="TD" />
+                <MetricNumberControl name="league_position" label="League position" defaultValue={team.league_position ?? ""} min={1} max={32} step={1} unit="#" />
                 <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
                   <input name="recruiting_active" type="checkbox" defaultChecked={Boolean(team.recruiting_active)} className="h-4 w-4 rounded border-white/20 text-red-600" />
                   Recruiting active
@@ -1003,12 +1017,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 </label>
                 <div className="md:col-span-2">
                   <Field label="Roster needs">
-                    <textarea
-                      name="roster_needs"
-                      defaultValue={Array.isArray(team.roster_needs) ? team.roster_needs.join("\n") : ""}
-                      placeholder={"Wide Receiver\nOffensive Line\nCornerback"}
-                      className={textareaClass}
-                    />
+                    <RosterNeedsBuilder name="roster_needs" defaultValue={Array.isArray(team.roster_needs) ? team.roster_needs : []} />
                   </Field>
                 </div>
                 <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 md:w-fit">
@@ -1105,8 +1114,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
         </div>
 
-        <aside className="overflow-hidden border border-white/10 bg-[#111]">
-          {profile.role === "club" ? (
+        {profile.role === "club" ? (
+        <aside className="order-1 overflow-hidden border border-white/10 bg-[#111]">
             <Panel eyebrow="Club Access" title={team ? "Connected club" : "Claim or create"}>
               {team ? (
                 <div>
@@ -1138,8 +1147,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 </div>
               )}
             </Panel>
-          ) : null}
         </aside>
+        ) : null}
       </section>
     </main>
   );

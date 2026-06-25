@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 interface NavLinksProps {
   isSignedIn: boolean;
   isAdmin: boolean;
+  notificationCount?: number;
 }
 
-export default function NavLinks({ isSignedIn, isAdmin }: NavLinksProps) {
+export default function NavLinks({ isSignedIn, isAdmin, notificationCount = 0 }: NavLinksProps) {
   const pathname = usePathname();
 
   function isActive(href: string) {
@@ -19,7 +20,7 @@ export default function NavLinks({ isSignedIn, isAdmin }: NavLinksProps) {
 
   function linkCls(href: string, extra?: string) {
     return cn(
-      "px-2.5 py-1.5 text-[12px] font-bold transition-all duration-150 xl:px-3",
+      "inline-flex min-h-10 items-center px-3 py-2 text-[13px] font-bold leading-tight transition-all duration-150 xl:px-4 2xl:px-5",
       isActive(href)
         ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
         : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-300",
@@ -28,7 +29,7 @@ export default function NavLinks({ isSignedIn, isAdmin }: NavLinksProps) {
   }
 
   return (
-    <div className="flex items-center gap-0.5 border border-slate-200 bg-white px-1.5 py-1.5 dark:border-white/10 dark:bg-[#111]">
+    <div className="flex min-w-0 items-center gap-1 border border-slate-200 bg-white px-2 py-2 dark:border-white/10 dark:bg-[#111] xl:gap-1.5">
       <Link href={routes.home} className={linkCls(routes.home)}>Home</Link>
       <Link href={routes.leagues} className={linkCls(routes.leagues)}>League directories</Link>
       <Link href={routes.teams} className={linkCls(routes.teams)}>Team directories</Link>
@@ -40,6 +41,14 @@ export default function NavLinks({ isSignedIn, isAdmin }: NavLinksProps) {
         <>
           <Link href={routes.messages} className={linkCls(routes.messages, "hidden xl:inline-flex")}>
             Messages
+          </Link>
+          <Link href={routes.notifications} className={linkCls(routes.notifications, "hidden 2xl:inline-flex")}>
+            Alerts
+            {notificationCount ? (
+              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-black text-white">
+                {notificationCount > 9 ? "9+" : notificationCount}
+              </span>
+            ) : null}
           </Link>
           {isAdmin && (
             <Link href={routes.admin} className={linkCls(routes.admin, "hidden 2xl:inline-flex")}>

@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getBaseUrl } from "@/lib/api";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // ─── Input constraints ────────────────────────────────────────────────────────
@@ -25,6 +25,26 @@ async function checkAuthRateLimit(action: string, redirectPath: string) {
     const waitMin = Math.ceil((resetAt - Date.now()) / 60_000);
     redirect(`${redirectPath}?error=${encodeURIComponent(`Too many attempts. Please wait ${waitMin} minute(s) before trying again.`)}`);
   }
+}
+
+async function emailAlreadyRegistered(email: string) {
+  const serviceClient = createSupabaseServiceRoleClient();
+  const normalizedEmail = email.trim().toLowerCase();
+  const perPage = 1000;
+
+  for (let page = 1; page <= 10; page += 1) {
+    const { data, error } = await serviceClient.auth.admin.listUsers({ page, perPage });
+
+    if (error) {
+      redirect(`/auth/sign-up?error=${encodeURIComponent("We could not verify that email. Please try again.")}`);
+    }
+
+    const users = data.users ?? [];
+    if (users.some((user) => user.email?.toLowerCase() === normalizedEmail)) return true;
+    if (users.length < perPage) return false;
+  }
+
+  redirect(`/auth/sign-up?error=${encodeURIComponent("We could not verify that email. Please contact support.")}`);
 }
 
 export async function signUpAction(formData: FormData) {
@@ -50,6 +70,9 @@ export async function signUpAction(formData: FormData) {
   if (password.length < 6) {
     redirect(`/auth/sign-up?error=${encodeURIComponent("Password must be at least 6 characters.")}`);
   }
+  if (await emailAlreadyRegistered(email)) {
+    redirect(`/auth/sign-up?error=${encodeURIComponent("That email already has an account. Sign in or reset your password instead.")}`);
+  }
 
   const { error } = await supabase.auth.signUp({
     email,
@@ -58,7 +81,7 @@ export async function signUpAction(formData: FormData) {
       data: {
         display_name: displayName
       },
-      emailRedirectTo: `${getBaseUrl()}/auth/callback?next=/onboarding`
+      emailRedirectTo: `${getBaseUrl()}/auth/callback?next=/welcome`
     }
   });
 
@@ -74,7 +97,7 @@ export async function signInAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const email = getRequired(formData, "email");
   const password = getRequired(formData, "password");
-  const next = String(formData.get("next") ?? "/dashboard");
+  const next = String(formData.get("next") ?? "/welcome");
 
   if (email.length > MAX_EMAIL_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
     redirect(`/auth/sign-in?error=${encodeURIComponent("Invalid credentials.")}`);
@@ -97,7 +120,7 @@ export async function forgotPasswordAction(formData: FormData) {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${getBaseUrl()}/auth/callback?next=/auth/reset-password`
+    redirectTo: `${getBaseUrl()}/auth/reset-password`
   });
 
   if (error) {

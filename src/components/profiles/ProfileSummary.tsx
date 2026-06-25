@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { startConversationAction } from "@/app/actions/messages";
 import { createPlayerProfileNoteAction } from "@/app/actions/player-notes";
+import { reportProfileAction } from "@/app/actions/profile-reports";
 import HudlFilmViewer, { type FilmLink } from "@/components/players/HudlFilmViewer";
 import PlayerPhotoGallery from "@/components/players/PlayerPhotoGallery";
 import PublicNotesPanel, { type PublicPlayerNote } from "@/components/players/PublicNotesPanel";
+import CareerStatsPanel from "@/components/profiles/CareerStatsPanel";
+import CombineMetricsPanel from "@/components/profiles/CombineMetricsPanel";
+import PlayerMeasureGrid from "@/components/profiles/PlayerMeasureGrid";
+import TrustSignals, { lastActiveLabel } from "@/components/ui/TrustSignals";
 import { roleLabel, type Profile } from "@/lib/auth";
 import { campusPipelines, getCampusTeam } from "@/lib/campus-to-pro";
 import { leagues, teams } from "@/lib/data";
@@ -13,12 +18,14 @@ interface ProfileSummaryProps {
   roleProfile?: Record<string, unknown> | null;
   showEditLink?: boolean;
   showMessageButton?: boolean;
+  showReportButton?: boolean;
   backHref?: string;
   backLabel?: string;
   filmLinks?: FilmLink[];
   careerEntries?: CareerEntry[];
   publicNotes?: PublicPlayerNote[];
   viewerTeamId?: string | null;
+  isWatchlistedByViewerClub?: boolean;
 }
 
 type SummaryField = [string, unknown];
@@ -73,6 +80,11 @@ function ageFromDob(item: unknown) {
   return age;
 }
 
+function numberValue(item: unknown) {
+  const parsed = Number(item);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function Panel({ eyebrow, children }: { eyebrow: string; children: React.ReactNode }) {
   return (
     <section className="border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#111]">
@@ -87,12 +99,14 @@ export default function ProfileSummary({
   roleProfile,
   showEditLink,
   showMessageButton,
+  showReportButton,
   backHref = "/profiles",
   backLabel = "Back to profiles",
   filmLinks = [],
   careerEntries = [],
   publicNotes = [],
-  viewerTeamId = null
+  viewerTeamId = null,
+  isWatchlistedByViewerClub = false
 }: ProfileSummaryProps) {
   const currentTeamId = stringValue(roleProfile?.current_team_id || roleProfile?.team_id);
   const campusTeam = getCampusTeam(currentTeamId);
@@ -109,17 +123,10 @@ export default function ProfileSummary({
   const secondaryTag = isPlayer ? formatPipeline(roleProfile?.pipeline_type) : profile.role === "fan" ? "Supporter" : roleLabel(profile.role);
   const availability = isPlayer && roleProfile?.available_for_transfer ? "Available" : "Open";
   const location = profile.location ?? currentTeam?.country ?? "Europe";
-  const completion = Math.min(100, 35 + (profile.bio ? 15 : 0) + (profile.headline ? 10 : 0) + filmLinks.length * 10 + photoUrls.length * 5);
+  const completion = Math.min(100, 35 + (profile.bio ? 20 : 0) + filmLinks.length * 10 + photoUrls.length * 5);
   const sortedCareerEntries = [...careerEntries].sort((a, b) => (a.start_year ?? 0) - (b.start_year ?? 0));
 
-  const stats: SummaryField[] = isPlayer
-    ? [
-        ["Position", roleProfile?.position],
-        ["Age", age],
-        ["Height", roleProfile?.height_cm ? `${roleProfile.height_cm} cm` : null],
-        ["Weight", roleProfile?.weight_kg ? `${roleProfile.weight_kg} kg` : null]
-      ]
-    : [
+  const stats: SummaryField[] = [
         ["Role", roleLabel(profile.role)],
         ["Location", location],
         ["Status", availability],
@@ -135,13 +142,13 @@ export default function ProfileSummary({
       ]
     : [
         ["Location", profile.location],
-        ["Headline", profile.headline]
+        ["Bio", profile.bio]
       ];
 
   return (
     <article className="overflow-hidden bg-white text-slate-950 dark:bg-[#090909] dark:text-white">
       <section className="border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#101010]">
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[110rem] px-4 py-3 sm:px-6 lg:px-8">
           <Link href={backHref} className="inline-flex h-11 items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/30 dark:hover:border-red-500/50 dark:hover:text-white">
             ← {backLabel}
           </Link>
@@ -149,8 +156,8 @@ export default function ProfileSummary({
       </section>
 
       <header className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#120807]">
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+        <div className="mx-auto max-w-[110rem] px-4 py-7 sm:px-6 lg:px-8">
+          <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-start">
             <div>
               <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
                 <div
@@ -161,17 +168,22 @@ export default function ProfileSummary({
                 </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap gap-2">
-                    <span className="border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-bold uppercase text-indigo-700 dark:border-indigo-400/60 dark:bg-indigo-500/15 dark:text-indigo-200">
+                    <span className="border border-indigo-400 bg-indigo-100 px-3 py-1 text-xs font-black uppercase text-indigo-950 shadow-sm dark:border-indigo-400/60 dark:bg-indigo-500/15 dark:text-indigo-100">
                       {primaryTag}
                     </span>
-                    <span className="border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-blue-700 dark:border-blue-500/60 dark:bg-blue-500/10 dark:text-blue-300">
+                    <span className="border border-blue-400 bg-blue-100 px-3 py-1 text-xs font-black uppercase text-blue-950 shadow-sm dark:border-blue-500/60 dark:bg-blue-500/15 dark:text-blue-100">
                       {secondaryTag}
                     </span>
-                    <span className="border border-green-300 bg-green-50 px-3 py-1 text-xs font-bold uppercase text-green-700 dark:border-green-500/50 dark:bg-green-500/10 dark:text-green-400">
+                    <span className="border border-green-400 bg-green-100 px-3 py-1 text-xs font-black uppercase text-green-950 shadow-sm dark:border-green-500/50 dark:bg-green-500/15 dark:text-green-100">
                       {profile.is_public ? "Public" : "Private"}
                     </span>
+                    {isPlayer && isWatchlistedByViewerClub ? (
+                      <span className="border border-amber-400 bg-amber-100 px-3 py-1 text-xs font-black uppercase text-amber-950 shadow-sm dark:border-amber-400/50 dark:bg-amber-500/15 dark:text-amber-100">
+                        Added to watchlist
+                      </span>
+                    ) : null}
                   </div>
-                  <h1 className="mt-4 text-5xl font-black leading-none sm:text-6xl">{profile.display_name}</h1>
+                  <h1 className="mt-4 text-4xl font-black leading-none sm:text-5xl">{profile.display_name}</h1>
                   <p className="mt-3 text-lg font-bold text-slate-500 dark:text-white/45">
                     {location}
                     {currentTeam ? ` · ${currentTeam.name}` : ""}
@@ -189,20 +201,29 @@ export default function ProfileSummary({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a]">
-              {stats.map(([label, item], index) => (
-                <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
-                  <p className="text-xs font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
-                  <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{value(item)}</p>
-                </div>
-              ))}
-            </div>
+            {isPlayer ? (
+              <PlayerMeasureGrid
+                position={stringValue(roleProfile?.position)}
+                age={age}
+                heightCm={numberValue(roleProfile?.height_cm)}
+                weightKg={numberValue(roleProfile?.weight_kg)}
+              />
+            ) : (
+              <div className="grid grid-cols-2 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a]">
+                {stats.map(([label, item], index) => (
+                  <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
+                    <p className="text-xs font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
+                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{value(item)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-8">
-        <div className="space-y-8 lg:border-r lg:border-slate-200 lg:pr-10 dark:lg:border-white/10">
+      <div className="mx-auto grid max-w-[110rem] gap-7 px-4 py-7 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="space-y-8 xl:border-r xl:border-slate-200 xl:pr-10 dark:xl:border-white/10">
           <section>
             <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Profile</p>
             <div className="mt-5 border border-slate-200 bg-white p-5 dark:border-white/15 dark:bg-[#1a1a1a]">
@@ -213,7 +234,7 @@ export default function ProfileSummary({
                 {[
                   ["Current team", currentTeam?.name],
                   ["Current league", currentLeagueName],
-                  ["Headline", profile.headline]
+                  ["Bio", profile.bio]
                 ].map(([label, item]) => (
                   <div key={label} className="bg-white p-4 dark:bg-[#111]">
                     <p className="text-xs font-black uppercase text-slate-500 dark:text-white/35">{label}</p>
@@ -257,6 +278,18 @@ export default function ProfileSummary({
             </section>
           ) : null}
 
+          {isPlayer ? (
+            <CombineMetricsPanel
+              fortyYardDash={numberValue(roleProfile?.forty_yard_dash)}
+              shuttleSeconds={numberValue(roleProfile?.shuttle_seconds)}
+              verticalJumpInches={numberValue(roleProfile?.vertical_jump_cm)}
+              broadJumpFeet={numberValue(roleProfile?.broad_jump_cm)}
+              benchReps={numberValue(roleProfile?.bench_reps)}
+            />
+          ) : null}
+
+          {isPlayer ? <CareerStatsPanel stats={roleProfile?.career_stats as Record<string, unknown> | null | undefined} /> : null}
+
           {isPlayer ? <PublicNotesPanel notes={publicNotes} /> : null}
 
           {isPlayer ? <HudlFilmViewer filmLinks={filmLinks} /> : null}
@@ -297,6 +330,28 @@ export default function ProfileSummary({
             </div>
           </Panel>
 
+          <Panel eyebrow="Trust Signals">
+            <TrustSignals
+              signals={[
+                {
+                  label: "Last active",
+                  value: lastActiveLabel(profile.updated_at),
+                  tone: "slate"
+                },
+                {
+                  label: "Completeness",
+                  value: `${completion}% profile readiness`,
+                  tone: completion >= 80 ? "green" : completion >= 55 ? "amber" : "red"
+                },
+                {
+                  label: "Public status",
+                  value: profile.is_public ? "Visible and shareable" : "Private profile",
+                  tone: profile.is_public ? "green" : "amber"
+                }
+              ]}
+            />
+          </Panel>
+
           <Panel eyebrow="Contact">
             <div className="space-y-3">
               {showMessageButton ? (
@@ -330,6 +385,33 @@ export default function ProfileSummary({
               ) : null}
             </div>
           </Panel>
+
+          {showReportButton ? (
+            <Panel eyebrow="Report Profile">
+              <form action={reportProfileAction} className="space-y-3">
+                <input type="hidden" name="reported_profile_id" value={profile.id} />
+                <input type="hidden" name="return_path" value={`/players/${profile.id}`} />
+                <label className="block">
+                  <span className="mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35">Reason</span>
+                  <select name="reason" required className="h-11 w-full border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none dark:border-white/10 dark:bg-black/35 dark:text-white">
+                    <option value="">Choose reason</option>
+                    <option value="impersonation">Possible impersonation</option>
+                    <option value="misleading_profile">Misleading profile</option>
+                    <option value="unsafe_contact">Unsafe contact</option>
+                    <option value="spam">Spam or abuse</option>
+                    <option value="other">Other concern</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35">Details</span>
+                  <textarea name="details" rows={3} maxLength={2000} className="w-full border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white" />
+                </label>
+                <button className="h-11 w-full border border-red-300 px-4 text-sm font-black uppercase text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-200 dark:hover:bg-red-500/10">
+                  Submit report
+                </button>
+              </form>
+            </Panel>
+          ) : null}
         </aside>
       </div>
     </article>

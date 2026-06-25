@@ -113,7 +113,7 @@ export default function ClubPipelineSection({ scoutId, canView, watchlisted, rea
   const signed = watchlisted.filter((player) => player.recruitmentStatus === "signed");
 
   return (
-    <section className="space-y-5 border border-slate-200 bg-slate-950 p-5 text-white dark:border-white/10 dark:bg-[#111]">
+    <section className="theme-private space-y-5 border border-slate-200 bg-white p-5 text-slate-950 dark:border-white/10 dark:bg-[#111] dark:text-white">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-black uppercase text-red-500">Recruitment Pipeline</p>

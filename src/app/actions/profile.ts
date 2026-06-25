@@ -23,12 +23,29 @@ function requiredText(formData: FormData, key: string) {
 }
 
 function numberOrNull(formData: FormData, key: string) {
-  const value = text(formData, key);
+  const value = text(formData, key)?.replace(",", ".");
   return value ? Number(value) : null;
 }
 
 function boolValue(formData: FormData, key: string) {
   return formData.get(key) === "on";
+}
+
+function parseCareerStats(formData: FormData) {
+  const raw = String(formData.get("career_stats_json") ?? "").trim();
+  if (!raw) return {};
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, value]) => [key, Number(value)])
+        .filter(([key, value]) => /^[a-z0-9_]+$/i.test(String(key)) && Number.isFinite(value as number) && Number(value) >= 0)
+        .slice(0, 16)
+    );
+  } catch {
+    return {};
+  }
 }
 
 function parseCareerTimeline(formData: FormData) {
@@ -181,6 +198,12 @@ async function upsertPlayerProfile(
     position: text(formData, "position"),
     height_cm: numberOrNull(formData, "height_cm"),
     weight_kg: numberOrNull(formData, "weight_kg"),
+    forty_yard_dash: numberOrNull(formData, "forty_yard_dash"),
+    shuttle_seconds: numberOrNull(formData, "shuttle_seconds"),
+    vertical_jump_cm: numberOrNull(formData, "vertical_jump_cm"),
+    broad_jump_cm: numberOrNull(formData, "broad_jump_cm"),
+    bench_reps: numberOrNull(formData, "bench_reps"),
+    career_stats: parseCareerStats(formData),
     current_team_id: currentTeamId,
     pipeline_type: pipelineType,
     available_for_transfer: boolValue(formData, "available_for_transfer"),
@@ -325,7 +348,7 @@ export async function completeOnboardingAction(formData: FormData) {
       id: user.id,
       role: roleValue,
       display_name: displayName,
-      headline: text(formData, "headline"),
+      headline: roleValue === "player" || roleValue === "club" ? null : text(formData, "headline"),
       bio: text(formData, "bio"),
       location: text(formData, "location"),
       is_public: boolValue(formData, "is_public"),
@@ -458,7 +481,7 @@ export async function completeOnboardingAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/scouts");
   revalidatePath(`/scouts/${user.id}`);
-  redirect("/account");
+  redirect("/dashboard?onboarded=1");
 }
 
 export async function updateAccountAction(formData: FormData) {
@@ -487,7 +510,7 @@ export async function updateAccountAction(formData: FormData) {
     .update({
       role: roleValue,
       display_name: requiredText(formData, "display_name"),
-      headline: text(formData, "headline"),
+      headline: roleValue === "player" || roleValue === "club" ? null : text(formData, "headline"),
       bio: text(formData, "bio"),
       location: text(formData, "location"),
       is_public: boolValue(formData, "is_public"),

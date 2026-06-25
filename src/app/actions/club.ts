@@ -838,15 +838,15 @@ export async function saveClubPhotoAction(formData: FormData) {
     url = data.publicUrl;
   }
 
-  // Enforce max 3 photos per team
+  // Enforce max 4 photos per team
   const { count } = await supabase
     .from("club_media")
     .select("id", { count: "exact", head: true })
     .eq("team_id", teamId)
     .eq("media_type", "photo");
 
-  if ((count ?? 0) >= 3) {
-    redirect(`${redirectPath}?error=Maximum 3 photos allowed per team.`);
+  if ((count ?? 0) >= 4) {
+    redirect(`${redirectPath}?error=Maximum 4 photos allowed per team.`);
   }
 
   const { error } = await supabase.from("club_media").insert({

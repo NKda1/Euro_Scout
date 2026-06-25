@@ -9,6 +9,11 @@ function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
+function withQueryParam(path: string, key: string, value: string) {
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}${key}=${encodeURIComponent(value)}`;
+}
+
 interface WatchlistExportItem {
   id: string;
   notes: string | null;
@@ -117,7 +122,7 @@ export async function addToWatchlistAction(formData: FormData) {
 
   const { data: wl } = await watchlistQuery.maybeSingle<{ id: string; team_id: string | null }>();
 
-  if (!wl) redirect(`${returnPath}?error=Watchlist not found.`);
+  if (!wl) redirect(withQueryParam(returnPath, "error", "Watchlist not found."));
 
   // Resolve profile_id → player_profiles.id
   const { data: playerProfile } = await serviceClient
@@ -126,20 +131,20 @@ export async function addToWatchlistAction(formData: FormData) {
     .eq("profile_id", playerProfileId)
     .maybeSingle<{ id: string }>();
 
-  if (!playerProfile) redirect(`${returnPath}?error=Player profile not found.`);
+  if (!playerProfile) redirect(withQueryParam(returnPath, "error", "Player profile not found."));
 
   const { error } = await serviceClient
     .from("watchlist_items")
     .upsert({ watchlist_id: watchlistId, player_id: playerProfile.id }, { onConflict: "watchlist_id,player_id" });
 
   if (error) {
-    redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
+    redirect(withQueryParam(returnPath, "error", error.message));
   }
 
   revalidatePath(`/watchlists/${watchlistId}`);
   revalidatePath("/watchlists");
   revalidatePath(returnPath);
-  redirect(`${returnPath}?notice=Player added to shortlist.`);
+  redirect(withQueryParam(returnPath, "notice", "Player added to shortlist."));
 }
 
 // ─── Remove player from watchlist ────────────────────────────────────────────
@@ -162,7 +167,7 @@ export async function removeFromWatchlistAction(formData: FormData) {
   await serviceClient.from("watchlist_items").delete().eq("id", watchlistItemId).eq("watchlist_id", watchlistId);
   revalidatePath(`/watchlists/${watchlistId}`);
   revalidatePath("/watchlists");
-  redirect(`/watchlists/${watchlistId}`);
+  redirect(`/watchlists?watchlist=${watchlistId}`);
 }
 
 // ─── Update notes on a watchlist item ────────────────────────────────────────
@@ -171,6 +176,7 @@ export async function updateWatchlistItemNotesAction(formData: FormData) {
   const { serviceClient, profile, teamId } = await requireConnectedClub();
   const watchlistItemId = text(formData, "watchlist_item_id");
   const watchlistId = text(formData, "watchlist_id");
+  const returnPath = text(formData, "return_path") || `/watchlists?watchlist=${watchlistId}`;
   const notes = text(formData, "notes").slice(0, 2000) || null;
 
   if (profile.role !== "admin") {
@@ -185,6 +191,8 @@ export async function updateWatchlistItemNotesAction(formData: FormData) {
 
   await serviceClient.from("watchlist_items").update({ notes }).eq("id", watchlistItemId).eq("watchlist_id", watchlistId);
   revalidatePath(`/watchlists/${watchlistId}`);
+  revalidatePath("/watchlists");
+  redirect(withQueryParam(returnPath, "notice", "Notes saved."));
 }
 
 // ─── Update recruitment status on a watchlist item ───────────────────────────
@@ -198,7 +206,7 @@ export async function updateWatchlistItemRecruitmentStatusAction(formData: FormD
   const allowedStatuses = new Set(["watchlisted", "in_negotiations", "signed", "archived"]);
 
   if (!allowedStatuses.has(status)) {
-    redirect(`${returnPath}?error=Choose a valid recruitment status.`);
+    redirect(withQueryParam(returnPath, "error", "Choose a valid recruitment status."));
   }
 
   if (profile.role !== "admin") {
@@ -220,11 +228,11 @@ export async function updateWatchlistItemRecruitmentStatusAction(formData: FormD
     .eq("id", watchlistItemId)
     .eq("watchlist_id", watchlistId);
 
-  if (error) redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(withQueryParam(returnPath, "error", error.message));
 
   revalidatePath(`/watchlists/${watchlistId}`);
   revalidatePath(returnPath);
-  redirect(`${returnPath}?notice=Recruitment status updated.`);
+  redirect(withQueryParam(returnPath, "notice", "Recruitment status updated."));
 }
 
 // ─── Export watchlist as CSV (premium gate stub) ──────────────────────────────

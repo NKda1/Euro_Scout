@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import LeagueHeader from "@/components/leagues/LeagueHeader";
 import TeamGrid from "@/components/teams/TeamGrid";
 import { getLeagueByIdOrSlug, getTeamsForLeague, leagues, regions, type MarketTier } from "@/lib/data";
+import { absoluteUrl, jsonLdScript, truncateMeta } from "@/lib/seo";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import type { Team } from "@/types";
 
@@ -77,7 +78,16 @@ export async function generateMetadata({ params }: LeagueDetailsPageProps): Prom
 
   return {
     title: `${league.name} | EuroScout Pro`,
-    description: league.description
+    description: truncateMeta(league.description),
+    alternates: {
+      canonical: `/leagues/${league.slug ?? league.id}`
+    },
+    openGraph: {
+      title: `${league.name} | EuroScout Pro`,
+      description: truncateMeta(league.description),
+      url: absoluteUrl(`/leagues/${league.slug ?? league.id}`),
+      type: "website"
+    }
   };
 }
 
@@ -109,6 +119,18 @@ export default async function LeagueDetailsPage({ params }: LeagueDetailsPagePro
 
   return (
     <main className="app-surface">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={jsonLdScript({
+          "@context": "https://schema.org",
+          "@type": "SportsOrganization",
+          name: league.name,
+          sport: "American football",
+          url: absoluteUrl(`/leagues/${league.slug ?? league.id}`),
+          description: league.description,
+          areaServed: league.countryScope
+        })}
+      />
       <section className="mx-auto max-w-[92rem] space-y-8 px-4 py-10 sm:px-6 lg:px-8">
         <LeagueHeader league={league} />
 

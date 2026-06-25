@@ -7,9 +7,10 @@ import { routes } from "@/constants/routes";
 interface MobileMenuProps {
   isSignedIn: boolean;
   isAdmin: boolean;
+  notificationCount?: number;
 }
 
-export default function MobileMenu({ isSignedIn, isAdmin }: MobileMenuProps) {
+export default function MobileMenu({ isSignedIn, isAdmin, notificationCount = 0 }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -61,6 +62,14 @@ export default function MobileMenu({ isSignedIn, isAdmin }: MobileMenuProps) {
               <>
                 <Link href={routes.messages} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
                   Messages
+                </Link>
+                <Link href={routes.notifications} onClick={close} className="flex items-center justify-between px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
+                  <span>Notifications</span>
+                  {notificationCount ? (
+                    <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-black text-white">
+                      {notificationCount > 9 ? "9+" : notificationCount}
+                    </span>
+                  ) : null}
                 </Link>
                 {isAdmin && (
                   <Link href={routes.admin} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">

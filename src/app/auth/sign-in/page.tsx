@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { signInAction } from "@/app/actions/auth";
 import AuthShell from "@/components/auth/AuthShell";
 import PasswordInput from "@/components/auth/PasswordInput";
+import { Notice } from "@/components/ui/StateDisplay";
 
 export const metadata: Metadata = {
   title: "Sign In | EuroScout Pro",
@@ -19,11 +20,27 @@ interface SignInPageProps {
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const { error, notice, next } = await searchParams;
+  const isExpiredLink = error ? /expired|invalid link|otp|token/i.test(error) : false;
 
   return (
     <AuthShell eyebrow="Welcome Back" title="Sign in and keep scouting.">
-      {notice ? <p className="mb-4 border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</p> : null}
-      {error ? <p className="mb-4 border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">{error}</p> : null}
+      {notice ? (
+        <div className="mb-4">
+          <Notice tone="success" title="Ready when you are.">{notice}</Notice>
+        </div>
+      ) : null}
+      {error ? (
+        <div className="mb-4">
+          <Notice
+            tone="danger"
+            title={isExpiredLink ? "That sign-in link has expired." : "We could not sign you in."}
+            actionHref={isExpiredLink ? "/auth/forgot-password" : undefined}
+            actionLabel={isExpiredLink ? "Request a new link" : undefined}
+          >
+            {isExpiredLink ? "For security, EuroScout links can only be used once and may expire. Request a fresh link and try again." : error}
+          </Notice>
+        </div>
+      ) : null}
       <form action={signInAction} className="space-y-4">
         <input type="hidden" name="next" value={next ?? "/dashboard"} />
         <label className="block">

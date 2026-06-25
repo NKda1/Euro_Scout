@@ -9,10 +9,10 @@ import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMed
 import ContactClubButton from "@/components/scouts/ContactClubButton";
 import ClubPipelineSection, { type PipelinePlayer } from "@/components/scouts/ClubPipelineSection";
 import ClubProfileHealthCard from "@/components/scouts/ClubProfileHealthCard";
-
-export const metadata: Metadata = {
-  title: "Club Profile | EuroScout Pro"
-};
+import ClubStatsVisualPanel from "@/components/scouts/ClubStatsVisualPanel";
+import TrustSignals, { lastActiveLabel } from "@/components/ui/TrustSignals";
+import { flagClubAccountAction } from "@/app/actions/club-flags";
+import { absoluteUrl, jsonLdScript, truncateMeta } from "@/lib/seo";
 
 interface ClubProfilePageProps {
   params: Promise<{
@@ -22,6 +22,64 @@ interface ClubProfilePageProps {
     error?: string;
     notice?: string;
   }>;
+}
+
+export async function generateMetadata({ params }: ClubProfilePageProps): Promise<Metadata> {
+  const { scoutId } = await params;
+  const supabase = createSupabaseServiceRoleClient();
+  const { data: member } = await supabase
+    .from("club_members")
+    .select(
+      `
+        profile_id,
+        teams!team_id (
+          id, name, city, country, logo_url, claim_status, league_id
+        ),
+        profiles!profile_id (
+          display_name, bio, headline, avatar_url, is_public
+        )
+      `
+    )
+    .or(`team_id.eq.${scoutId},profile_id.eq.${scoutId}`)
+    .eq("club_role", "owner")
+    .maybeSingle<{
+      profile_id: string;
+      teams: Pick<ClubTeam, "id" | "name" | "city" | "country" | "logo_url" | "claim_status" | "league_id">;
+      profiles: Pick<Profile, "display_name" | "bio" | "headline" | "avatar_url" | "is_public">;
+    }>();
+
+  const team = member?.teams;
+  const profile = member?.profiles;
+  if (!team || !profile?.is_public) {
+    return {
+      title: "Club Profile | EuroScout Pro",
+      description: "Public EuroScout Pro club profile."
+    };
+  }
+
+  const league = team.league_id ? getLeagueByIdOrSlug(team.league_id) : null;
+  const title = `${team.name} | ${team.claim_status === "verified" ? "Verified Club" : "Club"} | EuroScout Pro`;
+  const description = truncateMeta(profile.bio ?? profile.headline ?? [team.city, team.country, league?.name].filter(Boolean).join(" · "));
+  const canonical = `/scouts/${team.id}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: absoluteUrl(canonical),
+      type: "profile",
+      images: team.logo_url ? [{ url: team.logo_url, alt: team.name }] : undefined
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: team.logo_url ? [team.logo_url] : undefined
+    }
+  };
 }
 
 interface ClubTeam {
@@ -196,6 +254,23 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     }
   }
 
+  if (user && teamId && !isMember) {
+    await supabase
+      .from("club_profile_views")
+      .upsert(
+        {
+          team_id: teamId,
+          viewed_profile_id: user.id,
+          viewer_role: viewerRole,
+          view_date: new Date().toISOString().slice(0, 10)
+        },
+        {
+          onConflict: "team_id,viewed_profile_id,view_date",
+          ignoreDuplicates: true
+        }
+      );
+  }
+
   // Club media
   const { data: media } = teamId
     ? await supabase
@@ -297,6 +372,8 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
   const hasClubInbox = staff.length > 0;
   const canContact = isAuthenticated && viewerRole === "player" && !isMember && Boolean(teamId);
   const canMessageClub = canContact && hasClubInbox;
+  const canFlagClub = Boolean(teamId && isAuthenticated && !isMember && ["pending", "verified"].includes(team?.claim_status ?? ""));
+  const clubCanBeFlagged = Boolean(teamId && ["pending", "verified"].includes(team?.claim_status ?? ""));
   const shortlists = shortlistRows ?? [];
   const clubStaffIds = new Set(staff.map((staffMember) => staffMember.profile_id));
   const watchlistedPlayers: PipelinePlayer[] = shortlists.flatMap((shortlist) =>
@@ -360,21 +437,25 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     `${teamName} is setting up its EuroScout club profile. Recruiting information, staff details, media, and contact preferences will appear here as the club completes its profile.`;
   const openSpots = team?.open_roster_spots ?? 0;
   const rosterNeeds = (team?.roster_needs ?? []).filter(Boolean);
-  const formatNumber = (value: number | null | undefined) => value == null ? "—" : new Intl.NumberFormat("en-GB").format(value);
   const formatPercent = (value: number | null | undefined) => value == null ? "—" : `${new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 }).format(value)}%`;
-  const teamStats = [
-    ["Pass Play", formatPercent(team?.pass_run_percentage)],
-    ["Passing Yards", formatNumber(team?.passing_yards)],
-    ["Rushing Yards", formatNumber(team?.rushing_yards)],
-    ["Touchdowns", formatNumber(team?.touchdowns_scored)],
-    ["League Rank", team?.league_position ? `#${team.league_position}` : "—"],
-    ["Open Spots", String(openSpots || "—")]
-  ] as [string, string][];
-
   return (
     <main className="app-surface min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={jsonLdScript({
+          "@context": "https://schema.org",
+          "@type": "SportsTeam",
+          name: teamName,
+          sport: "American football",
+          url: absoluteUrl(teamId ? `/scouts/${teamId}` : `/scouts/${scoutId}`),
+          logo: team?.logo_url ?? undefined,
+          address: location || undefined,
+          memberOf: leagueLabel,
+          sameAs: team?.website ? [team.website] : undefined
+        })}
+      />
       <section className="border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#101010]">
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[92rem] px-4 py-3 sm:px-6 lg:px-8">
           <Link
             href="/scouts"
             className="inline-flex h-11 items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/30 dark:hover:border-red-500/50 dark:hover:text-white"
@@ -386,8 +467,8 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
 
       <article>
         <header className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#120807]">
-          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+          <div className="mx-auto max-w-[92rem] px-4 py-7 sm:px-6 lg:px-8">
+            <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
               <div>
                 <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
                   <div
@@ -398,14 +479,14 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap gap-2">
-                      <span className="border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-bold uppercase text-indigo-700 dark:border-indigo-400/60 dark:bg-indigo-500/15 dark:text-indigo-200">
+                      <span className="border border-indigo-400 bg-indigo-100 px-3 py-1 text-xs font-black uppercase text-indigo-950 shadow-sm dark:border-indigo-400/60 dark:bg-indigo-500/15 dark:text-indigo-100">
                         Club
                       </span>
-                      <span className="border border-green-300 bg-green-50 px-3 py-1 text-xs font-bold uppercase text-green-700 dark:border-green-500/50 dark:bg-green-500/10 dark:text-green-400">
+                      <span className="border border-green-400 bg-green-100 px-3 py-1 text-xs font-black uppercase text-green-950 shadow-sm dark:border-green-500/50 dark:bg-green-500/15 dark:text-green-100">
                         <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-green-400 align-middle" />
                         {isVerified ? "Verified" : "Pending"}
                       </span>
-                      <span className="border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-blue-700 dark:border-blue-500/60 dark:bg-blue-500/10 dark:text-blue-300">
+                      <span className="border border-blue-400 bg-blue-100 px-3 py-1 text-xs font-black uppercase text-blue-950 shadow-sm dark:border-blue-500/60 dark:bg-blue-500/15 dark:text-blue-100">
                         {leagueLabel} {team?.tier ? `- Tier ${team.tier}` : ""}
                       </span>
                     </div>
@@ -414,7 +495,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                   </div>
                 </div>
 
-                <div className="mt-9 flex flex-wrap gap-3">
+                <div className="mt-7 flex flex-wrap gap-3">
                   {[
                     ["Region", team?.country ?? "Europe"],
                     ["Type", campusPipeline?.label ?? league?.tier ?? "Club"],
@@ -449,7 +530,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
           </div>
         </header>
 
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-8">
+        <div className="mx-auto grid max-w-[92rem] gap-7 px-4 py-7 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
           <div className="space-y-8 lg:border-r lg:border-slate-200 lg:pr-10 dark:lg:border-white/10">
             {error ? <p className="border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">{error}</p> : null}
             {notice ? <p className="border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</p> : null}
@@ -492,15 +573,42 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
               />
             )}
 
+            <ClubStatsVisualPanel
+              passRunPercentage={team?.pass_run_percentage}
+              passingYards={team?.passing_yards}
+              rushingYards={team?.rushing_yards}
+              touchdowns={team?.touchdowns_scored}
+              leaguePosition={team?.league_position}
+              openSpots={openSpots}
+            />
+
             <section>
-              <p className="text-sm font-black uppercase text-red-500">Team Stats</p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {teamStats.map(([label, value]) => (
-                  <div key={label} className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#1a1a1a]">
-                    <p className="text-xs font-black uppercase text-slate-500 dark:text-white/35">{label}</p>
-                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{value}</p>
-                  </div>
-                ))}
+              <p className="text-sm font-black uppercase text-red-500">Trust Signals</p>
+              <div className="mt-5">
+                <TrustSignals
+                  signals={[
+                    {
+                      label: "Verification",
+                      value: isVerified ? "Verified club account" : `Claim status: ${team?.claim_status ?? "unclaimed"}`,
+                      tone: isVerified ? "green" : "amber"
+                    },
+                    {
+                      label: "Last active",
+                      value: lastActiveLabel(team?.updated_at ?? resolvedProfile.updated_at),
+                      tone: "slate"
+                    },
+                    {
+                      label: "Recruiting",
+                      value: team?.recruiting_active ? "Recruiting active" : "Recruiting status not listed",
+                      tone: team?.recruiting_active ? "green" : "amber"
+                    },
+                    {
+                      label: "Public status",
+                      value: resolvedProfile.is_public ? "Visible and shareable" : "Private profile",
+                      tone: resolvedProfile.is_public ? "green" : "amber"
+                    }
+                  ]}
+                />
               </div>
             </section>
 
@@ -544,6 +652,55 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                 )}
 
               </section>
+
+              {clubCanBeFlagged ? (
+                <section className="border border-amber-200 bg-amber-50 p-7 dark:border-amber-500/25 dark:bg-amber-500/10">
+                  <p className="text-sm font-black uppercase text-amber-700 dark:text-amber-300">Flag club account</p>
+                  <p className="mt-3 text-sm font-semibold leading-6 text-amber-900/70 dark:text-amber-100/70">
+                    Report this club if the claimed owner does not appear connected to the organisation.
+                  </p>
+
+                  {canFlagClub && teamId ? (
+                    <form action={flagClubAccountAction} className="mt-5 space-y-3">
+                      <input type="hidden" name="team_id" value={teamId} />
+                      <input type="hidden" name="return_path" value={`/scouts/${scoutId}`} />
+                      <select
+                        name="reason"
+                        required
+                        defaultValue=""
+                        className="h-12 w-full border border-amber-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-amber-500 dark:border-amber-400/25 dark:bg-black/35 dark:text-white"
+                      >
+                        <option value="" disabled>Choose a reason</option>
+                        <option value="not_affiliated">Owner is not affiliated</option>
+                        <option value="wrong_owner">Wrong owner or staff member</option>
+                        <option value="impersonation">Possible impersonation</option>
+                        <option value="duplicate_claim">Duplicate club claim</option>
+                        <option value="other">Other concern</option>
+                      </select>
+                      <textarea
+                        name="details"
+                        rows={4}
+                        placeholder="Add context for the admin review team..."
+                        className="w-full border border-amber-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 dark:border-amber-400/25 dark:bg-black/35 dark:text-white dark:placeholder:text-white/25"
+                      />
+                      <button className="h-12 w-full bg-amber-600 px-5 text-sm font-black uppercase text-white transition hover:bg-amber-700">
+                        Submit flag
+                      </button>
+                    </form>
+                  ) : isMember ? (
+                    <p className="mt-5 border border-amber-200 bg-white/70 p-4 text-sm font-bold text-amber-900/70 dark:border-amber-400/20 dark:bg-black/25 dark:text-amber-100/65">
+                      Club staff cannot flag their own club account.
+                    </p>
+                  ) : (
+                    <Link
+                      href={`/auth/sign-in?return_url=/scouts/${scoutId}`}
+                      className="mt-5 inline-flex h-12 w-full items-center justify-center bg-amber-600 px-5 text-sm font-black uppercase text-white transition hover:bg-amber-700"
+                    >
+                      Sign in to flag
+                    </Link>
+                  )}
+                </section>
+              ) : null}
 
               {team && (
                 <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">

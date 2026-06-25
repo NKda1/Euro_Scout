@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useState, useMemo } from "react";
+import { useEffect, useTransition, useState, useMemo } from "react";
 import type { ReactNode } from "react";
 import CareerTimelineBuilder, { type CareerTimelineDraft } from "@/components/account/CareerTimelineBuilder";
 import { leagues, regions, teams } from "@/lib/data";
@@ -90,6 +90,9 @@ function isRedirectError(err: unknown): boolean {
 const inputClass =
   "h-11 w-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white dark:placeholder:text-white/25";
 
+const textareaClass =
+  "min-h-28 w-full resize-y border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white dark:placeholder:text-white/25";
+
 const selectClass =
   "h-11 w-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white";
 
@@ -127,6 +130,177 @@ function ToggleChip({ label, selected, onToggle }: { label: string; selected: bo
     )}>
       {label}
     </button>
+  );
+}
+
+type CareerStatsDraft = Record<string, number>;
+
+const PLAYER_STAT_GROUPS: Record<string, Array<{ key: string; label: string; max: number; step?: number; unit?: string }>> = {
+  QB: [
+    { key: "passing_yards", label: "Passing yards", max: 8000, step: 25, unit: "yds" },
+    { key: "passing_touchdowns", label: "Passing TDs", max: 80, unit: "TD" },
+    { key: "completion_percentage", label: "Completion", max: 100, step: 0.1, unit: "%" },
+    { key: "interceptions", label: "Interceptions", max: 40 }
+  ],
+  WR: [
+    { key: "receptions", label: "Receptions", max: 180 },
+    { key: "targets", label: "Targets", max: 240 },
+    { key: "receiving_yards", label: "Receiving yards", max: 3000, step: 25, unit: "yds" },
+    { key: "touchdowns", label: "Touchdowns", max: 40, unit: "TD" }
+  ],
+  RB: [
+    { key: "carries", label: "Carries", max: 350 },
+    { key: "rushing_yards", label: "Rushing yards", max: 3000, step: 25, unit: "yds" },
+    { key: "receptions", label: "Receptions", max: 120 },
+    { key: "touchdowns", label: "Touchdowns", max: 45, unit: "TD" }
+  ],
+  DB: [
+    { key: "tackles", label: "Tackles", max: 180 },
+    { key: "interceptions", label: "Picks", max: 20 },
+    { key: "pass_breakups", label: "PBUs", max: 40 },
+    { key: "touchdowns", label: "Touchdowns", max: 12, unit: "TD" }
+  ],
+  LB: [
+    { key: "tackles", label: "Tackles", max: 220 },
+    { key: "sacks", label: "Sacks", max: 35, step: 0.5 },
+    { key: "tackles_for_loss", label: "TFLs", max: 50, step: 0.5 },
+    { key: "forced_fumbles", label: "Forced fumbles", max: 15 }
+  ],
+  DL: [
+    { key: "tackles", label: "Tackles", max: 160 },
+    { key: "sacks", label: "Sacks", max: 35, step: 0.5 },
+    { key: "tackles_for_loss", label: "TFLs", max: 50, step: 0.5 },
+    { key: "forced_fumbles", label: "Forced fumbles", max: 15 }
+  ],
+  OL: [
+    { key: "games_started", label: "Games started", max: 80 },
+    { key: "sacks_allowed", label: "Sacks allowed", max: 40, step: 0.5 },
+    { key: "pressures_allowed", label: "Pressures allowed", max: 80 },
+    { key: "penalties", label: "Penalties", max: 40 }
+  ],
+  ST: [
+    { key: "field_goal_percentage", label: "FG made", max: 100, step: 0.1, unit: "%" },
+    { key: "punt_average", label: "Punt average", max: 60, step: 0.1, unit: "yd" },
+    { key: "touchbacks", label: "Touchbacks", max: 120 },
+    { key: "longest_field_goal", label: "Long FG", max: 70, unit: "yd" }
+  ]
+};
+
+function statGroupForPosition(position?: string | null) {
+  const clean = String(position ?? "").toUpperCase();
+  if (clean.includes("QB")) return "QB";
+  if (clean.includes("RB")) return "RB";
+  if (clean.includes("WR") || clean.includes("TE")) return "WR";
+  if (clean.includes("DB") || clean.includes("CB") || clean.includes("S")) return "DB";
+  if (clean.includes("LB")) return "LB";
+  if (clean.includes("DL") || clean.includes("DE") || clean.includes("DT") || clean.includes("EDGE")) return "DL";
+  if (clean.includes("OL") || clean.includes("OT") || clean.includes("OG") || clean === "C") return "OL";
+  if (clean.includes("K") || clean.includes("P")) return "ST";
+  return "WR";
+}
+
+function OnboardingMetricControl({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  unit
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;
+}) {
+  const numericValue = Number(value);
+
+  return (
+    <label className="block border border-slate-200 bg-white/70 p-3 dark:border-white/10 dark:bg-white/5">
+      <FieldLabel>{label}</FieldLabel>
+      <div className="space-y-3">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={Number.isFinite(numericValue) && value !== "" ? numericValue : min}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-2 w-full accent-red-600"
+        />
+        <div className="flex h-10 w-full min-w-0 items-center border border-slate-200 bg-white dark:border-white/10 dark:bg-black/35">
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step="any"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm font-black text-slate-950 outline-none dark:text-white"
+          />
+          {unit ? <span className="shrink-0 px-3 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">{unit}</span> : null}
+        </div>
+      </div>
+    </label>
+  );
+}
+
+function PlayerStatsBuilder({
+  position,
+  stats,
+  onChange
+}: {
+  position: string;
+  stats: CareerStatsDraft;
+  onChange: (stats: CareerStatsDraft) => void;
+}) {
+  const [group, setGroup] = useState(statGroupForPosition(position));
+  const fields = PLAYER_STAT_GROUPS[group] ?? PLAYER_STAT_GROUPS.WR;
+
+  useEffect(() => {
+    if (!position) return;
+    setGroup(statGroupForPosition(position));
+  }, [position]);
+
+  return (
+    <div className="border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-black text-slate-950 dark:text-white">Season stats</p>
+          <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Add your latest season totals. You can refine these later.</p>
+        </div>
+        <select value={group} onChange={(event) => setGroup(event.target.value)} className="h-10 border border-slate-200 bg-white px-3 text-xs font-black text-slate-900 dark:border-white/10 dark:bg-black/35 dark:text-white">
+          {Object.keys(PLAYER_STAT_GROUPS).map((key) => <option key={key} value={key}>{key}</option>)}
+        </select>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {fields.map((field) => {
+          const value = Number(stats[field.key] ?? 0);
+          return (
+            <label key={field.key} className="block border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-black/25">
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{field.label}</span>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  type="range"
+                  min={0}
+                  max={field.max}
+                  step={field.step ?? 1}
+                  value={Number.isFinite(value) ? value : 0}
+                  onChange={(event) => onChange({ ...stats, [field.key]: Number(event.target.value) })}
+                  className="h-2 flex-1 accent-red-600"
+                />
+                <span className="w-20 text-right text-sm font-black text-slate-950 dark:text-white">
+                  {Number.isFinite(value) ? value : 0}{field.unit ? ` ${field.unit}` : ""}
+                </span>
+              </div>
+            </label>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -243,13 +417,13 @@ function RoleStep({ value, onChange, allowAdmin }: { value: UserRole; onChange: 
 function IdentityStep(props: {
   displayName: string; setDisplayName: (v: string) => void;
   location:    string; setLocation:    (v: string) => void;
-  headline:    string; setHeadline:    (v: string) => void;
+  bio:         string; setBio:         (v: string) => void;
 }) {
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Your identity.</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">This is how you appear on EuroScout. Make it recognisable.</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Keep it simple: who you are, where you fit in football, and what people should remember.</p>
       </div>
       <label className="block">
         <FieldLabel required>Display name</FieldLabel>
@@ -260,8 +434,13 @@ function IdentityStep(props: {
         <input value={props.location} onChange={(e) => props.setLocation(e.target.value)} placeholder="e.g. Berlin, Germany" className={inputClass} />
       </label>
       <label className="block">
-        <FieldLabel>Headline</FieldLabel>
-        <input value={props.headline} onChange={(e) => props.setHeadline(e.target.value)} placeholder="e.g. Starting QB at Berlin Rebels" className={inputClass} />
+        <FieldLabel>Short bio</FieldLabel>
+        <textarea
+          value={props.bio}
+          onChange={(e) => props.setBio(e.target.value)}
+          placeholder="Two or three sharp sentences. Mention your role, level, style and what you are looking for next."
+          className={textareaClass}
+        />
       </label>
     </div>
   );
@@ -272,8 +451,6 @@ function IdentityStep(props: {
 type PlayerPipelineOrigin = "europe" | CampusPipeline | "other";
 
 function PlayerStep(props: {
-  firstName:            string; setFirstName:            (v: string) => void;
-  lastName:             string; setLastName:             (v: string) => void;
   dob:                  string; setDob:                  (v: string) => void;
   nationality:          string; setNationality:          (v: string) => void;
   languages:           string[]; toggleLanguage:           (l: string) => void;
@@ -287,7 +464,6 @@ function PlayerStep(props: {
   pipelineOrigin:       PlayerPipelineOrigin; setPipelineOrigin: (v: PlayerPipelineOrigin) => void;
   campusYearStart:      string; setCampusYearStart:      (v: string) => void;
   campusYearEnd:        string; setCampusYearEnd:        (v: string) => void;
-  availableForTransfer: boolean; setAvailableForTransfer: (v: boolean) => void;
   careerTimeline:       CareerTimelineDraft[]; setCareerTimeline: (v: CareerTimelineDraft[]) => void;
 }) {
   const age = calcAge(props.dob);
@@ -322,14 +498,6 @@ function PlayerStep(props: {
       <div>
         <SectionHeading>Personal</SectionHeading>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <FieldLabel>First name</FieldLabel>
-            <input value={props.firstName} onChange={(e) => props.setFirstName(e.target.value)} placeholder="Jonas" className={inputClass} />
-          </label>
-          <label className="block">
-            <FieldLabel>Last name</FieldLabel>
-            <input value={props.lastName} onChange={(e) => props.setLastName(e.target.value)} placeholder="Weber" className={inputClass} />
-          </label>
           <label className="block">
             <FieldLabel>Date of birth{age !== null ? ` (age ${age})` : ""}</FieldLabel>
             <input type="date" value={props.dob} onChange={(e) => props.setDob(e.target.value)} className={inputClass} />
@@ -428,6 +596,19 @@ function PlayerStep(props: {
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">in</span>
               </div>
             </div>
+            <input
+              type="range"
+              min="48"
+              max="84"
+              step="1"
+              value={(Number(props.heightFt) || 6) * 12 + (Number(props.heightIn) || 0)}
+              onChange={(event) => {
+                const totalInches = Number(event.target.value);
+                props.setHeightFt(String(Math.floor(totalInches / 12)));
+                props.setHeightIn(String(totalInches % 12));
+              }}
+              className="mt-3 w-full accent-red-600"
+            />
             {heightCm > 0 && <span className="mt-1 block text-xs text-slate-400">{heightCm} cm</span>}
           </div>
 
@@ -437,6 +618,15 @@ function PlayerStep(props: {
               <input type="number" placeholder="95" value={props.weightKg} onChange={(e) => props.setWeightKg(e.target.value)} className={inputClass + " pr-9"} />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">kg</span>
             </div>
+            <input
+              type="range"
+              min="55"
+              max="160"
+              step="1"
+              value={Number(props.weightKg) || 95}
+              onChange={(event) => props.setWeightKg(event.target.value)}
+              className="mt-3 w-full accent-red-600"
+            />
             {props.weightKg && !isNaN(Number(props.weightKg)) && Number(props.weightKg) > 0 && (
               <span className="mt-1 block text-xs text-slate-400">{Math.round(Number(props.weightKg) * 2.205)} lbs</span>
             )}
@@ -489,22 +679,59 @@ function PlayerStep(props: {
             <FieldLabel>Career timeline</FieldLabel>
             <CareerTimelineBuilder entries={props.careerTimeline} onChange={props.setCareerTimeline} />
           </div>
-        </div>
 
-        <label className="mt-4 flex cursor-pointer items-center gap-3 border border-slate-200 bg-white px-4 py-3.5 transition hover:border-red-200 dark:border-white/10 dark:bg-[#111] dark:hover:border-red-500/30">
-          <span className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition",
-            props.availableForTransfer ? "border-red-600 bg-red-600" : "border-slate-300 dark:border-white/30"
-          )}>
-            {props.availableForTransfer && <CheckIcon />}
-          </span>
-          <input type="checkbox" checked={props.availableForTransfer} onChange={(e) => props.setAvailableForTransfer(e.target.checked)} className="sr-only" />
-          <span>
-            <span className="block text-sm font-bold text-slate-900 dark:text-white">Available for transfer</span>
-            <span className="block text-xs text-slate-500 dark:text-slate-400">Open to new club offers for the upcoming season</span>
-          </span>
-        </label>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function PlayerPerformanceStep(props: {
+  position: string;
+  fortyYardDash: string; setFortyYardDash: (v: string) => void;
+  shuttleSeconds: string; setShuttleSeconds: (v: string) => void;
+  verticalJumpIn: string; setVerticalJumpIn: (v: string) => void;
+  broadJumpFt: string; setBroadJumpFt: (v: string) => void;
+  benchReps: string; setBenchReps: (v: string) => void;
+  seasonStats: CareerStatsDraft; setSeasonStats: (v: CareerStatsDraft) => void;
+  availableForTransfer: boolean; setAvailableForTransfer: (v: boolean) => void;
+}) {
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Metrics and stats.</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Add the numbers clubs use to compare players. Skip anything you do not have yet.</p>
+      </div>
+
+      <div>
+        <SectionHeading>Combine metrics</SectionHeading>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <OnboardingMetricControl label="40 yard dash" value={props.fortyYardDash} onChange={props.setFortyYardDash} min={3.5} max={8} step={0.01} unit="sec" />
+          <OnboardingMetricControl label="Shuttle" value={props.shuttleSeconds} onChange={props.setShuttleSeconds} min={3} max={8} step={0.01} unit="sec" />
+          <OnboardingMetricControl label="Vertical jump" value={props.verticalJumpIn} onChange={props.setVerticalJumpIn} min={15} max={50} step={0.5} unit="in" />
+          <OnboardingMetricControl label="Broad jump" value={props.broadJumpFt} onChange={props.setBroadJumpFt} min={4} max={14} step={0.1} unit="ft" />
+          <OnboardingMetricControl label="Bench reps" value={props.benchReps} onChange={props.setBenchReps} min={0} max={60} step={1} unit="reps" />
+        </div>
+      </div>
+
+      <div>
+        <SectionHeading>Season stats</SectionHeading>
+        <PlayerStatsBuilder position={props.position} stats={props.seasonStats} onChange={props.setSeasonStats} />
+      </div>
+
+      <label className="flex cursor-pointer items-center gap-3 border border-slate-200 bg-white px-4 py-3.5 transition hover:border-red-200 dark:border-white/10 dark:bg-[#111] dark:hover:border-red-500/30">
+        <span className={cn(
+          "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition",
+          props.availableForTransfer ? "border-red-600 bg-red-600" : "border-slate-300 dark:border-white/30"
+        )}>
+          {props.availableForTransfer && <CheckIcon />}
+        </span>
+        <input type="checkbox" checked={props.availableForTransfer} onChange={(e) => props.setAvailableForTransfer(e.target.checked)} className="sr-only" />
+        <span>
+          <span className="block text-sm font-bold text-slate-900 dark:text-white">Available for transfer</span>
+          <span className="block text-xs text-slate-500 dark:text-slate-400">Open to new club offers for the upcoming season</span>
+        </span>
+      </label>
     </div>
   );
 }
@@ -524,6 +751,10 @@ function ClubStep(props: {
   newTeamRegionId: string; setNewTeamRegionId: (v: string) => void;
   newTeamStadium:  string; setNewTeamStadium:  (v: string) => void;
 }) {
+  const countryOptions = regions.map((region) => ({
+    country: region.countryScope,
+    regionId: region.id
+  }));
   const claimableTeams = useMemo(() => [
     ...campusTeams.map((team) => ({
       id: team.id,
@@ -674,20 +905,26 @@ function ClubStep(props: {
             </label>
             <label className="block">
               <FieldLabel required>Country</FieldLabel>
-              <input value={props.newTeamCountry} onChange={(e) => props.setNewTeamCountry(e.target.value)} placeholder="Team country" className={inputClass} />
+              <select
+                value={props.newTeamCountry}
+                onChange={(e) => {
+                  const selected = countryOptions.find((item) => item.country === e.target.value);
+                  props.setNewTeamCountry(e.target.value);
+                  props.setNewTeamRegionId(selected?.regionId ?? "");
+                }}
+                className={selectClass}
+              >
+                <option value="">Select country</option>
+                {countryOptions.map((item) => (
+                  <option key={item.regionId} value={item.country}>{item.country}</option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <FieldLabel required>League</FieldLabel>
               <select value={props.newTeamLeagueId} onChange={(e) => props.setNewTeamLeagueId(e.target.value)} className={selectClass}>
                 <option value="">Select league</option>
                 {leagues.map((league) => <option key={league.id} value={league.id}>{league.name}</option>)}
-              </select>
-            </label>
-            <label className="block">
-              <FieldLabel required>Region</FieldLabel>
-              <select value={props.newTeamRegionId} onChange={(e) => props.setNewTeamRegionId(e.target.value)} className={selectClass}>
-                <option value="">Select region</option>
-                {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
               </select>
             </label>
             <label className="block sm:col-span-2">
@@ -752,24 +989,29 @@ interface OnboardingWizardProps {
   action: (formData: FormData) => Promise<void>;
   allowAdminRole?: boolean;
   error?: string | null;
+  initialRole?: UserRole;
+  previewMode?: boolean;
 }
 
-export default function OnboardingWizard({ action, allowAdminRole = false, error }: OnboardingWizardProps) {
+export default function OnboardingWizard({ action, allowAdminRole = false, error, initialRole = "player", previewMode = false }: OnboardingWizardProps) {
   const [isPending, startTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
 
   // Step 1
-  const [role, setRole] = useState<UserRole>("player");
+  const [role, setRole] = useState<UserRole>(initialRole);
+
+  useEffect(() => {
+    setRole(initialRole);
+    setStep(1);
+  }, [initialRole]);
 
   // Step 2 – identity
   const [displayName, setDisplayName] = useState("");
   const [location, setLocation]       = useState("");
-  const [headline, setHeadline]       = useState("");
+  const [bio, setBio]                 = useState("");
 
   // Step 3 – player
-  const [firstName,            setFirstName]            = useState("");
-  const [lastName,             setLastName]             = useState("");
   const [dob,                  setDob]                  = useState("");
   const [nationality,          setNationality]          = useState("");
   const [languages,            setLanguages]            = useState<string[]>([]);
@@ -778,6 +1020,12 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
   const [heightFt,             setHeightFt]             = useState("");
   const [heightIn,             setHeightIn]             = useState("");
   const [weightKg,             setWeightKg]             = useState("");
+  const [fortyYardDash,        setFortyYardDash]        = useState("");
+  const [shuttleSeconds,       setShuttleSeconds]       = useState("");
+  const [verticalJumpIn,       setVerticalJumpIn]       = useState("");
+  const [broadJumpFt,          setBroadJumpFt]          = useState("");
+  const [benchReps,            setBenchReps]            = useState("");
+  const [seasonStats,          setSeasonStats]          = useState<CareerStatsDraft>({});
   const [currentTeamId,        setCurrentTeamId]        = useState("");
   const [pipelineType,         setPipelineType]         = useState("");
   const [pipelineOrigin,       setPipelineOrigin]       = useState<PlayerPipelineOrigin>("europe");
@@ -805,17 +1053,20 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
 
   // Derived
   const hasRoleStep    = ROLE_CONFIG[role]?.hasRoleStep ?? false;
-  const totalSteps     = hasRoleStep ? 4 : 3;
+  const hasPerformanceStep = role === "player";
+  const totalSteps     = hasPerformanceStep ? 5 : hasRoleStep ? 4 : 3;
   const roleStepNum    = hasRoleStep ? 3 : null;
-  const confirmStepNum = hasRoleStep ? 4 : 3;
+  const performanceStepNum = hasPerformanceStep ? 4 : null;
+  const confirmStepNum = hasPerformanceStep ? 5 : hasRoleStep ? 4 : 3;
 
   const roleStepLabels: Record<string, string>       = { player: "Player details", club: "Your club" };
-  const roleStepDescriptions: Record<string, string> = { player: "Position, stats & availability", club: "Find and connect to your team" };
+  const roleStepDescriptions: Record<string, string> = { player: "Position, pathway and team", club: "Find and connect to your team" };
 
   const stepConfig: StepMeta[] = [
     { label: "Your role", description: "How you use EuroScout" },
     { label: "Identity",  description: "Name and presence" },
     ...(hasRoleStep ? [{ label: roleStepLabels[role] ?? "Your details", description: roleStepDescriptions[role] ?? "" }] : []),
+    ...(hasPerformanceStep ? [{ label: "Metrics & stats", description: "Combine numbers and season production" }] : []),
     { label: "All set",   description: "Review and publish" },
   ];
 
@@ -828,12 +1079,11 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     fd.append("role",         role);
     fd.append("display_name", displayName.trim());
     fd.append("location",     location.trim());
-    fd.append("headline",     headline.trim());
+    fd.append("headline",     "");
+    fd.append("bio",          bio.trim());
     fd.append("is_public",    isPublic ? "on" : "");
 
     // Player fields
-    fd.append("first_name",        firstName.trim());
-    fd.append("last_name",         lastName.trim());
     fd.append("dob",               dob);
     fd.append("nationality",       nationality);
     fd.append("languages",         languages.join(","));
@@ -841,6 +1091,12 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     fd.append("position",          position);
     fd.append("height_cm",         heightCm > 0 ? String(heightCm) : "");
     fd.append("weight_kg",         weightKg);
+    fd.append("forty_yard_dash",   fortyYardDash);
+    fd.append("shuttle_seconds",   shuttleSeconds);
+    fd.append("vertical_jump_cm",  verticalJumpIn);
+    fd.append("broad_jump_cm",     broadJumpFt);
+    fd.append("bench_reps",        benchReps);
+    fd.append("career_stats_json", JSON.stringify(seasonStats));
     fd.append("current_team_id",   currentTeamId);
     fd.append("campus_pipeline_origin", pipelineOrigin);
     fd.append("pipeline_type",     isCampusPipeline(pipelineOrigin) ? pipelineOrigin : pipelineType);
@@ -906,13 +1162,11 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
             <IdentityStep
               displayName={displayName} setDisplayName={setDisplayName}
               location={location}       setLocation={setLocation}
-              headline={headline}       setHeadline={setHeadline}
+              bio={bio}                 setBio={setBio}
             />
           )}
           {step === roleStepNum && role === "player" && (
             <PlayerStep
-              firstName={firstName}                       setFirstName={setFirstName}
-              lastName={lastName}                         setLastName={setLastName}
               dob={dob}                                   setDob={setDob}
               nationality={nationality}                   setNationality={setNationality}
               languages={languages}                       toggleLanguage={toggleLanguage}
@@ -926,8 +1180,19 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
               pipelineOrigin={pipelineOrigin}             setPipelineOrigin={setPipelineOrigin}
               campusYearStart={campusYearStart}           setCampusYearStart={setCampusYearStart}
               campusYearEnd={campusYearEnd}               setCampusYearEnd={setCampusYearEnd}
-              availableForTransfer={availableForTransfer} setAvailableForTransfer={setAvailableForTransfer}
               careerTimeline={careerTimeline}             setCareerTimeline={setCareerTimeline}
+            />
+          )}
+          {step === performanceStepNum && role === "player" && (
+            <PlayerPerformanceStep
+              position={position}
+              fortyYardDash={fortyYardDash}               setFortyYardDash={setFortyYardDash}
+              shuttleSeconds={shuttleSeconds}             setShuttleSeconds={setShuttleSeconds}
+              verticalJumpIn={verticalJumpIn}             setVerticalJumpIn={setVerticalJumpIn}
+              broadJumpFt={broadJumpFt}                   setBroadJumpFt={setBroadJumpFt}
+              benchReps={benchReps}                       setBenchReps={setBenchReps}
+              seasonStats={seasonStats}                   setSeasonStats={setSeasonStats}
+              availableForTransfer={availableForTransfer} setAvailableForTransfer={setAvailableForTransfer}
             />
           )}
           {step === roleStepNum && role === "club" && (
@@ -972,10 +1237,10 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
             </button>
           ) : (
             <button
-              type="button" onClick={handleSubmit} disabled={isPending}
+              type="button" onClick={handleSubmit} disabled={isPending || previewMode}
               className="inline-flex h-11 items-center bg-red-600 px-6 text-sm font-black text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isPending ? "Setting up your profile…" : "Complete onboarding"}
+              {previewMode ? "Preview only" : isPending ? "Setting up your profile…" : "Complete onboarding"}
             </button>
           )}
         </div>
