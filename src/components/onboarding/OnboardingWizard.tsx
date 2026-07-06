@@ -3,7 +3,7 @@
 import { useEffect, useTransition, useState, useMemo } from "react";
 import type { ReactNode } from "react";
 import CareerTimelineBuilder, { type CareerTimelineDraft } from "@/components/account/CareerTimelineBuilder";
-import { leagues, regions, teams } from "@/lib/data";
+import { leagues as seededLeagues, teams } from "@/lib/data";
 import {
   campusPipelines,
   campusTeams,
@@ -13,9 +13,11 @@ import {
   isFrenchCanadianCampusTeam,
   type CampusPipeline
 } from "@/lib/campus-to-pro";
+import { clubCreationRegions } from "@/lib/club-regions";
 import { countries } from "@/constants/countries";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/auth";
+import type { League } from "@/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -740,6 +742,14 @@ function PlayerPerformanceStep(props: {
 
 type ClubAction = "claim" | "join" | "new" | "";
 
+interface ClubSearchTeam {
+  id: string;
+  name: string;
+  city: string;
+  country: string;
+  label: string;
+}
+
 function ClubStep(props: {
   teamSearch:      string; setTeamSearch:      (v: string) => void;
   selectedTeamId:  string; setSelectedTeamId:  (v: string) => void;
@@ -749,28 +759,29 @@ function ClubStep(props: {
   newTeamCountry:  string; setNewTeamCountry:  (v: string) => void;
   newTeamLeagueId: string; setNewTeamLeagueId: (v: string) => void;
   newTeamRegionId: string; setNewTeamRegionId: (v: string) => void;
+  newTeamDivision: string; setNewTeamDivision: (v: string) => void;
   newTeamStadium:  string; setNewTeamStadium:  (v: string) => void;
+  availableClubTeams: ClubSearchTeam[];
+  availableLeagues: League[];
 }) {
-  const countryOptions = regions.map((region) => ({
-    country: region.countryScope,
-    regionId: region.id
-  }));
-  const claimableTeams = useMemo(() => [
-    ...campusTeams.map((team) => ({
+  const { newTeamName, setClubAction, setNewTeamName, teamSearch } = props;
+  const claimableTeams = useMemo(() => Array.from(new Map([
+    ...campusTeams.map((team): ClubSearchTeam => ({
       id: team.id,
       name: team.name,
       city: team.city,
       country: team.country,
       label: `${team.name} (${campusPipelines[team.leagueId].label})`
     })),
-    ...teams.map((team) => ({
+    ...teams.map((team): ClubSearchTeam => ({
       id: team.id,
       name: team.name,
       city: team.city,
       country: team.country,
       label: `${team.name} (${team.country})`
-    }))
-  ], []);
+    })),
+    ...props.availableClubTeams
+  ].map((team) => [team.id, team])).values()), [props.availableClubTeams]);
 
   const filtered = useMemo(() => {
     const q = props.teamSearch.toLowerCase().trim();
@@ -784,12 +795,27 @@ function ClubStep(props: {
 
   const selectedTeam = claimableTeams.find((t) => t.id === props.selectedTeamId);
   const noResults = props.teamSearch.trim().length >= 2 && filtered.length === 0;
+  const divisionSuggestions = props.newTeamLeagueId === "bucs"
+    ? ["Premier", "Division 1", "Division 2", "Conference"]
+    : props.newTeamLeagueId === "gfl-2"
+      ? ["North", "South"]
+      : props.newTeamLeagueId === "bafa-division-one"
+        ? ["North", "South", "Division 1"]
+        : ["North", "South", "Division 1", "Division 2", "Premier"];
+
+  useEffect(() => {
+    if (noResults && !newTeamName.trim()) {
+      setNewTeamName(teamSearch.trim());
+      setClubAction("new");
+    }
+  }, [newTeamName, noResults, setClubAction, setNewTeamName, teamSearch]);
 
   function selectTeam(id: string) {
     props.setSelectedTeamId(id);
     props.setTeamSearch("");
     props.setClubAction("");
     props.setNewTeamName("");
+    props.setNewTeamDivision("");
   }
 
   function clearSelection() {
@@ -797,6 +823,23 @@ function ClubStep(props: {
     props.setClubAction("");
     props.setTeamSearch("");
     props.setNewTeamName("");
+    props.setNewTeamDivision("");
+  }
+
+  function selectLeague(leagueId: string) {
+    props.setNewTeamLeagueId(leagueId);
+
+    if (leagueId === "bucs" || leagueId === "bafa-division-one") {
+      props.setNewTeamCountry("United Kingdom");
+      if (!["gb-eng", "gb-sco", "gb-wal", "united-kingdom"].includes(props.newTeamRegionId)) {
+        props.setNewTeamRegionId("gb-eng");
+      }
+    }
+
+    if (leagueId === "gfl-2") {
+      props.setNewTeamCountry("Germany");
+      props.setNewTeamRegionId("germany");
+    }
   }
 
   return (
@@ -904,28 +947,45 @@ function ClubStep(props: {
               <input value={props.newTeamCity} onChange={(e) => props.setNewTeamCity(e.target.value)} placeholder="Team city" className={inputClass} />
             </label>
             <label className="block">
-              <FieldLabel required>Country</FieldLabel>
+              <FieldLabel required>Country / region</FieldLabel>
               <select
-                value={props.newTeamCountry}
+                value={props.newTeamRegionId}
                 onChange={(e) => {
-                  const selected = countryOptions.find((item) => item.country === e.target.value);
-                  props.setNewTeamCountry(e.target.value);
-                  props.setNewTeamRegionId(selected?.regionId ?? "");
+                  const selected = clubCreationRegions.find((item) => item.id === e.target.value);
+                  props.setNewTeamRegionId(e.target.value);
+                  props.setNewTeamCountry(selected?.country ?? "");
                 }}
                 className={selectClass}
               >
-                <option value="">Select country</option>
-                {countryOptions.map((item) => (
-                  <option key={item.regionId} value={item.country}>{item.country}</option>
+                <option value="">Select country or region</option>
+                {clubCreationRegions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label === item.country ? item.country : `${item.label}, ${item.country}`}
+                  </option>
                 ))}
               </select>
             </label>
             <label className="block">
               <FieldLabel required>League</FieldLabel>
-              <select value={props.newTeamLeagueId} onChange={(e) => props.setNewTeamLeagueId(e.target.value)} className={selectClass}>
+              <select value={props.newTeamLeagueId} onChange={(e) => selectLeague(e.target.value)} className={selectClass}>
                 <option value="">Select league</option>
-                {leagues.map((league) => <option key={league.id} value={league.id}>{league.name}</option>)}
+                {props.availableLeagues.map((league) => <option key={league.id} value={league.id}>{league.name}</option>)}
               </select>
+            </label>
+            <label className="block">
+              <FieldLabel required>Division / conference</FieldLabel>
+              <input
+                list="club-division-suggestions"
+                value={props.newTeamDivision}
+                onChange={(e) => props.setNewTeamDivision(e.target.value)}
+                placeholder="e.g. Division 1, North, GFL 2 South"
+                className={inputClass}
+              />
+              <datalist id="club-division-suggestions">
+                {divisionSuggestions.map((division) => (
+                  <option key={division} value={division} />
+                ))}
+              </datalist>
             </label>
             <label className="block sm:col-span-2">
               <FieldLabel>Stadium</FieldLabel>
@@ -991,9 +1051,19 @@ interface OnboardingWizardProps {
   error?: string | null;
   initialRole?: UserRole;
   previewMode?: boolean;
+  availableClubTeams?: ClubSearchTeam[];
+  availableLeagues?: League[];
 }
 
-export default function OnboardingWizard({ action, allowAdminRole = false, error, initialRole = "player", previewMode = false }: OnboardingWizardProps) {
+export default function OnboardingWizard({
+  action,
+  allowAdminRole = false,
+  error,
+  initialRole = "player",
+  previewMode = false,
+  availableClubTeams = [],
+  availableLeagues = seededLeagues
+}: OnboardingWizardProps) {
   const [isPending, startTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
@@ -1043,6 +1113,7 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
   const [newTeamCountry, setNewTeamCountry] = useState("");
   const [newTeamLeagueId, setNewTeamLeagueId] = useState("");
   const [newTeamRegionId, setNewTeamRegionId] = useState("");
+  const [newTeamDivision, setNewTeamDivision] = useState("");
   const [newTeamStadium, setNewTeamStadium] = useState("");
 
   // Final
@@ -1113,6 +1184,7 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     fd.append("new_team_country",  newTeamCountry.trim());
     fd.append("new_team_league_id", newTeamLeagueId);
     fd.append("new_team_region_id", newTeamRegionId);
+    fd.append("new_team_division", newTeamDivision.trim());
     fd.append("new_team_stadium",  newTeamStadium.trim());
 
     setSubmitError(null);
@@ -1131,6 +1203,8 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
     ? [position, isCampusPipeline(pipelineOrigin) ? campusPipelines[pipelineOrigin].label : pipelineType].filter(Boolean).join(" · ")
     : role === "club" && selectedTeamId
       ? getCampusTeam(selectedTeamId)?.name ?? teams.find((t) => t.id === selectedTeamId)?.name ?? ""
+      : role === "club" && newTeamName
+        ? [newTeamName, newTeamDivision].filter(Boolean).join(" · ")
       : "";
 
   const currentError = submitError ?? error;
@@ -1205,7 +1279,10 @@ export default function OnboardingWizard({ action, allowAdminRole = false, error
               newTeamCountry={newTeamCountry} setNewTeamCountry={setNewTeamCountry}
               newTeamLeagueId={newTeamLeagueId} setNewTeamLeagueId={setNewTeamLeagueId}
               newTeamRegionId={newTeamRegionId} setNewTeamRegionId={setNewTeamRegionId}
+              newTeamDivision={newTeamDivision} setNewTeamDivision={setNewTeamDivision}
               newTeamStadium={newTeamStadium} setNewTeamStadium={setNewTeamStadium}
+              availableClubTeams={availableClubTeams}
+              availableLeagues={availableLeagues}
             />
           )}
           {step === confirmStepNum && (

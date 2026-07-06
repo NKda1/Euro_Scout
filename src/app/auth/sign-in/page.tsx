@@ -15,12 +15,16 @@ interface SignInPageProps {
     error?: string;
     notice?: string;
     next?: string;
+    email?: string;
   }>;
 }
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
-  const { error, notice, next } = await searchParams;
+  const { error, notice, next, email } = await searchParams;
   const isExpiredLink = error ? /expired|invalid link|otp|token/i.test(error) : false;
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  const signUpParams = new URLSearchParams({ next: safeNext });
+  if (email) signUpParams.set("email", email);
 
   return (
     <AuthShell eyebrow="Welcome Back" title="Sign in and keep scouting.">
@@ -42,10 +46,10 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         </div>
       ) : null}
       <form action={signInAction} className="space-y-4">
-        <input type="hidden" name="next" value={next ?? "/dashboard"} />
+        <input type="hidden" name="next" value={safeNext} />
         <label className="block">
           <span className="text-sm font-black uppercase text-slate-600 dark:text-slate-300">Email</span>
-          <input name="email" type="email" required autoComplete="email" className="mt-2 h-12 w-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-[#090909] dark:text-white dark:focus:ring-red-500/20" />
+          <input name="email" type="email" required autoComplete="email" defaultValue={email ?? ""} className="mt-2 h-12 w-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-[#090909] dark:text-white dark:focus:ring-red-500/20" />
         </label>
         <label className="block">
           <div className="flex items-center justify-between">
@@ -60,7 +64,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
       </form>
       <p className="mt-5 text-center text-sm font-semibold text-slate-400 dark:text-slate-400">
         New here?{" "}
-        <Link href="/auth/sign-up" className="font-black text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300">
+        <Link href={`/auth/sign-up?${signUpParams.toString()}`} className="font-black text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300">
           Create an account
         </Link>
       </p>

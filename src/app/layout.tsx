@@ -14,6 +14,15 @@ export const metadata: Metadata = {
     template: "%s"
   },
   description: "Premium European American football league and team intelligence.",
+  icons: {
+    icon: [
+      { url: "/images/Euro_Scout_Logo%202.png", type: "image/png" }
+    ],
+    shortcut: "/images/Euro_Scout_Logo%202.png",
+    apple: [
+      { url: "/images/Euro_Scout_Logo%202.png", type: "image/png" }
+    ]
+  },
   openGraph: {
     title: "EuroScout Pro",
     description: "Premium European American football league and team intelligence.",

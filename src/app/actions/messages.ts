@@ -2,18 +2,277 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getAuthenticatedProfile } from "@/lib/auth";
+import { getAuthenticatedProfile, type Profile } from "@/lib/auth";
+import { isPremiumActive } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 // ─── Input constraints ────────────────────────────────────────────────────────
 const MAX_SUBJECT_LENGTH = 200;
 const MAX_BODY_LENGTH = 5_000;
+const FREE_CONVERSATION_TOKEN_LIMIT = 5;
+const FREE_REPLIES_PER_CONVERSATION = 3;
+const MESSAGE_TOKEN_WINDOW_DAYS = 7;
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
 type ServiceClient = ReturnType<typeof createSupabaseServiceRoleClient>;
+
+interface MessageTokenWallet {
+  profile_id: string;
+  weekly_limit: number;
+  tokens_remaining: number;
+  window_started_at: string;
+  window_ends_at: string;
+}
+
+interface MessageReplyAllowance {
+  profile_id: string;
+  conversation_id: string;
+  reply_limit: number;
+  replies_remaining: number;
+  started_with_token: boolean;
+}
+
+function messageTokenWindowEnd(from = new Date()) {
+  return new Date(from.getTime() + MESSAGE_TOKEN_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function conversationTokenLimitError(windowEndsAt: string) {
+  const refreshDate = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(windowEndsAt));
+
+  return `You have used your free conversation tokens. Upgrade to premium for unlimited messaging, or wait until ${refreshDate}.`;
+}
+
+async function getOrCreateMessageTokenWallet(serviceClient: ServiceClient, profileId: string) {
+  const { data: existingWallet, error: readError } = await serviceClient
+    .from("message_token_wallets")
+    .select("profile_id, weekly_limit, tokens_remaining, window_started_at, window_ends_at")
+    .eq("profile_id", profileId)
+    .maybeSingle<MessageTokenWallet>();
+
+  if (readError) return { wallet: null, error: readError.message };
+  if (existingWallet) return { wallet: existingWallet, error: null };
+
+  const now = new Date();
+  const { data: newWallet, error: createError } = await serviceClient
+    .from("message_token_wallets")
+    .insert({
+      profile_id: profileId,
+      weekly_limit: FREE_CONVERSATION_TOKEN_LIMIT,
+      tokens_remaining: FREE_CONVERSATION_TOKEN_LIMIT,
+      window_started_at: now.toISOString(),
+      window_ends_at: messageTokenWindowEnd(now)
+    })
+    .select("profile_id, weekly_limit, tokens_remaining, window_started_at, window_ends_at")
+    .single<MessageTokenWallet>();
+
+  return { wallet: newWallet ?? null, error: createError?.message ?? null };
+}
+
+async function spendConversationToken(params: {
+  serviceClient: ServiceClient;
+  profile: Profile;
+  conversationId?: string | null;
+}) {
+  const { serviceClient, profile, conversationId } = params;
+
+  if (isPremiumActive(profile)) {
+    await serviceClient.from("message_token_events").insert({
+      profile_id: profile.id,
+      conversation_id: conversationId ?? null,
+      event_type: "premium_bypass",
+      metadata: { account_tier: profile.account_tier, charge_type: "conversation_start" }
+    });
+    return null;
+  }
+
+  const { wallet: initialWallet, error } = await getOrCreateMessageTokenWallet(serviceClient, profile.id);
+  if (error) return error;
+  if (!initialWallet) return "Could not open your conversation token wallet.";
+
+  let wallet = initialWallet;
+  const now = new Date();
+
+  if (new Date(wallet.window_ends_at).getTime() <= now.getTime()) {
+    const refreshedWallet = {
+      tokens_remaining: wallet.weekly_limit,
+      window_started_at: now.toISOString(),
+      window_ends_at: messageTokenWindowEnd(now),
+      updated_at: now.toISOString()
+    };
+
+    const { data: refreshed, error: refreshError } = await serviceClient
+      .from("message_token_wallets")
+      .update(refreshedWallet)
+      .eq("profile_id", profile.id)
+      .select("profile_id, weekly_limit, tokens_remaining, window_started_at, window_ends_at")
+      .single<MessageTokenWallet>();
+
+    if (refreshError || !refreshed) {
+      return refreshError?.message ?? "Could not refresh your conversation tokens.";
+    }
+
+    await serviceClient.from("message_token_events").insert({
+      profile_id: profile.id,
+      conversation_id: conversationId ?? null,
+      event_type: "weekly_refresh",
+      tokens_before: wallet.tokens_remaining,
+      tokens_after: refreshed.tokens_remaining
+    });
+
+    wallet = refreshed;
+  }
+
+  if (wallet.tokens_remaining <= 0) {
+    return conversationTokenLimitError(wallet.window_ends_at);
+  }
+
+  const tokensBefore = wallet.tokens_remaining;
+  const tokensAfter = tokensBefore - 1;
+  const { error: spendError } = await serviceClient
+    .from("message_token_wallets")
+    .update({
+      tokens_remaining: tokensAfter,
+      updated_at: now.toISOString()
+    })
+    .eq("profile_id", profile.id);
+
+  if (spendError) return spendError.message;
+
+  await serviceClient.from("message_token_events").insert({
+    profile_id: profile.id,
+    conversation_id: conversationId ?? null,
+    event_type: "message_sent",
+    tokens_before: tokensBefore,
+    tokens_after: tokensAfter,
+    metadata: { charge_type: "conversation_start" }
+  });
+
+  return null;
+}
+
+async function getOrCreateReplyAllowance(params: {
+  serviceClient: ServiceClient;
+  profileId: string;
+  conversationId: string;
+  startedWithToken?: boolean;
+}) {
+  const { serviceClient, profileId, conversationId, startedWithToken = false } = params;
+  const { data: existingAllowance, error: readError } = await serviceClient
+    .from("message_reply_allowances")
+    .select("profile_id, conversation_id, reply_limit, replies_remaining, started_with_token")
+    .eq("profile_id", profileId)
+    .eq("conversation_id", conversationId)
+    .maybeSingle<MessageReplyAllowance>();
+
+  if (readError) return { allowance: null, error: readError.message };
+  if (existingAllowance) return { allowance: existingAllowance, error: null };
+
+  const { data: newAllowance, error: createError } = await serviceClient
+    .from("message_reply_allowances")
+    .insert({
+      profile_id: profileId,
+      conversation_id: conversationId,
+      reply_limit: FREE_REPLIES_PER_CONVERSATION,
+      replies_remaining: FREE_REPLIES_PER_CONVERSATION,
+      started_with_token: startedWithToken
+    })
+    .select("profile_id, conversation_id, reply_limit, replies_remaining, started_with_token")
+    .single<MessageReplyAllowance>();
+
+  return { allowance: newAllowance ?? null, error: createError?.message ?? null };
+}
+
+async function grantReplyAllowance(params: {
+  serviceClient: ServiceClient;
+  profile: Profile;
+  conversationId: string;
+  startedWithToken: boolean;
+}) {
+  const { serviceClient, profile, conversationId, startedWithToken } = params;
+  if (isPremiumActive(profile)) return null;
+
+  const { error } = await serviceClient.from("message_reply_allowances").upsert(
+    {
+      profile_id: profile.id,
+      conversation_id: conversationId,
+      reply_limit: FREE_REPLIES_PER_CONVERSATION,
+      replies_remaining: FREE_REPLIES_PER_CONVERSATION,
+      started_with_token: startedWithToken,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "profile_id,conversation_id" }
+  );
+
+  return error?.message ?? null;
+}
+
+async function spendReplyAllowance(params: {
+  serviceClient: ServiceClient;
+  profile: Profile;
+  conversationId: string;
+}) {
+  const { serviceClient, profile, conversationId } = params;
+
+  if (isPremiumActive(profile)) {
+    await serviceClient.from("message_token_events").insert({
+      profile_id: profile.id,
+      conversation_id: conversationId,
+      event_type: "premium_bypass",
+      metadata: { account_tier: profile.account_tier, charge_type: "reply_allowance" }
+    });
+    return { error: null, repliesRemaining: null as number | null };
+  }
+
+  const { allowance: initialAllowance, error } = await getOrCreateReplyAllowance({
+    serviceClient,
+    profileId: profile.id,
+    conversationId
+  });
+
+  if (error) return { error, repliesRemaining: null as number | null };
+  if (!initialAllowance) return { error: "Could not open your reply allowance for this conversation.", repliesRemaining: null };
+
+  if (initialAllowance.replies_remaining <= 0) {
+    return {
+      error: `You have used your ${initialAllowance.reply_limit} free replies in this conversation. Upgrade to premium for unlimited replies.`,
+      repliesRemaining: 0
+    };
+  }
+
+  const repliesBefore = initialAllowance.replies_remaining;
+  const repliesAfter = repliesBefore - 1;
+  const { error: spendError } = await serviceClient
+    .from("message_reply_allowances")
+    .update({
+      replies_remaining: repliesAfter,
+      updated_at: new Date().toISOString()
+    })
+    .eq("profile_id", profile.id)
+    .eq("conversation_id", conversationId);
+
+  if (spendError) return { error: spendError.message, repliesRemaining: null as number | null };
+
+  await serviceClient.from("message_token_events").insert({
+    profile_id: profile.id,
+    conversation_id: conversationId,
+    event_type: "message_sent",
+    metadata: {
+      charge_type: "reply_allowance",
+      replies_before: repliesBefore,
+      replies_after: repliesAfter
+    }
+  });
+
+  return { error: null, repliesRemaining: repliesAfter };
+}
 
 async function getConnectedClub(serviceClient: ServiceClient, profileId: string) {
   const { data: membership } = await serviceClient
@@ -103,17 +362,19 @@ async function ensureConversationParticipants(params: {
 async function appendMessageToExistingThread(params: {
   serviceClient: ServiceClient;
   conversationId: string;
-  senderProfileId: string;
+  senderProfile: Profile;
   body?: string;
 }) {
-  const { serviceClient, conversationId, senderProfileId, body } = params;
+  const { serviceClient, conversationId, senderProfile, body } = params;
   if (!body) return null;
 
   const now = new Date().toISOString();
+  const allowanceSpend = await spendReplyAllowance({ serviceClient, profile: senderProfile, conversationId });
+  if (allowanceSpend.error) return allowanceSpend.error;
 
   const { error: messageError } = await serviceClient.from("messages").insert({
     conversation_id: conversationId,
-    sender_profile_id: senderProfileId,
+    sender_profile_id: senderProfile.id,
     body
   });
 
@@ -127,7 +388,7 @@ async function appendMessageToExistingThread(params: {
       .from("conversation_participants")
       .update({ last_seen_at: now })
       .eq("conversation_id", conversationId)
-      .eq("profile_id", senderProfileId)
+      .eq("profile_id", senderProfile.id)
   ]);
 
   return null;
@@ -135,19 +396,25 @@ async function appendMessageToExistingThread(params: {
 
 async function createThread(params: {
   serviceClient: ServiceClient;
-  createdBy: string;
+  senderProfile: Profile;
   subject: string;
   teamId: string | null;
   participantIds: string[];
   initialMessage?: string;
   errorPath: string;
 }) {
-  const { serviceClient, createdBy, subject, teamId, participantIds, initialMessage, errorPath } = params;
+  const { serviceClient, senderProfile, subject, teamId, participantIds, initialMessage, errorPath } = params;
+  const createdBy = senderProfile.id;
   const uniqueParticipantIds = Array.from(new Set([createdBy, ...participantIds].filter(Boolean)));
   const now = new Date().toISOString();
 
   if (uniqueParticipantIds.length < 2) {
     redirect(`${errorPath}?error=That conversation needs both a player and a club contact.`);
+  }
+
+  const tokenError = await spendConversationToken({ serviceClient, profile: senderProfile });
+  if (tokenError) {
+    redirect(`${errorPath}?error=${encodeURIComponent(tokenError)}`);
   }
 
   const { data: conversation, error: conversationError } = await serviceClient
@@ -177,6 +444,17 @@ async function createThread(params: {
 
   if (participantsError) {
     redirect(`${errorPath}?error=${encodeURIComponent(participantsError.message)}`);
+  }
+
+  const allowanceError = await grantReplyAllowance({
+    serviceClient,
+    profile: senderProfile,
+    conversationId: conversation.id,
+    startedWithToken: true
+  });
+
+  if (allowanceError) {
+    redirect(`${errorPath}?error=${encodeURIComponent(allowanceError)}`);
   }
 
   if (initialMessage) {
@@ -255,7 +533,7 @@ export async function startConversationAction(formData: FormData) {
       const messageError = await appendMessageToExistingThread({
         serviceClient,
         conversationId: existingConversationId,
-        senderProfileId: profile.id,
+        senderProfile: profile,
         body: initialMessage
       });
       if (messageError) {
@@ -265,7 +543,7 @@ export async function startConversationAction(formData: FormData) {
     } else {
       conversationId = await createThread({
         serviceClient,
-        createdBy: profile.id,
+        senderProfile: profile,
         subject,
         teamId: connectedTeamId,
         participantIds,
@@ -280,12 +558,16 @@ export async function startConversationAction(formData: FormData) {
 
     const { data: team } = await serviceClient
       .from("teams")
-      .select("id, name")
+      .select("id, name, direct_messaging_enabled")
       .eq("id", teamId)
-      .maybeSingle<{ id: string; name: string }>();
+      .maybeSingle<{ id: string; name: string; direct_messaging_enabled: boolean | null }>();
 
     if (!team) {
       redirect("/messages?error=Club not found.");
+    }
+
+    if (team.direct_messaging_enabled === false) {
+      redirect("/messages?error=This club is not receiving direct messages right now. Use Express interest instead.");
     }
 
     const participantIds = await getClubParticipantIds(serviceClient, team.id);
@@ -301,7 +583,7 @@ export async function startConversationAction(formData: FormData) {
       const messageError = await appendMessageToExistingThread({
         serviceClient,
         conversationId: existingConversationId,
-        senderProfileId: profile.id,
+        senderProfile: profile,
         body: initialMessage
       });
       if (messageError) {
@@ -311,7 +593,7 @@ export async function startConversationAction(formData: FormData) {
     } else {
       conversationId = await createThread({
         serviceClient,
-        createdBy: profile.id,
+        senderProfile: profile,
         subject: subject || `Message to ${team.name}`,
         teamId: team.id,
         participantIds,
@@ -334,7 +616,7 @@ interface SentMessage {
 
 export async function sendMessageAction(
   formData: FormData
-): Promise<{ ok: true; message: SentMessage } | { ok: false; error?: string }> {
+): Promise<{ ok: true; message: SentMessage; replyAllowanceRemaining: number | null } | { ok: false; error?: string }> {
   const { profile } = await getAuthenticatedProfile();
 
   if (!profile?.onboarding_complete) {
@@ -377,6 +659,31 @@ export async function sendMessageAction(
     return { ok: false, error: "Messages are only available between player and club accounts." };
   }
 
+  if (profile.role === "player") {
+    const { data: conversation } = await serviceClient
+      .from("conversations")
+      .select("team_id")
+      .eq("id", conversationId)
+      .maybeSingle<{ team_id: string | null }>();
+
+    if (conversation?.team_id) {
+      const { data: team } = await serviceClient
+        .from("teams")
+        .select("direct_messaging_enabled")
+        .eq("id", conversation.team_id)
+        .maybeSingle<{ direct_messaging_enabled: boolean | null }>();
+
+      if (team?.direct_messaging_enabled === false) {
+        return { ok: false, error: "This club is not receiving direct messages right now. Use Express interest instead." };
+      }
+    }
+  }
+
+  const allowanceSpend = await spendReplyAllowance({ serviceClient, profile, conversationId });
+  if (allowanceSpend.error) {
+    return { ok: false, error: allowanceSpend.error };
+  }
+
   const { data: message, error } = await serviceClient
     .from("messages")
     .insert({
@@ -402,7 +709,7 @@ export async function sendMessageAction(
   ]);
   revalidatePath("/messages");
   revalidatePath(`/messages/${conversationId}`);
-  return { ok: true, message };
+  return { ok: true, message, replyAllowanceRemaining: allowanceSpend.repliesRemaining };
 }
 
 export async function markConversationReadAction(conversationId: string) {
@@ -502,6 +809,20 @@ export async function contactClubAction(formData: FormData) {
   }
 
   const serviceClient = createSupabaseServiceRoleClient();
+  const { data: team } = await serviceClient
+    .from("teams")
+    .select("id, direct_messaging_enabled")
+    .eq("id", teamId)
+    .maybeSingle<{ id: string; direct_messaging_enabled: boolean | null }>();
+
+  if (!team) {
+    redirect("/scouts?error=Club not found.");
+  }
+
+  if (team.direct_messaging_enabled === false) {
+    redirect(`/scouts/${scoutId}?error=This club is not receiving direct messages right now. Use Express interest instead.`);
+  }
+
   // Prevent club members from messaging their own club
   const { data: selfMembership } = await serviceClient
     .from("club_members")
@@ -528,7 +849,7 @@ export async function contactClubAction(formData: FormData) {
     const messageError = await appendMessageToExistingThread({
       serviceClient,
       conversationId: existingConversationId,
-      senderProfileId: profile.id,
+      senderProfile: profile,
       body: message
     });
     if (messageError) {
@@ -538,7 +859,7 @@ export async function contactClubAction(formData: FormData) {
   } else {
     conversationId = await createThread({
       serviceClient,
-      createdBy: profile.id,
+      senderProfile: profile,
       subject: `Message from ${profile.display_name}`,
       teamId,
       participantIds,

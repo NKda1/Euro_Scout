@@ -202,7 +202,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     redirect(`/profiles/${player.profile_id}`);
   }
 
-  if (user && user.id !== player.profile_id) {
+  if (user && user.id !== player.profile_id && currentProfile?.role !== "admin") {
     await serviceClient
       .from("player_profile_views")
       .upsert(
@@ -222,7 +222,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
 
   const { data: filmLinks } = await serviceClient
     .from("film_links")
-    .select("id, url, provider, film_type, label, is_default")
+    .select("id, url, provider, film_type, label, thumbnail_url, is_default")
     .eq("player_profile_id", player.id)
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: false })

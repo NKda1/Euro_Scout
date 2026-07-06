@@ -19,4 +19,5 @@ export interface Team {
   contact_email?: string | null;
   open_roster_spots?: number | null;
   recruiting_active?: boolean | null;
+  direct_messaging_enabled?: boolean | null;
 }

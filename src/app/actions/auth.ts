@@ -11,6 +11,20 @@ const MAX_EMAIL_LENGTH = 254;   // RFC 5321
 const MAX_PASSWORD_LENGTH = 72; // bcrypt effective max
 const MAX_NAME_LENGTH = 100;
 
+function safeNextPath(value: FormDataEntryValue | string | null | undefined, fallback = "/welcome") {
+  const next = String(value ?? "").trim();
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return fallback;
+  return next;
+}
+
+function authPathWithParams(path: string, params: Record<string, string | undefined>) {
+  const url = new URL(path, "http://euro-scout.local");
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+  });
+  return `${url.pathname}${url.search}`;
+}
+
 function getRequired(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   if (!value) throw new Error(`${key} is required`);
@@ -27,16 +41,22 @@ async function checkAuthRateLimit(action: string, redirectPath: string) {
   }
 }
 
-async function emailAlreadyRegistered(email: string) {
+async function getRequestBaseUrl() {
+  const headerStore = await headers();
+  return headerStore.get("origin") ?? getBaseUrl();
+}
+
+async function emailAlreadyRegistered(email: string, next: string) {
   const serviceClient = createSupabaseServiceRoleClient();
   const normalizedEmail = email.trim().toLowerCase();
   const perPage = 1000;
+  const signUpPath = authPathWithParams("/auth/sign-up", { next });
 
   for (let page = 1; page <= 10; page += 1) {
     const { data, error } = await serviceClient.auth.admin.listUsers({ page, perPage });
 
     if (error) {
-      redirect(`/auth/sign-up?error=${encodeURIComponent("We could not verify that email. Please try again.")}`);
+      redirect(authPathWithParams(signUpPath, { error: "We could not verify that email. Please try again." }));
     }
 
     const users = data.users ?? [];
@@ -44,34 +64,37 @@ async function emailAlreadyRegistered(email: string) {
     if (users.length < perPage) return false;
   }
 
-  redirect(`/auth/sign-up?error=${encodeURIComponent("We could not verify that email. Please contact support.")}`);
+  redirect(authPathWithParams(signUpPath, { error: "We could not verify that email. Please contact support." }));
 }
 
 export async function signUpAction(formData: FormData) {
   await checkAuthRateLimit("sign-up", "/auth/sign-up");
   const supabase = await createSupabaseServerClient();
+  const baseUrl = await getRequestBaseUrl();
   const email = getRequired(formData, "email");
   const password = getRequired(formData, "password");
   const confirmPassword = String(formData.get("confirm_password") ?? "");
   const displayName = getRequired(formData, "display_name");
+  const next = safeNextPath(formData.get("next"), "/welcome");
+  const signUpPath = authPathWithParams("/auth/sign-up", { next });
 
   if (email.length > MAX_EMAIL_LENGTH) {
-    redirect(`/auth/sign-up?error=${encodeURIComponent("Invalid email address.")}`);
+    redirect(authPathWithParams(signUpPath, { error: "Invalid email address." }));
   }
   if (displayName.length > MAX_NAME_LENGTH) {
-    redirect(`/auth/sign-up?error=${encodeURIComponent(`Display name must be ${MAX_NAME_LENGTH} characters or fewer.`)}`);
+    redirect(authPathWithParams(signUpPath, { error: `Display name must be ${MAX_NAME_LENGTH} characters or fewer.` }));
   }
   if (password.length > MAX_PASSWORD_LENGTH) {
-    redirect(`/auth/sign-up?error=${encodeURIComponent(`Password must be ${MAX_PASSWORD_LENGTH} characters or fewer.`)}`);
+    redirect(authPathWithParams(signUpPath, { error: `Password must be ${MAX_PASSWORD_LENGTH} characters or fewer.` }));
   }
   if (password !== confirmPassword) {
-    redirect(`/auth/sign-up?error=${encodeURIComponent("Passwords do not match.")}`);
+    redirect(authPathWithParams(signUpPath, { error: "Passwords do not match." }));
   }
   if (password.length < 6) {
-    redirect(`/auth/sign-up?error=${encodeURIComponent("Password must be at least 6 characters.")}`);
+    redirect(authPathWithParams(signUpPath, { error: "Password must be at least 6 characters." }));
   }
-  if (await emailAlreadyRegistered(email)) {
-    redirect(`/auth/sign-up?error=${encodeURIComponent("That email already has an account. Sign in or reset your password instead.")}`);
+  if (await emailAlreadyRegistered(email, next)) {
+    redirect(authPathWithParams("/auth/sign-in", { next, error: "That email already has an account. Sign in or reset your password instead." }));
   }
 
   const { error } = await supabase.auth.signUp({
@@ -81,15 +104,15 @@ export async function signUpAction(formData: FormData) {
       data: {
         display_name: displayName
       },
-      emailRedirectTo: `${getBaseUrl()}/auth/callback?next=/welcome`
+      emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`
     }
   });
 
   if (error) {
-    redirect(`/auth/sign-up?error=${encodeURIComponent(error.message)}`);
+    redirect(authPathWithParams(signUpPath, { error: error.message }));
   }
 
-  redirect("/auth/sign-in?notice=Check your email to confirm your account, then sign in.");
+  redirect(authPathWithParams("/auth/sign-in", { next, notice: "Check your email to confirm your account, then sign in." }));
 }
 
 export async function signInAction(formData: FormData) {
@@ -97,22 +120,23 @@ export async function signInAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const email = getRequired(formData, "email");
   const password = getRequired(formData, "password");
-  const next = String(formData.get("next") ?? "/welcome");
+  const next = safeNextPath(formData.get("next"), "/welcome");
 
   if (email.length > MAX_EMAIL_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
-    redirect(`/auth/sign-in?error=${encodeURIComponent("Invalid credentials.")}`);
+    redirect(authPathWithParams("/auth/sign-in", { next, error: "Invalid credentials." }));
   }
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    redirect(`/auth/sign-in?error=${encodeURIComponent(error.message)}`);
+    redirect(authPathWithParams("/auth/sign-in", { next, error: error.message }));
   }
-  redirect(next.startsWith("/") ? next : "/dashboard");
+  redirect(next);
 }
 
 export async function forgotPasswordAction(formData: FormData) {
   await checkAuthRateLimit("forgot-password", "/auth/forgot-password");
   const supabase = await createSupabaseServerClient();
+  const baseUrl = await getRequestBaseUrl();
   const email = getRequired(formData, "email");
 
   if (email.length > MAX_EMAIL_LENGTH) {
@@ -120,7 +144,7 @@ export async function forgotPasswordAction(formData: FormData) {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${getBaseUrl()}/auth/reset-password`
+    redirectTo: `${baseUrl}/auth/reset-password`
   });
 
   if (error) {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { startConversationAction } from "@/app/actions/messages";
+import { requestPlayerCallAction } from "@/app/actions/meetings";
 import { createPlayerProfileNoteAction } from "@/app/actions/player-notes";
 import { reportProfileAction } from "@/app/actions/profile-reports";
 import HudlFilmViewer, { type FilmLink } from "@/components/players/HudlFilmViewer";
@@ -8,6 +9,7 @@ import PublicNotesPanel, { type PublicPlayerNote } from "@/components/players/Pu
 import CareerStatsPanel from "@/components/profiles/CareerStatsPanel";
 import CombineMetricsPanel from "@/components/profiles/CombineMetricsPanel";
 import PlayerMeasureGrid from "@/components/profiles/PlayerMeasureGrid";
+import ShareProfileButton from "@/components/profiles/ShareProfileButton";
 import TrustSignals, { lastActiveLabel } from "@/components/ui/TrustSignals";
 import { roleLabel, type Profile } from "@/lib/auth";
 import { campusPipelines, getCampusTeam } from "@/lib/campus-to-pro";
@@ -26,6 +28,7 @@ interface ProfileSummaryProps {
   publicNotes?: PublicPlayerNote[];
   viewerTeamId?: string | null;
   isWatchlistedByViewerClub?: boolean;
+  sharePath?: string;
 }
 
 type SummaryField = [string, unknown];
@@ -100,13 +103,14 @@ export default function ProfileSummary({
   showEditLink,
   showMessageButton,
   showReportButton,
-  backHref = "/profiles",
-  backLabel = "Back to profiles",
+  backHref = "/players",
+  backLabel = "Back to players",
   filmLinks = [],
   careerEntries = [],
   publicNotes = [],
   viewerTeamId = null,
-  isWatchlistedByViewerClub = false
+  isWatchlistedByViewerClub = false,
+  sharePath
 }: ProfileSummaryProps) {
   const currentTeamId = stringValue(roleProfile?.current_team_id || roleProfile?.team_id);
   const campusTeam = getCampusTeam(currentTeamId);
@@ -125,6 +129,7 @@ export default function ProfileSummary({
   const location = profile.location ?? currentTeam?.country ?? "Europe";
   const completion = Math.min(100, 35 + (profile.bio ? 20 : 0) + filmLinks.length * 10 + photoUrls.length * 5);
   const sortedCareerEntries = [...careerEntries].sort((a, b) => (a.start_year ?? 0) - (b.start_year ?? 0));
+  const resolvedSharePath = sharePath ?? (isPlayer ? `/players/${profile.id}` : `/profiles/${profile.id}`);
 
   const stats: SummaryField[] = [
         ["Role", roleLabel(profile.role)],
@@ -147,16 +152,11 @@ export default function ProfileSummary({
 
   return (
     <article className="overflow-hidden bg-white text-slate-950 dark:bg-[#090909] dark:text-white">
-      <section className="border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#101010]">
-        <div className="mx-auto max-w-[110rem] px-4 py-3 sm:px-6 lg:px-8">
-          <Link href={backHref} className="inline-flex h-11 items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/30 dark:hover:border-red-500/50 dark:hover:text-white">
+      <header className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#120807]">
+        <div className="mx-auto max-w-[110rem] px-4 py-6 sm:px-6 lg:px-8">
+          <Link href={backHref} className="mb-5 inline-flex h-10 items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white">
             ← {backLabel}
           </Link>
-        </div>
-      </section>
-
-      <header className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#120807]">
-        <div className="mx-auto max-w-[110rem] px-4 py-7 sm:px-6 lg:px-8">
           <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-start">
             <div>
               <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
@@ -352,6 +352,18 @@ export default function ProfileSummary({
             />
           </Panel>
 
+          <Panel eyebrow="Share">
+            <p className="mb-4 text-sm font-semibold leading-6 text-slate-500 dark:text-white/45">
+              Copy this public profile link or send it through your device share menu.
+            </p>
+            <ShareProfileButton
+              path={resolvedSharePath}
+              title={`${profile.display_name} | EuroScout Pro`}
+              text={`View ${profile.display_name} on EuroScout Pro.`}
+              className="w-full"
+            />
+          </Panel>
+
           <Panel eyebrow="Contact">
             <div className="space-y-3">
               {showMessageButton ? (
@@ -369,6 +381,31 @@ export default function ProfileSummary({
                   Sign in to message
                 </Link>
               )}
+              {isPlayer && showMessageButton && viewerTeamId ? (
+                <form action={requestPlayerCallAction} className="grid gap-3 border-t border-slate-200 pt-4 dark:border-white/10">
+                  <input type="hidden" name="target_profile_id" value={profile.id} />
+                  <input type="hidden" name="team_id" value={viewerTeamId} />
+                  <input type="hidden" name="return_to" value={`/players/${profile.id}`} />
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35">Preferred call time</span>
+                    <input name="proposed_start_at" type="datetime-local" required className="h-11 w-full border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35">Alternative time</span>
+                    <input name="proposed_alternative_at" type="datetime-local" className="h-11 w-full border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white" />
+                  </label>
+                  <textarea
+                    name="request_note"
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Agenda: role fit, contract details, film review, scholarship route..."
+                    className="w-full border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white dark:placeholder:text-white/25"
+                  />
+                  <button className="h-11 w-full border border-red-300 px-4 text-sm font-black uppercase text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-200 dark:hover:bg-red-500/10">
+                    Invite to video call
+                  </button>
+                </form>
+              ) : null}
               {isPlayer && showMessageButton && viewerTeamId ? (
                 <form action={createPlayerProfileNoteAction} className="border-t border-slate-200 pt-4 dark:border-white/10">
                   <input type="hidden" name="player_profile_id" value={String(roleProfile?.id ?? "")} />

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { signOutAction } from "@/app/actions/auth";
+import { acceptClubStaffInviteAction, declineClubStaffInviteAction } from "@/app/actions/club";
 import { restoreAdminRoleAction } from "@/app/actions/profile";
+import ShareProfileButton from "@/components/profiles/ShareProfileButton";
 import { requireOnboardedProfile, roleLabel, isReservedAdminEmail, type Profile, type UserRole } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -27,6 +29,21 @@ interface ClubMembershipSummary {
     recruiting_active: boolean | null;
     open_roster_spots: number | null;
     roster_needs: unknown;
+  } | null;
+}
+
+interface ClubStaffInviteSummary {
+  id: string;
+  team_id: string;
+  email: string;
+  club_role: string;
+  expires_at: string;
+  teams: {
+    id: string;
+    name: string;
+    city: string | null;
+    country: string | null;
+    logo_url: string | null;
   } | null;
 }
 
@@ -56,6 +73,13 @@ function initials(name: string) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short"
+  }).format(new Date(value));
 }
 
 function SettingsRow({ label, value }: { label: string; value: string }) {
@@ -180,9 +204,10 @@ function buildDashboardModel(params: {
   clubMediaCount: number;
   watchlistCount: number;
   articleCount: number;
+  articleOpenCount: number;
   pendingClubCount: number;
 }): DashboardModel {
-  const { profile, roleProfile, clubMembership, filmCount, careerCount, clubMediaCount, watchlistCount, articleCount, pendingClubCount } = params;
+  const { profile, roleProfile, clubMembership, filmCount, careerCount, clubMediaCount, watchlistCount, articleCount, articleOpenCount, pendingClubCount } = params;
   const role = profile.role as UserRole;
   const team = clubMembership?.teams ?? null;
   const playerPhotos = Array.isArray(roleProfile?.photo_urls) ? roleProfile.photo_urls.length : 0;
@@ -313,6 +338,12 @@ function buildDashboardModel(params: {
         helper: articleCount > 0 ? `${articleCount} article link${articleCount === 1 ? "" : "s"} added.` : "Add a league report, interview or external article.",
         href: "/account",
         complete: articleCount > 0
+      },
+      {
+        title: "Check article analytics",
+        helper: articleOpenCount > 0 ? `${articleOpenCount} article open${articleOpenCount === 1 ? "" : "s"} tracked.` : "Opens appear after readers click your article links.",
+        href: "/analytics",
+        complete: articleOpenCount > 0
       }
     ];
 
@@ -412,13 +443,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         .select("id", { count: "exact", head: true })
         .eq("team_id", clubMembership.team_id)
     : { count: 0 };
-  const { count: profileViewCount } = profile.role === "player"
+  const playerProfileId = profile.role === "player" && roleProfile?.id ? String(roleProfile.id) : "";
+  const { count: profileViewCount } = playerProfileId
     ? await serviceClient
         .from("player_profile_views")
         .select("id", { count: "exact", head: true })
-        .eq("viewed_profile_id", profile.id)
+        .eq("player_profile_id", playerProfileId)
+        .neq("viewer_role", "admin")
     : { count: 0 };
-  const playerProfileId = profile.role === "player" && roleProfile?.id ? String(roleProfile.id) : "";
   const { count: filmCount } = playerProfileId
     ? await serviceClient.from("film_links").select("id", { count: "exact", head: true }).eq("player_profile_id", playerProfileId)
     : { count: 0 };
@@ -431,9 +463,38 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const { count: articleCount } = profile.role === "journalist"
     ? await serviceClient.from("journalist_articles").select("id", { count: "exact", head: true }).eq("journalist_profile_id", profile.id)
     : { count: 0 };
+  const { count: articleOpenCount } = profile.role === "journalist"
+    ? await serviceClient.from("journalist_article_clicks").select("id", { count: "exact", head: true }).eq("journalist_profile_id", profile.id)
+    : { count: 0 };
   const { count: pendingClubCount } = profile.role === "admin"
     ? await serviceClient.from("teams").select("id", { count: "exact", head: true }).eq("claim_status", "pending")
     : { count: 0 };
+  const normalizedUserEmail = user.email?.trim().toLowerCase() ?? "";
+  const { data: pendingStaffInvites } = profile.role === "club" && normalizedUserEmail
+    ? await serviceClient
+        .from("club_staff_invites")
+        .select(
+          `
+            id,
+            team_id,
+            email,
+            club_role,
+            expires_at,
+            teams!team_id (
+              id,
+              name,
+              city,
+              country,
+              logo_url
+            )
+          `
+        )
+        .eq("email", normalizedUserEmail)
+        .eq("status", "pending")
+        .gte("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .returns<ClubStaffInviteSummary[]>()
+    : { data: [] as ClubStaffInviteSummary[] };
   const publicProfileHref =
     profile.role === "player"
       ? `/players/${profile.id}`
@@ -449,6 +510,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     clubMediaCount: clubMediaCount ?? 0,
     watchlistCount: watchlistCount ?? 0,
     articleCount: articleCount ?? 0,
+    articleOpenCount: articleOpenCount ?? 0,
     pendingClubCount: pendingClubCount ?? 0
   });
 
@@ -500,6 +562,46 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </form>
           ) : null}
 
+          {(pendingStaffInvites ?? []).length ? (
+            <section className="border border-red-200 bg-red-50 p-5 dark:border-red-500/30 dark:bg-red-500/10">
+              <p className="text-sm font-black uppercase tracking-[0.16em] text-red-600 dark:text-red-200">Club staff invite</p>
+              <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">Join your organisation.</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-red-100/70">
+                A club has invited this email to join its EuroScout staff account. Accepting will connect your profile to the club workbench.
+              </p>
+              <div className="mt-5 grid gap-3">
+                {(pendingStaffInvites ?? []).map((invite) => (
+                  <div key={invite.id} className="border border-red-200 bg-white p-4 dark:border-red-500/25 dark:bg-black/20">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-base font-black text-slate-950 dark:text-white">{invite.teams?.name ?? "Club account"}</p>
+                        <p className="mt-1 text-sm font-semibold capitalize text-slate-500 dark:text-red-100/60">
+                          {invite.club_role.replace("_", " ")} · expires {formatShortDate(invite.expires_at)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <form action={acceptClubStaffInviteAction}>
+                          <input type="hidden" name="invite_id" value={invite.id} />
+                          <input type="hidden" name="return_to" value="/dashboard" />
+                          <button className="h-10 bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
+                            Join club
+                          </button>
+                        </form>
+                        <form action={declineClubStaffInviteAction}>
+                          <input type="hidden" name="invite_id" value={invite.id} />
+                          <input type="hidden" name="return_to" value="/dashboard" />
+                          <button className="h-10 border border-slate-200 bg-white px-4 text-xs font-black uppercase text-slate-600 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-transparent dark:text-red-100/60">
+                            Decline
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <ReadinessPanel model={dashboardModel} />
 
           <section>
@@ -512,6 +614,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <OverviewMetric label="Watchlists" value={String(watchlistCount ?? 0)} helper={clubMembership?.teams?.name ?? "No club connected"} />
               ) : profile.role === "player" ? (
                 <OverviewMetric label="Views" value={String(profileViewCount ?? 0)} helper="Profile visits" />
+              ) : profile.role === "journalist" ? (
+                <OverviewMetric label="Article opens" value={String(articleOpenCount ?? 0)} helper={`${articleCount ?? 0} article link${articleCount === 1 ? "" : "s"}`} />
               ) : (
                 <OverviewMetric label="Email" value={user.email ? "Connected" : "Missing"} helper={user.email ?? "Not available"} />
               )}
@@ -522,8 +626,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <p className="text-sm font-black uppercase tracking-[0.16em] text-red-500">Tools</p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <ActionLink href={publicProfileHref} title="Public profile preview" helper="See the profile exactly as other users see it." primary />
-              <ActionLink href="/analytics" title="Analytics" helper="Track profile views, film attention and recruiting signals." />
-              <ActionLink href="/messages" title="Messages" helper="Open club-player conversations and unread replies." />
+              <ActionLink href="/analytics" title="Analytics" helper={profile.role === "journalist" ? "Track article opens, readers and link performance." : "Track profile views, film attention and recruiting signals."} />
+              {profile.role !== "admin" ? (
+                <ActionLink href="/messages" title="Messages" helper="Open club-player conversations and unread replies." />
+              ) : null}
               <ActionLink href="/account" title="Edit account fields" helper="Update photos, media, stats and public profile content." />
               {profile.role === "club" ? (
                 <>
@@ -551,6 +657,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 Sign out
               </button>
             </form>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a]">
+            <p className="text-sm font-black uppercase text-red-500">Share Profile</p>
+            <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-white/45">
+              Send your public EuroScout profile to clubs, players, readers or staff contacts.
+            </p>
+            <ShareProfileButton
+              path={publicProfileHref}
+              title={`${profile.display_name} | EuroScout Pro`}
+              text={`View ${profile.display_name} on EuroScout Pro.`}
+              variant="solid"
+              className="mt-5 w-full"
+            />
           </section>
         </aside>
       </section>

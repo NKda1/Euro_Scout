@@ -1,77 +1,32 @@
 import type { Metadata } from "next";
 import TeamDirectory from "@/components/teams/TeamDirectory";
-import { teams, type MarketTier } from "@/lib/data";
+import { teams } from "@/lib/data";
+import { mergeDirectoryLeagues, type DbLeagueForDirectory } from "@/lib/directory-data";
+import { dbTeamToDirectoryTeam, type DbTeamForDirectory } from "@/lib/europe";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import type { Team } from "@/types";
 
 export const metadata: Metadata = {
   title: "Team Directories | EuroScout Pro",
   description: "Browse the European American football team directories indexed by EuroScout Pro."
 };
 
-interface DbTeamRow {
-  id: string;
-  name: string;
-  slug: string;
-  league_id: string;
-  region_id: string;
-  city: string;
-  country: string;
-  division: string | null;
-  stadium: string | null;
-  logo_url: string | null;
-  tier: number | null;
-  claim_status: Team["claim_status"] | null;
-  claimed_at: string | null;
-  claim_expires_at: string | null;
-  claimed_by: string | null;
-  website: string | null;
-  contact_email: string | null;
-  open_roster_spots: number | null;
-  recruiting_active: boolean | null;
-}
-
-function tierToMarketTier(tier: number | null): MarketTier {
-  if (tier === 1) return "gold";
-  if (tier === 2) return "silver";
-  return "bronze";
-}
-
-function dbTeamToTeam(team: DbTeamRow): Team {
-  return {
-    id: team.id,
-    name: team.name,
-    city: team.city,
-    country: team.country,
-    countryFlag: "",
-    leagueId: team.league_id,
-    regionId: team.region_id,
-    marketTier: tierToMarketTier(team.tier),
-    division: team.division ?? undefined,
-    stadium: team.stadium ?? undefined,
-    logoUrl: team.logo_url ?? undefined,
-    slug: team.slug,
-    claim_status: team.claim_status ?? undefined,
-    claimed_at: team.claimed_at,
-    claim_expires_at: team.claim_expires_at,
-    claimed_by: team.claimed_by,
-    website: team.website,
-    contact_email: team.contact_email,
-    open_roster_spots: team.open_roster_spots,
-    recruiting_active: team.recruiting_active
-  };
-}
-
 export default async function TeamsPage() {
   const supabase = createSupabaseServiceRoleClient();
-  const { data: dbTeams } = await supabase
-    .from("teams")
-    .select("id, name, slug, league_id, region_id, city, country, division, stadium, logo_url, tier, claim_status, claimed_at, claim_expires_at, claimed_by, website, contact_email, open_roster_spots, recruiting_active")
-    .returns<DbTeamRow[]>();
+  const [{ data: dbTeams }, { data: dbLeagues }] = await Promise.all([
+    supabase
+      .from("teams")
+      .select("id, name, slug, league_id, region_id, city, country, division, stadium, logo_url, tier, claim_status, claimed_at, claim_expires_at, claimed_by, website, contact_email, open_roster_spots, recruiting_active")
+      .returns<DbTeamForDirectory[]>(),
+    supabase
+      .from("leagues")
+      .select("id, name, slug, country_scope, region_ids, tier, status, team_count, description, short_code")
+      .returns<DbLeagueForDirectory[]>()
+  ]);
 
   const mergedTeams = Array.from(
-    new Map([...teams, ...(dbTeams ?? []).map(dbTeamToTeam)].map((team) => [team.id, team])).values()
+    new Map([...teams, ...(dbTeams ?? []).map(dbTeamToDirectoryTeam).filter((team): team is NonNullable<typeof team> => Boolean(team))].map((team) => [team.id, team])).values()
   );
+  const mergedLeagues = mergeDirectoryLeagues(dbLeagues ?? [], mergedTeams);
 
   return (
     <main className="app-surface">
@@ -83,7 +38,7 @@ export default async function TeamsPage() {
             Browse clubs by city and country across EuroScout Pro.
           </p>
         </div>
-        <TeamDirectory teams={mergedTeams} />
+        <TeamDirectory teams={mergedTeams} leagues={mergedLeagues} />
       </section>
     </main>
   );

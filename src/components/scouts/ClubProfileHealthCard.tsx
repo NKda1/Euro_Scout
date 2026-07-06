@@ -6,6 +6,8 @@ interface ClubProfileHealthCardProps {
   isVerified: boolean;
 }
 
+const MAX_CLUB_PHOTOS = 4;
+
 export default function ClubProfileHealthCard({
   hasBio,
   hasWebsite,
@@ -21,7 +23,7 @@ export default function ClubProfileHealthCard({
   const rows: HealthRow[] = [
     ["Completeness", `${completeness}%`, completeness >= 80 ? "good" : completeness >= 40 ? "neutral" : "bad"],
     ["Team Video", hasVideo ? "Added" : "Missing", hasVideo ? "good" : "bad"],
-    ["Photos", `${photoCount} / 3`, photoCount >= 3 ? "good" : photoCount > 0 ? "neutral" : "bad"],
+    ["Photos", `${photoCount} / ${MAX_CLUB_PHOTOS}`, photoCount >= MAX_CLUB_PHOTOS ? "good" : photoCount > 0 ? "neutral" : "bad"],
     ["Website", hasWebsite ? "Added" : "Missing", hasWebsite ? "good" : "bad"],
     ["Verified", isVerified ? "Yes" : "Pending", isVerified ? "good" : "neutral"]
   ];

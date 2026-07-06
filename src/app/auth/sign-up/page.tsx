@@ -10,15 +10,17 @@ export const metadata: Metadata = {
 interface SignUpPageProps {
   searchParams: Promise<{
     error?: string;
+    email?: string;
+    next?: string;
   }>;
 }
 
 export default async function SignUpPage({ searchParams }: SignUpPageProps) {
-  const { error } = await searchParams;
+  const { error, email, next } = await searchParams;
 
   return (
     <AuthShell eyebrow="Create Account" title="Join the European football network.">
-      <SignUpForm error={error} />
+      <SignUpForm error={error} defaultEmail={email} next={next} />
     </AuthShell>
   );
 }

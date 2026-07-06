@@ -26,6 +26,9 @@ export default function TeamCard({ team }: { team: Team }) {
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
             {team.city}, {team.country}
           </p>
+          {team.division ? (
+            <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.14em] text-red-600 dark:text-red-300">{team.division}</p>
+          ) : null}
         </div>
       </div>
     </Link>

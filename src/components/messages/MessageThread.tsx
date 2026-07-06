@@ -22,6 +22,9 @@ interface MessageThreadProps {
   participantReadStates: ParticipantReadState[];
   currentProfileId: string;
   currentRole: string;
+  isPremiumMessaging: boolean;
+  replyAllowanceLimit: number;
+  replyAllowanceRemaining: number | null;
   isAdminAudit: boolean;
   flagged?: boolean;
 }
@@ -51,12 +54,16 @@ export default function MessageThread({
   participantReadStates,
   currentProfileId,
   currentRole,
+  isPremiumMessaging,
+  replyAllowanceLimit,
+  replyAllowanceRemaining,
   isAdminAudit,
   flagged
 }: MessageThreadProps) {
   const [messages, setMessages] = useState<Message[]>(sortMessages(initialMessages));
   const [profileMap] = useState<Map<string, Profile>>(new Map(profiles.map((p) => [p.id, p])));
   const [readStates, setReadStates] = useState<ParticipantReadState[]>(participantReadStates);
+  const [remainingReplies, setRemainingReplies] = useState<number | null>(replyAllowanceRemaining);
   const [body, setBody] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -162,6 +169,7 @@ export default function MessageThread({
 
     const result = await sendMessageAction(formData);
     if (result.ok) {
+      setRemainingReplies(result.replyAllowanceRemaining);
       setMessages((prev) => {
         const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
         if (withoutOptimistic.some((message) => message.id === result.message.id)) {
@@ -226,6 +234,14 @@ export default function MessageThread({
       {flagged && (
         <div className="mx-4 mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-xs font-bold text-green-700 dark:border-green-400/30 dark:bg-green-500/10 dark:text-green-200 sm:mx-6">
           Contact flagged. The admin team will review your report.
+        </div>
+      )}
+
+      {!isAdminAudit && (
+        <div className="mx-4 mt-4 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 sm:mx-6">
+          {isPremiumMessaging
+            ? "Premium messaging: unlimited replies in this conversation."
+            : `${remainingReplies ?? replyAllowanceLimit}/${replyAllowanceLimit} free replies left in this conversation.`}
         </div>
       )}
 

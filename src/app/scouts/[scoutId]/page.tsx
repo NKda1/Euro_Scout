@@ -7,9 +7,11 @@ import { getLeagueByIdOrSlug } from "@/lib/data";
 import { campusPipelines, isCampusPipeline } from "@/lib/campus-to-pro";
 import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMediaSection";
 import ContactClubButton from "@/components/scouts/ContactClubButton";
+import ScheduleClubCallButton from "@/components/scouts/ScheduleClubCallButton";
 import ClubPipelineSection, { type PipelinePlayer } from "@/components/scouts/ClubPipelineSection";
 import ClubProfileHealthCard from "@/components/scouts/ClubProfileHealthCard";
 import ClubStatsVisualPanel from "@/components/scouts/ClubStatsVisualPanel";
+import ShareProfileButton from "@/components/profiles/ShareProfileButton";
 import TrustSignals, { lastActiveLabel } from "@/components/ui/TrustSignals";
 import { flagClubAccountAction } from "@/app/actions/club-flags";
 import { absoluteUrl, jsonLdScript, truncateMeta } from "@/lib/seo";
@@ -103,6 +105,7 @@ interface ClubTeam {
   website: string | null;
   contact_email: string | null;
   pipeline_names_public: boolean;
+  direct_messaging_enabled: boolean;
   claimed_by: string | null;
   updated_at: string;
 }
@@ -181,6 +184,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     logo_url, recruiting_active, open_roster_spots, roster_needs,
     pass_run_percentage, passing_yards, rushing_yards, touchdowns_scored,
     league_position, website, contact_email, pipeline_names_public,
+    direct_messaging_enabled,
     claimed_by, updated_at
   `;
   const memberSelect = `
@@ -190,7 +194,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     teams!team_id (${teamSelect}),
     profiles!profile_id (
       id, role, display_name, headline, bio, location,
-      avatar_url, is_public, onboarding_complete, created_at, updated_at
+                    avatar_url, account_tier, premium_expires_at, is_public, onboarding_complete, created_at, updated_at
     )
   `;
 
@@ -370,8 +374,9 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
   const isAuthenticated = Boolean(user);
   const staff = staffRows ?? [];
   const hasClubInbox = staff.length > 0;
+  const directMessagingEnabled = team?.direct_messaging_enabled !== false;
   const canContact = isAuthenticated && viewerRole === "player" && !isMember && Boolean(teamId);
-  const canMessageClub = canContact && hasClubInbox;
+  const canMessageClub = canContact && hasClubInbox && directMessagingEnabled;
   const canFlagClub = Boolean(teamId && isAuthenticated && !isMember && ["pending", "verified"].includes(team?.claim_status ?? ""));
   const clubCanBeFlagged = Boolean(teamId && ["pending", "verified"].includes(team?.claim_status ?? ""));
   const shortlists = shortlistRows ?? [];
@@ -454,20 +459,15 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
           sameAs: team?.website ? [team.website] : undefined
         })}
       />
-      <section className="border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#101010]">
-        <div className="mx-auto max-w-[92rem] px-4 py-3 sm:px-6 lg:px-8">
-          <Link
-            href="/scouts"
-            className="inline-flex h-11 items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/30 dark:hover:border-red-500/50 dark:hover:text-white"
-          >
-            ← Back to clubs
-          </Link>
-        </div>
-      </section>
-
       <article>
         <header className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#120807]">
-          <div className="mx-auto max-w-[92rem] px-4 py-7 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-[92rem] px-4 py-6 sm:px-6 lg:px-8">
+            <Link
+              href="/scouts"
+              className="mb-5 inline-flex h-10 items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white"
+            >
+              ← Back to clubs
+            </Link>
             <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
               <div>
                 <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
@@ -618,12 +618,16 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
             <section className="border border-red-200 bg-white p-7 dark:border-red-500/25 dark:bg-[#1a1a1a]">
               <p className="mb-5 text-sm font-black uppercase text-red-500">Contact Club</p>
                 {canContact && teamId ? (
-                  <ContactClubButton
-                    scoutId={scoutId}
-                    teamId={teamId}
-                    teamName={teamName}
-                    canMessage={canMessageClub}
-                  />
+                  <div className="grid gap-3">
+                    <ContactClubButton
+                      scoutId={scoutId}
+                      teamId={teamId}
+                      teamName={teamName}
+                      canMessage={canMessageClub}
+                      messagingClosedReason={hasClubInbox && !directMessagingEnabled ? "This club is using express interest instead of direct inbox messages right now." : undefined}
+                    />
+                    <ScheduleClubCallButton scoutId={scoutId} teamId={teamId} teamName={teamName} />
+                  </div>
                 ) : isOwner ? (
                   <Link
                     href="/account"
@@ -651,6 +655,19 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                   </p>
                 )}
 
+              </section>
+
+              <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
+                <p className="text-sm font-black uppercase text-red-500">Share Club</p>
+                <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-white/45">
+                  Copy this club profile link for players, staff and external recruiting conversations.
+                </p>
+                <ShareProfileButton
+                  path={teamId ? `/scouts/${teamId}` : `/scouts/${scoutId}`}
+                  title={`${teamName} | EuroScout Pro`}
+                  text={`View ${teamName} on EuroScout Pro.`}
+                  className="mt-5 w-full"
+                />
               </section>
 
               {clubCanBeFlagged ? (

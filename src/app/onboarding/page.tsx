@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { completeOnboardingAction } from "@/app/actions/profile";
 import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
 import { getAuthenticatedProfile, isReservedAdminEmail, isUserRole, type UserRole } from "@/lib/auth";
+import { mergeDirectoryLeagues, type DbLeagueForDirectory } from "@/lib/directory-data";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Onboarding | EuroScout Pro",
@@ -26,6 +28,28 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
   if (profile?.onboarding_complete && !isAdminPreview) {
     redirect("/dashboard");
   }
+
+  const serviceClient = createSupabaseServiceRoleClient();
+  const [{ data: dbTeams }, { data: dbLeagues }] = await Promise.all([
+    serviceClient
+      .from("teams")
+      .select("id, name, city, country")
+      .order("name")
+      .returns<Array<{ id: string; name: string; city: string | null; country: string | null }>>(),
+    serviceClient
+      .from("leagues")
+      .select("id, name, slug, country_scope, region_ids, tier, status, team_count, description, short_code")
+      .order("name")
+      .returns<DbLeagueForDirectory[]>()
+  ]);
+  const availableClubTeams = (dbTeams ?? []).map((team) => ({
+    id: team.id,
+    name: team.name,
+    city: team.city ?? "",
+    country: team.country ?? "",
+    label: `${team.name} (${team.country ?? "Unknown country"})`
+  }));
+  const availableLeagues = mergeDirectoryLeagues(dbLeagues ?? []);
 
   return (
     <main className="app-surface min-h-screen">
@@ -66,6 +90,8 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
             error={error}
             initialRole={selectedRole}
             previewMode={isAdminPreview}
+            availableClubTeams={availableClubTeams}
+            availableLeagues={availableLeagues}
           />
           </div>
         </div>

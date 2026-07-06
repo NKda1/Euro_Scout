@@ -1,4 +1,8 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { deleteClubMediaAction, saveClubVideoAction, saveClubPhotoAction } from "@/app/actions/club";
+import { getEmbeddableVideoUrl, getPreviewEmbedUrl, getVideoProviderLabel, getVideoThumbnailUrl } from "@/lib/video";
 
 export interface ClubMediaRow {
   id: string;
@@ -18,42 +22,99 @@ interface ClubMediaSectionProps {
   returnTo?: string;
 }
 
+const MAX_CLUB_PHOTOS = 4;
+
 function getVideoEmbedUrl(url: string, provider: string | null): string | null {
-  if (provider === "youtube" || url.includes("youtube.com") || url.includes("youtu.be")) {
-    const match = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-    if (match) return `https://www.youtube.com/embed/${match[1]}`;
-  }
-  if (provider === "vimeo" || url.includes("vimeo.com")) {
-    const match = url.match(/vimeo\.com\/(\d+)/);
-    if (match) return `https://player.vimeo.com/video/${match[1]}`;
-  }
-  return null;
+  return getEmbeddableVideoUrl(url) ?? (provider === "youtube" || provider === "vimeo" ? getEmbeddableVideoUrl(url) : null);
 }
 
 export default function ClubMediaSection({ scoutId, teamId, media, isMember, returnTo }: ClubMediaSectionProps) {
+  const [videoPreviewActive, setVideoPreviewActive] = useState(false);
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
   const video = media.find((m) => m.media_type === "video") ?? null;
-  const photos = media.filter((m) => m.media_type === "photo").sort((a, b) => a.display_order - b.display_order);
+  const photos = useMemo(
+    () =>
+      media
+        .filter((m) => m.media_type === "photo")
+        .sort((a, b) => a.display_order - b.display_order)
+        .slice(0, MAX_CLUB_PHOTOS),
+    [media]
+  );
   const embedUrl = video ? getVideoEmbedUrl(video.url, video.provider) : null;
+  const previewEmbedUrl = video ? getPreviewEmbedUrl(video.url) : null;
+  const videoThumbnailUrl = video ? getVideoThumbnailUrl(video.url) : null;
+  const activePhoto = activePhotoIndex === null ? null : photos[activePhotoIndex] ?? null;
+
+  function showPreviousPhoto() {
+    setActivePhotoIndex((current) => {
+      if (current === null || photos.length === 0) return current;
+      return current === 0 ? photos.length - 1 : current - 1;
+    });
+  }
+
+  function showNextPhoto() {
+    setActivePhotoIndex((current) => {
+      if (current === null || photos.length === 0) return current;
+      return current === photos.length - 1 ? 0 : current + 1;
+    });
+  }
 
   const isEmpty = !video && photos.length === 0;
   if (isEmpty && !isMember) return null;
 
   return (
-    <section className="space-y-5">
+    <section className="max-w-full space-y-5 overflow-hidden">
       <p className="text-sm font-black uppercase text-red-500">Club Media</p>
 
       <div>
         {video ? (
           <div className="relative overflow-hidden rounded-lg border border-white/15 bg-[#1a1a1a]">
             {embedUrl ? (
-              <div className="aspect-video">
-                <iframe
-                  src={embedUrl}
-                  title={video.label ?? "Team video"}
-                  className="h-full w-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+              <div
+                className="aspect-video"
+                onMouseEnter={() => setVideoPreviewActive(true)}
+                onFocus={() => setVideoPreviewActive(true)}
+                onMouseLeave={() => setVideoPreviewActive(false)}
+              >
+                {videoPreviewActive && previewEmbedUrl ? (
+                  <div className="relative h-full w-full">
+                    <iframe
+                      src={previewEmbedUrl}
+                      title={`${video.label ?? "Team video"} hover preview`}
+                      className="pointer-events-none h-full w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                    <a
+                      href={video.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute bottom-5 right-5 inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-black text-slate-950 shadow-xl transition hover:bg-red-50"
+                    >
+                      Open video
+                    </a>
+                  </div>
+                ) : videoThumbnailUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setVideoPreviewActive(true)}
+                    className="group flex h-full w-full items-end bg-cover bg-center p-6 text-left"
+                    style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.82)), url(${videoThumbnailUrl})` }}
+                    aria-label={`Preview ${video.label ?? "team video"}`}
+                  >
+                    <span className="inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-black text-slate-950 shadow-xl transition group-hover:bg-red-50">
+                      Hover preview
+                    </span>
+                  </button>
+                ) : (
+                  <iframe
+                    src={embedUrl}
+                    title={video.label ?? "Team video"}
+                    className="h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                )}
               </div>
             ) : (
               <a
@@ -72,7 +133,7 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
                 {video.label && <p className="flex-1 text-base font-black text-white">{video.label}</p>}
                 {video.provider && (
                   <span className="shrink-0 rounded border border-white/15 px-3 py-1 text-xs font-bold uppercase text-white/35">
-                    {video.provider}
+                    {getVideoProviderLabel(video.provider === "youtube" || video.provider === "vimeo" || video.provider === "hudl" ? video.provider : "external")}
                   </span>
                 )}
               </div>
@@ -131,16 +192,23 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
       </div>
 
       <div>
-        <div className="grid grid-cols-3 gap-3">
-          {[0, 1, 2].map((slot) => {
+        <div className="grid max-w-full grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: MAX_CLUB_PHOTOS }).map((_, slot) => {
             const photo = photos[slot];
 
             if (photo) {
               return (
-                <div key={photo.id} className="relative aspect-[4/3] overflow-hidden rounded-lg border border-white/15">
-                  {/* Next.js <Image> not used intentionally — external URL origin is unknown at build time */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.url} alt={`Club photo ${slot + 1}`} className="h-full w-full object-cover" />
+                <div key={photo.id} className="relative aspect-[4/3] min-w-0 overflow-hidden rounded-lg border border-white/15">
+                  <button
+                    type="button"
+                    onClick={() => setActivePhotoIndex(slot)}
+                    className="absolute inset-0 transition hover:scale-[1.03]"
+                    aria-label={`Open club photo ${slot + 1}`}
+                  >
+                    {/* Next.js Image is not used because club media can point at arbitrary external origins. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.url} alt={`Club photo ${slot + 1}`} className="h-full w-full object-cover" />
+                  </button>
                   {isMember && (
                     <form action={deleteClubMediaAction} className="absolute right-1.5 top-1.5">
                       <input type="hidden" name="media_id" value={photo.id} />
@@ -165,7 +233,7 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
                 <form
                   key={`slot-${slot}`}
                   action={saveClubPhotoAction}
-                  className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 bg-[#1a1a1a] p-3"
+                  className="flex aspect-[4/3] min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 bg-[#1a1a1a] p-3"
                 >
                   <input type="hidden" name="team_id" value={teamId} />
                   <input type="hidden" name="scout_id" value={scoutId} />
@@ -177,7 +245,7 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
                     name="photo"
                     required
                     accept="image/png,image/jpeg,image/webp,image/gif"
-                    className="w-full rounded border border-white/10 bg-black/30 px-2 py-1 text-[10px] text-white file:mr-2 file:rounded file:border-0 file:bg-red-600 file:px-2 file:py-1 file:text-[10px] file:font-black file:text-white focus:border-red-500 focus:outline-none"
+                    className="max-w-full rounded border border-white/10 bg-black/30 px-2 py-1 text-[10px] text-white file:mr-2 file:rounded file:border-0 file:bg-red-600 file:px-2 file:py-1 file:text-[10px] file:font-black file:text-white focus:border-red-500 focus:outline-none"
                   />
                   <button
                     type="submit"
@@ -192,7 +260,7 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
             return (
               <div
                 key={`empty-${slot}`}
-                className="flex aspect-[4/3] items-end rounded-lg border border-dashed border-white/15 bg-[#1a1a1a] p-4"
+                className="flex aspect-[4/3] min-w-0 items-end rounded-lg border border-dashed border-white/15 bg-[#1a1a1a] p-4"
               >
                 <p className="text-xs font-black uppercase text-white/35">Photo {slot + 1}</p>
               </div>
@@ -200,6 +268,43 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
           })}
         </div>
       </div>
+
+      {activePhoto ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4" role="dialog" aria-modal="true">
+          <div className="relative w-full max-w-5xl border border-white/10 bg-[#111] p-3 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setActivePhotoIndex(null)}
+              className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/75 text-xl font-black text-white transition hover:bg-red-600"
+              aria-label="Close club photo viewer"
+            >
+              x
+            </button>
+            {photos.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={showPreviousPhoto}
+                  className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/75 text-2xl font-black text-white transition hover:bg-red-600"
+                  aria-label="Previous club photo"
+                >
+                  {"<"}
+                </button>
+                <button
+                  type="button"
+                  onClick={showNextPhoto}
+                  className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/75 text-2xl font-black text-white transition hover:bg-red-600"
+                  aria-label="Next club photo"
+                >
+                  {">"}
+                </button>
+              </>
+            ) : null}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={activePhoto.url} alt={activePhoto.label ?? "Club profile gallery"} className="max-h-[82vh] w-full object-contain" />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

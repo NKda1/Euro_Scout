@@ -36,6 +36,7 @@ interface CampusDbTeam {
   city: string | null;
   country: string | null;
   region_id: string | null;
+  division: string | null;
   recruiting_active: boolean | null;
   claim_status: string | null;
   logo_url: string | null;
@@ -109,7 +110,7 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
   const [{ data: dbTeams }, { data: players, error: playersError }, { data: userData }] = await Promise.all([
     supabase
       .from("teams")
-      .select("id, name, slug, league_id, city, country, region_id, recruiting_active, claim_status, logo_url")
+      .select("id, name, slug, league_id, city, country, region_id, division, recruiting_active, claim_status, logo_url")
       .eq("league_id", activePipeline)
       .order("name")
       .returns<CampusDbTeam[]>(),
@@ -141,6 +142,7 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
     city: team.city,
     country: team.country,
     region_id: team.regionId,
+    division: null,
     recruiting_active: true,
     claim_status: "unclaimed",
     logo_url: null
@@ -247,6 +249,7 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
             <div className="grid gap-3 md:grid-cols-2">
               {directoryTeams.map((team) => {
                 const localTeam = getCampusTeam(team.id);
+                const bucsLevelLabel = localTeam ? "BUCS Premier" : team.division ?? "BUCS submitted club";
                 return (
                   <Link key={team.id} href={`/scouts/${team.id}`} className={`${panelClass} p-4 transition hover:border-red-400/45 hover:bg-slate-50 dark:hover:bg-[#151515]`}>
                     <div className="flex items-start justify-between gap-3">
@@ -258,7 +261,9 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
                           {team.logo_url ? "" : initials(team.name)}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-600 dark:text-red-300">{localTeam?.conference ?? pipeline.label}</p>
+                          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-600 dark:text-red-300">
+                            {activePipeline === "bucs" ? bucsLevelLabel : localTeam?.conference ?? pipeline.label}
+                          </p>
                           <h3 className="mt-2 truncate text-lg font-black text-slate-950 dark:text-white">{team.name}</h3>
                           <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-white/45">{team.city}, {team.country}</p>
                         </div>
@@ -267,6 +272,11 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
                       <span className="border border-emerald-300 bg-emerald-100 px-2 py-1 text-emerald-950 shadow-sm dark:border-emerald-400/35 dark:bg-emerald-500/15 dark:text-emerald-100">{team.claim_status === "verified" ? "Verified" : "Available"}</span>
+                      {activePipeline === "bucs" ? (
+                        <span className="border border-slate-300 bg-slate-100 px-2 py-1 text-slate-800 shadow-sm dark:border-white/15 dark:bg-white/10 dark:text-white/80">
+                          {localTeam ? "Seeded Premier" : "Club-created division"}
+                        </span>
+                      ) : null}
                       {localTeam?.bilingual ? <span className="border border-red-300 bg-red-100 px-2 py-1 text-red-950 shadow-sm dark:border-red-400/35 dark:bg-red-500/15 dark:text-red-100">French useful</span> : null}
                     </div>
                   </Link>

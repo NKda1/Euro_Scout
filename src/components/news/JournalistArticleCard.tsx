@@ -47,7 +47,7 @@ export default function JournalistArticleCard({ article, leagueLabels = {} }: Jo
 
   return (
     <Link
-      href={article.article_url}
+      href={`/news/articles/${article.id}/open`}
       target="_blank"
       rel="noopener noreferrer"
       className="group flex h-full flex-col overflow-hidden border border-slate-200 bg-white shadow-sm transition hover:border-red-300 hover:bg-slate-50 dark:border-white/10 dark:bg-[#111] dark:hover:border-red-500/45 dark:hover:bg-[#151515]"

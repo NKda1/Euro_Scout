@@ -9,6 +9,8 @@ export type UserRole = (typeof userRoles)[number];
 export interface Profile {
   id: string;
   role: UserRole;
+  account_tier: "free" | "premium";
+  premium_expires_at: string | null;
   display_name: string;
   headline: string | null;
   bio: string | null;
@@ -16,6 +18,7 @@ export interface Profile {
   avatar_url: string | null;
   is_public: boolean;
   onboarding_complete: boolean;
+  welcome_tour_seen: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -64,6 +67,8 @@ export async function getAuthenticatedProfile() {
           bio: profile?.bio ?? null,
           location: profile?.location ?? null,
           avatar_url: profile?.avatar_url ?? null,
+          account_tier: "premium",
+          premium_expires_at: null,
           is_public: profile?.is_public ?? false,
           onboarding_complete: true,
           updated_at: new Date().toISOString()
@@ -74,7 +79,8 @@ export async function getAuthenticatedProfile() {
       .maybeSingle<Profile>();
 
     if (!error && adminProfile) {
-      return { supabase, user, profile: adminProfile };
+      await serviceClient.from("profiles").update({ welcome_tour_seen: true }).eq("id", user.id);
+      return { supabase, user, profile: { ...adminProfile, welcome_tour_seen: true } };
     }
   }
 
@@ -85,6 +91,11 @@ export async function requireOnboardedProfile() {
   const context = await getAuthenticatedProfile();
 
   if (!context.profile?.onboarding_complete) {
+    if (context.profile?.welcome_tour_seen) {
+      const role = context.profile.role !== "admin" ? context.profile.role : "player";
+      redirect(`/onboarding?role=${role}`);
+    }
+
     redirect("/welcome");
   }
 

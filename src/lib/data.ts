@@ -1,6 +1,7 @@
 import leaguesSeed from "@/data/leagues.seed";
 import regionsSeed from "@/data/regions.seed";
 import teamsSeed from "@/data/teams.seed";
+import { countryCodeForClubCountry } from "@/lib/club-regions";
 import type { League } from "@/types";
 
 export type MarketTier = "gold" | "silver" | "bronze";
@@ -17,19 +18,14 @@ export const marketTierLeagueIds: Record<MarketTier, string[]> = {
   bronze: []
 };
 
-const countryFlags: Record<string, string> = {
-  Austria: "🇦🇹",
-  "Czech Republic": "🇨🇿",
-  Denmark: "🇩🇰",
-  France: "🇫🇷",
-  Germany: "🇩🇪",
-  Hungary: "🇭🇺",
-  Italy: "🇮🇹",
-  Poland: "🇵🇱",
-  Spain: "🇪🇸",
-  Switzerland: "🇨🇭",
-  "United Kingdom": "🇬🇧"
-};
+function flagForCountryCode(countryCode: string | null | undefined) {
+  if (!countryCode || countryCode.length !== 2) return "🏳️";
+  return countryCode
+    .toUpperCase()
+    .split("")
+    .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+    .join("");
+}
 
 export function getMarketTierForLeague(leagueId: string): MarketTier {
   if (marketTierLeagueIds.gold.includes(leagueId)) {
@@ -44,7 +40,7 @@ export function getMarketTierForLeague(leagueId: string): MarketTier {
 }
 
 export function getFlagForCountry(country: string) {
-  return countryFlags[country] ?? "🏳️";
+  return flagForCountryCode(countryCodeForClubCountry(country));
 }
 
 export const teams = teamsSeed.map((team) => ({

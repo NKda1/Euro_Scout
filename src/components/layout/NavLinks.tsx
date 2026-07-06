@@ -8,10 +8,9 @@ import { cn } from "@/lib/utils";
 interface NavLinksProps {
   isSignedIn: boolean;
   isAdmin: boolean;
-  notificationCount?: number;
 }
 
-export default function NavLinks({ isSignedIn, isAdmin, notificationCount = 0 }: NavLinksProps) {
+export default function NavLinks({ isSignedIn, isAdmin }: NavLinksProps) {
   const pathname = usePathname();
 
   function isActive(href: string) {
@@ -41,14 +40,6 @@ export default function NavLinks({ isSignedIn, isAdmin, notificationCount = 0 }:
         <>
           <Link href={routes.messages} className={linkCls(routes.messages, "hidden xl:inline-flex")}>
             Messages
-          </Link>
-          <Link href={routes.notifications} className={linkCls(routes.notifications, "hidden 2xl:inline-flex")}>
-            Alerts
-            {notificationCount ? (
-              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-black text-white">
-                {notificationCount > 9 ? "9+" : notificationCount}
-              </span>
-            ) : null}
           </Link>
           {isAdmin && (
             <Link href={routes.admin} className={linkCls(routes.admin, "hidden 2xl:inline-flex")}>

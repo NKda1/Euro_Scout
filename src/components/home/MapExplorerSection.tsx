@@ -22,8 +22,9 @@ export default function MapExplorerSection({ regions, leagues, teams }: MapExplo
       return [];
     }
 
-    return leagues.filter((league) => league.regionIds.includes(selectedRegion.id));
-  }, [leagues, selectedRegion]);
+    const leagueIdsWithTeamsInRegion = new Set(teams.filter((team) => team.regionId === selectedRegion.id).map((team) => team.leagueId));
+    return leagues.filter((league) => league.regionIds.includes(selectedRegion.id) || leagueIdsWithTeamsInRegion.has(league.id));
+  }, [leagues, selectedRegion, teams]);
 
   const selectedTeams = useMemo(() => {
     if (!selectedRegion) {
@@ -35,7 +36,7 @@ export default function MapExplorerSection({ regions, leagues, teams }: MapExplo
 
   const availableRegions = regions.map((region) => ({
     ...region,
-    leagueCount: leagues.filter((league) => league.regionIds.includes(region.id)).length,
+    leagueCount: leagues.filter((league) => league.regionIds.includes(region.id) || teams.some((team) => team.regionId === region.id && team.leagueId === league.id)).length,
     teamCount: teams.filter((team) => team.regionId === region.id).length
   }));
 

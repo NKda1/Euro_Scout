@@ -8,9 +8,10 @@ interface ContactClubButtonProps {
   teamId: string;
   teamName: string;
   canMessage?: boolean;
+  messagingClosedReason?: string;
 }
 
-export default function ContactClubButton({ scoutId, teamId, teamName, canMessage = true }: ContactClubButtonProps) {
+export default function ContactClubButton({ scoutId, teamId, teamName, canMessage = true, messagingClosedReason }: ContactClubButtonProps) {
   const [open, setOpen] = useState(false);
 
   if (!open) {
@@ -35,7 +36,7 @@ export default function ContactClubButton({ scoutId, teamId, teamName, canMessag
           </button>
         ) : (
           <p className="border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-black/20 dark:text-white/35">
-            Direct messages open once this club account has verified staff.
+            {messagingClosedReason ?? "Direct messages open once this club account has verified staff."}
           </p>
         )}
       </div>

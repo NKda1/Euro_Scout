@@ -3,11 +3,10 @@ import Link from "next/link";
 const adminLinks = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/users", label: "Users" },
-  { href: "/admin/profiles", label: "Profiles" },
   { href: "/admin/players", label: "Players" },
+  { href: "/admin/clubs", label: "Clubs" },
   { href: "/admin/club-verification", label: "Club Verification" },
   { href: "/admin/news", label: "News" },
-  { href: "/admin/messages", label: "Messages" },
   { href: "/admin/disputes", label: "Disputes" }
 ];
 

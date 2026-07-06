@@ -1,6 +1,6 @@
 import { deleteFilmLinkAction, saveFilmLinkAction } from "@/app/actions/film";
 import type { FilmLink } from "@/components/players/HudlFilmViewer";
-import { detectVideoProvider, getEmbeddableVideoUrl, getVideoProviderLabel, normalizeVideoUrl } from "@/lib/video";
+import { detectVideoProvider, getEmbeddableVideoUrl, getVideoProviderLabel, getVideoThumbnailUrl, normalizeVideoUrl } from "@/lib/video";
 
 const inputClass = "h-11 w-full rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/25 focus:border-red-500";
 
@@ -10,6 +10,7 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
   const defaultProvider = defaultFilm ? detectVideoProvider(defaultFilm.url) : "hudl";
   const defaultProviderLabel = getVideoProviderLabel(defaultProvider);
   const defaultEmbedUrl = defaultFilm ? getEmbeddableVideoUrl(defaultFilm.url) : null;
+  const defaultThumbnailUrl = defaultFilm ? defaultFilm.thumbnail_url ?? getVideoThumbnailUrl(defaultFilm.url) : null;
 
   return (
     <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-6">
@@ -17,7 +18,17 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
 
       <div className="mt-5 overflow-hidden rounded-lg border border-white/15 bg-black/30">
         <div className="aspect-video">
-          {defaultFilm && defaultEmbedUrl ? (
+          {defaultThumbnailUrl ? (
+            <div
+              className="flex h-full items-end bg-cover bg-center p-6"
+              style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.78)), url(${defaultThumbnailUrl})` }}
+            >
+              <div>
+                <p className="text-xs font-black uppercase text-red-400">{defaultProviderLabel} thumbnail</p>
+                <p className="mt-2 text-xl font-black text-white">{defaultFilm.label ?? "Player film"}</p>
+              </div>
+            </div>
+          ) : defaultFilm && defaultEmbedUrl ? (
             <iframe
               src={defaultEmbedUrl}
               title={defaultFilm.label ?? "Player film"}
@@ -69,6 +80,7 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
           <option value="training">Training</option>
         </select>
         <input name="url" required placeholder="Hudl, YouTube or Vimeo URL" className={`${inputClass} md:col-span-2`} />
+        <input name="thumbnail_url" type="url" placeholder="Thumbnail image URL (optional)" className={`${inputClass} md:col-span-2`} />
         <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
           <input name="is_default" type="checkbox" className="h-4 w-4 rounded border-white/20 text-red-600" />
           Set as default film
@@ -82,7 +94,9 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-black text-white">{film.label ?? "Player film"}</p>
-                <p className="mt-1 text-xs font-semibold text-white/35">{film.film_type} {film.is_default ? "- Default" : ""}</p>
+                <p className="mt-1 text-xs font-semibold text-white/35">
+                  {film.film_type} {film.is_default ? "- Default" : ""} {film.thumbnail_url ? "- Thumbnail set" : ""}
+                </p>
               </div>
               <form action={deleteFilmLinkAction}>
                 <input type="hidden" name="film_id" value={film.id} />
@@ -102,6 +116,7 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
                   <option value="training">Training</option>
                 </select>
                 <input name="url" required defaultValue={film.url} placeholder="Hudl, YouTube or Vimeo URL" className={`${inputClass} md:col-span-2`} />
+                <input name="thumbnail_url" type="url" defaultValue={film.thumbnail_url ?? ""} placeholder="Thumbnail image URL (optional)" className={`${inputClass} md:col-span-2`} />
                 <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
                   <input name="is_default" type="checkbox" defaultChecked={film.is_default} className="h-4 w-4 rounded border-white/20 text-red-600" />
                   Set as default film

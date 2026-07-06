@@ -27,6 +27,9 @@ export default function TeamList({ teams, className }: TeamListProps) {
               <span className="block text-xs text-slate-500 dark:text-slate-400">
                 {team.city}, {team.country}
               </span>
+              {team.division ? (
+                <span className="mt-1 block text-[10px] font-black uppercase tracking-[0.14em] text-red-600 dark:text-red-300">{team.division}</span>
+              ) : null}
             </span>
             <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-red-600">View</span>
           </Link>

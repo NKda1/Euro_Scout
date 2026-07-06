@@ -15,6 +15,18 @@ interface CountResult {
   count: number | null;
 }
 
+export interface NotificationSummary {
+  total: number;
+  unreadMessages: number;
+  clubInterest: number;
+  profileViews: number;
+  watchlistUpdates: number;
+  adminAlerts: number;
+  callRequests: number;
+  staffInvites: number;
+  articleEngagement: number;
+}
+
 async function unreadMessagesForProfile(profile: Profile) {
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: participants } = await serviceClient
@@ -45,13 +57,28 @@ async function unreadMessagesForProfile(profile: Profile) {
   );
 }
 
-export async function getNotificationSummary(profile: Profile) {
+export async function getNotificationSummary(profile: Profile, email?: string | null): Promise<NotificationSummary> {
   const serviceClient = createSupabaseServiceRoleClient();
   const unreadMessages = await unreadMessagesForProfile(profile);
   let clubInterest = 0;
   let profileViews = 0;
   let adminAlerts = 0;
   let watchlistUpdates = 0;
+  let callRequests = 0;
+  let staffInvites = 0;
+  let articleEngagement = 0;
+  const recentCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  if (profile.role === "club" && email) {
+    const { count } = await serviceClient
+      .from("club_staff_invites")
+      .select("id", { count: "exact", head: true })
+      .eq("email", email.trim().toLowerCase())
+      .eq("status", "pending")
+      .gte("expires_at", new Date().toISOString()) as CountResult;
+
+    staffInvites = count ?? 0;
+  }
 
   if (profile.role === "club") {
     const { data: membership } = await serviceClient
@@ -72,10 +99,17 @@ export async function getNotificationSummary(profile: Profile) {
         .from("watchlist_items")
         .select("id, watchlists!inner(team_id)", { count: "exact", head: true })
         .eq("watchlists.team_id", membership.team_id)
-        .gte("added_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) as CountResult;
+        .gte("added_at", recentCutoff) as CountResult;
+
+      const { count: meetingCount } = await serviceClient
+        .from("meeting_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("team_id", membership.team_id)
+        .in("status", ["pending", "club_proposed", "accepted"]) as CountResult;
 
       clubInterest = interestCount ?? 0;
       watchlistUpdates = watchlistCount ?? 0;
+      callRequests = meetingCount ?? 0;
     }
   }
 
@@ -91,22 +125,43 @@ export async function getNotificationSummary(profile: Profile) {
         .from("player_profile_views")
         .select("id", { count: "exact", head: true })
         .eq("player_profile_id", playerProfile.id)
-        .gte("viewed_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) as CountResult;
+        .neq("viewer_role", "admin")
+        .gte("viewed_at", recentCutoff) as CountResult;
+
+      const { count: meetingCount } = await serviceClient
+        .from("meeting_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("player_profile_id", profile.id)
+        .in("status", ["pending", "club_proposed", "accepted"]) as CountResult;
 
       profileViews = count ?? 0;
+      callRequests = meetingCount ?? 0;
     }
   }
 
-  if (profile.role === "admin") {
-    const [pendingClubsResult, disputesResult] = await Promise.all([
-      serviceClient.from("teams").select("id", { count: "exact", head: true }).eq("claim_status", "pending"),
-      serviceClient.from("club_disputes").select("id", { count: "exact", head: true }).eq("status", "open")
-    ]);
+  if (profile.role === "journalist") {
+    const { count } = await serviceClient
+      .from("journalist_article_clicks")
+      .select("id", { count: "exact", head: true })
+      .eq("journalist_profile_id", profile.id)
+      .gte("clicked_at", recentCutoff) as CountResult;
 
-    adminAlerts = (pendingClubsResult.count ?? 0) + (disputesResult.count ?? 0);
+    articleEngagement = count ?? 0;
   }
 
-  const total = unreadMessages + clubInterest + profileViews + adminAlerts + watchlistUpdates;
+  if (profile.role === "admin") {
+    const [pendingClubsResult, disputesResult, reportsResult, meetingResult] = await Promise.all([
+      serviceClient.from("teams").select("id", { count: "exact", head: true }).eq("claim_status", "pending"),
+      serviceClient.from("club_disputes").select("id", { count: "exact", head: true }).eq("status", "open"),
+      serviceClient.from("profile_reports").select("id", { count: "exact", head: true }).eq("status", "open"),
+      serviceClient.from("meeting_requests").select("id", { count: "exact", head: true }).in("status", ["pending", "club_proposed"])
+    ]);
+
+    adminAlerts = (pendingClubsResult.count ?? 0) + (disputesResult.count ?? 0) + (reportsResult.count ?? 0);
+    callRequests = meetingResult.count ?? 0;
+  }
+
+  const total = unreadMessages + clubInterest + profileViews + adminAlerts + watchlistUpdates + callRequests + staffInvites + articleEngagement;
 
   return {
     total,
@@ -114,6 +169,9 @@ export async function getNotificationSummary(profile: Profile) {
     clubInterest,
     profileViews,
     watchlistUpdates,
-    adminAlerts
+    adminAlerts,
+    callRequests,
+    staffInvites,
+    articleEngagement
   };
 }

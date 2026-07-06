@@ -26,6 +26,19 @@ export default function LeagueDirectory({ leagues, teams }: { leagues: League[];
     });
   }, [leagues, marketTier, query]);
 
+  const groupedLeagues = useMemo(() => {
+    const byCountry = new Map<string, League[]>();
+
+    for (const league of filteredLeagues) {
+      const key = league.countryScope || "European market";
+      const group = byCountry.get(key) ?? [];
+      group.push(league);
+      byCountry.set(key, group);
+    }
+
+    return Array.from(byCountry.entries()).map(([countryScope, items]) => ({ countryScope, leagues: items }));
+  }, [filteredLeagues]);
+
   return (
     <section className="space-y-6">
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -46,28 +59,41 @@ export default function LeagueDirectory({ leagues, teams }: { leagues: League[];
           </select>
         </label>
       </div>
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {filteredLeagues.length > 0 ? (
-          filteredLeagues.map((league) => {
-            const leagueTeams = teams.filter((team) => team.leagueId === league.id);
+      {groupedLeagues.length > 0 ? (
+        <div className="space-y-8">
+          {groupedLeagues.map((group) => (
+            <section key={group.countryScope}>
+              <div className="mb-4 flex items-end justify-between gap-4 border-b border-slate-200 pb-3 dark:border-white/10">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Country / market</p>
+                  <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-white">{group.countryScope}</h2>
+                </div>
+                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{group.leagues.length} leagues</span>
+              </div>
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {group.leagues.map((league) => {
+                  const leagueTeams = teams.filter((team) => team.leagueId === league.id);
 
-            return (
-              <LeagueCard
-                key={league.id}
-                league={league}
-                teams={leagueTeams}
-                expanded={expandedLeagueId === league.id}
-                onViewLeague={() => setExpandedLeagueId((currentId) => (currentId === league.id ? null : league.id))}
-              />
-            );
-          })
-        ) : (
+                  return (
+                    <LeagueCard
+                      key={league.id}
+                      league={league}
+                      teams={leagueTeams}
+                      expanded={expandedLeagueId === league.id}
+                      onViewLeague={() => setExpandedLeagueId((currentId) => (currentId === league.id ? null : league.id))}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
           <div className="border border-dashed border-slate-300 bg-white p-8 text-center dark:border-white/15 dark:bg-[#111] md:col-span-2 xl:col-span-3">
             <h2 className="text-sm font-black text-slate-950 dark:text-white">No leagues found</h2>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Try a different league, country or tier.</p>
           </div>
-        )}
-      </div>
+      )}
     </section>
   );
 }

@@ -11,10 +11,15 @@ const labelClass = "text-sm font-black uppercase text-slate-600 dark:text-slate-
 
 interface SignUpFormProps {
   error?: string;
+  defaultEmail?: string;
+  next?: string;
 }
 
-export default function SignUpForm({ error }: SignUpFormProps) {
+export default function SignUpForm({ error, defaultEmail, next }: SignUpFormProps) {
   const [matchError, setMatchError] = useState<string | null>(null);
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/welcome";
+  const signInParams = new URLSearchParams({ next: safeNext });
+  if (defaultEmail) signInParams.set("email", defaultEmail);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
@@ -36,13 +41,14 @@ export default function SignUpForm({ error }: SignUpFormProps) {
         </p>
       )}
       <form action={signUpAction} onSubmit={handleSubmit} className="space-y-4">
+        <input type="hidden" name="next" value={safeNext} />
         <label className="block">
           <span className={labelClass}>Display name</span>
           <input name="display_name" required autoComplete="name" className={inputClass} />
         </label>
         <label className="block">
           <span className={labelClass}>Email</span>
-          <input name="email" type="email" required autoComplete="email" className={inputClass} />
+          <input name="email" type="email" required autoComplete="email" defaultValue={defaultEmail ?? ""} className={inputClass} />
         </label>
         <label className="block">
           <span className={labelClass}>Password</span>
@@ -58,7 +64,7 @@ export default function SignUpForm({ error }: SignUpFormProps) {
       </form>
       <p className="mt-5 text-center text-sm font-semibold text-slate-400 dark:text-slate-400">
         Already have an account?{" "}
-        <Link href="/auth/sign-in" className="font-black text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300">
+        <Link href={`/auth/sign-in?${signInParams.toString()}`} className="font-black text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300">
           Sign in
         </Link>
       </p>

@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import LeagueHeader from "@/components/leagues/LeagueHeader";
 import TeamGrid from "@/components/teams/TeamGrid";
 import { getLeagueByIdOrSlug, getTeamsForLeague, leagues, regions, type MarketTier } from "@/lib/data";
+import { dbLeagueToDirectoryLeague, groupTeamsByDivision, type DbLeagueForDirectory } from "@/lib/directory-data";
 import { absoluteUrl, jsonLdScript, truncateMeta } from "@/lib/seo";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import type { Team } from "@/types";
+import type { League, Team } from "@/types";
 
 interface LeagueDetailsPageProps {
   params: Promise<{
@@ -34,6 +35,8 @@ interface DbTeamRow {
   open_roster_spots: number | null;
   recruiting_active: boolean | null;
 }
+
+const leagueSelect = "id, name, slug, country_scope, region_ids, tier, status, team_count, description, short_code";
 
 function tierToMarketTier(tier: number | null): MarketTier {
   if (tier === 1) return "gold";
@@ -66,9 +69,26 @@ function dbTeamToTeam(team: DbTeamRow): Team {
   };
 }
 
+async function getDirectoryLeague(leagueId: string): Promise<League | null> {
+  const seededLeague = getLeagueByIdOrSlug(leagueId);
+
+  if (seededLeague) {
+    return seededLeague;
+  }
+
+  const supabase = createSupabaseServiceRoleClient();
+  const { data } = await supabase
+    .from("leagues")
+    .select(leagueSelect)
+    .or(`id.eq.${leagueId},slug.eq.${leagueId}`)
+    .maybeSingle<DbLeagueForDirectory>();
+
+  return data ? dbLeagueToDirectoryLeague(data) : null;
+}
+
 export async function generateMetadata({ params }: LeagueDetailsPageProps): Promise<Metadata> {
   const { leagueId } = await params;
-  const league = getLeagueByIdOrSlug(leagueId);
+  const league = await getDirectoryLeague(leagueId);
 
   if (!league) {
     return {
@@ -99,7 +119,7 @@ export function generateStaticParams() {
 
 export default async function LeagueDetailsPage({ params }: LeagueDetailsPageProps) {
   const { leagueId } = await params;
-  const league = getLeagueByIdOrSlug(leagueId);
+  const league = await getDirectoryLeague(leagueId);
 
   if (!league) {
     notFound();
@@ -115,6 +135,12 @@ export default async function LeagueDetailsPage({ params }: LeagueDetailsPagePro
   const leagueTeams = Array.from(
     new Map([...getTeamsForLeague(league.id), ...(dbTeams ?? []).map(dbTeamToTeam)].map((team) => [team.id, team])).values()
   );
+  const leagueForHeader = {
+    ...league,
+    teamCount: leagueTeams.length
+  };
+  const divisionGroups = groupTeamsByDivision(leagueTeams);
+  const showDivisionGroups = divisionGroups.some((group) => group.hasExplicitDivision);
   const leagueRegions = regions.filter((region) => league.regionIds.includes(region.id));
 
   return (
@@ -132,12 +158,29 @@ export default async function LeagueDetailsPage({ params }: LeagueDetailsPagePro
         })}
       />
       <section className="mx-auto max-w-[92rem] space-y-8 px-4 py-10 sm:px-6 lg:px-8">
-        <LeagueHeader league={league} />
+        <LeagueHeader league={leagueForHeader} />
 
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <div>
             <h2 className="mb-4 text-2xl font-black tracking-tight text-slate-950 dark:text-white">Teams</h2>
-            <TeamGrid teams={leagueTeams} />
+            {showDivisionGroups ? (
+              <div className="space-y-6">
+                {divisionGroups.map((group) => (
+                  <section key={group.name} className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#111]">
+                    <div className="mb-4 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Division</p>
+                        <h3 className="mt-1 text-xl font-black text-slate-950 dark:text-white">{group.name}</h3>
+                      </div>
+                      <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{group.teams.length} teams</span>
+                    </div>
+                    <TeamGrid teams={group.teams} />
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <TeamGrid teams={leagueTeams} />
+            )}
           </div>
           <aside className="glass-card p-6">
             <h2 className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">Coverage</h2>

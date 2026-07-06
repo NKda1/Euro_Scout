@@ -122,6 +122,42 @@ const leagues: LeagueSeed[] = [
     status: "active",
     teamCount: 10,
     description: "The United Kingdom's Premiership tier, split into North and South divisions."
+  },
+  {
+    id: "bafa-division-one",
+    slug: "bafa-division-one",
+    name: "BAFA Division One",
+    shortName: "BAFA D1",
+    countryScope: "United Kingdom",
+    regionIds: ["united-kingdom"],
+    tier: "national",
+    status: "active",
+    teamCount: 0,
+    description: "The United Kingdom's senior lower-division pathway for clubs below the BAFA Premiership."
+  },
+  {
+    id: "gfl-2",
+    slug: "gfl-2",
+    name: "German Football League 2",
+    shortName: "GFL 2",
+    countryScope: "Germany",
+    regionIds: ["germany"],
+    tier: "national",
+    status: "active",
+    teamCount: 0,
+    description: "Germany's second national tier, giving ambitious clubs a route toward the GFL."
+  },
+  {
+    id: "bucs",
+    slug: "bucs",
+    name: "BUCS American Football",
+    shortName: "BUCS",
+    countryScope: "United Kingdom",
+    regionIds: ["united-kingdom"],
+    tier: "university",
+    status: "active",
+    teamCount: 0,
+    description: "UK university American football, including Premier and lower-division programs that feed the European football pathway."
   }
 ];
 

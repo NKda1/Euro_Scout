@@ -5,6 +5,7 @@ import TeamList from "@/components/teams/TeamList";
 import MarketTierBadge from "@/components/ui/MarketTierBadge";
 import TierBadge from "@/components/ui/TierBadge";
 import { routes } from "@/constants/routes";
+import { groupTeamsByDivision } from "@/lib/directory-data";
 import { cn } from "@/lib/utils";
 
 interface LeagueCardProps {
@@ -16,6 +17,9 @@ interface LeagueCardProps {
 }
 
 export default function LeagueCard({ league, compact = false, teams = [], expanded = false, onViewLeague }: LeagueCardProps) {
+  const divisionGroups = groupTeamsByDivision(teams);
+  const showDivisionGroups = divisionGroups.some((group) => group.hasExplicitDivision);
+
   return (
     <article className="glass-card p-5 transition hover:border-red-300 dark:hover:border-red-500/45">
       <div className="flex items-start justify-between gap-4">
@@ -68,10 +72,26 @@ export default function LeagueCard({ league, compact = false, teams = [], expand
       {expanded ? (
         <div className="mt-5 border-t border-slate-100 pt-5 dark:border-white/10">
           <div className="mb-3 flex items-center justify-between">
-            <h4 className="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Teams</h4>
+            <h4 className="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {showDivisionGroups ? "Divisions" : "Teams"}
+            </h4>
             <span className="text-xs font-bold text-red-600">{teams.length} listed</span>
           </div>
-          <TeamList teams={teams} className={teams.length > 4 ? "max-h-80 overflow-y-auto overscroll-contain" : undefined} />
+          {showDivisionGroups ? (
+            <div className="space-y-3">
+              {divisionGroups.map((group) => (
+                <section key={group.name} className="border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-black/20">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h5 className="text-sm font-black text-slate-950 dark:text-white">{group.name}</h5>
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{group.teams.length} teams</span>
+                  </div>
+                  <TeamList teams={group.teams} className={group.teams.length > 3 ? "max-h-64 overflow-y-auto overscroll-contain" : undefined} />
+                </section>
+              ))}
+            </div>
+          ) : (
+            <TeamList teams={teams} className={teams.length > 4 ? "max-h-80 overflow-y-auto overscroll-contain" : undefined} />
+          )}
         </div>
       ) : null}
     </article>

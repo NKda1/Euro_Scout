@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { randomUUID } from "node:crypto";
 import { isReservedAdminEmail, requireAdminProfile } from "@/lib/auth";
 import { isCampusPipeline } from "@/lib/campus-to-pro";
+import { regionForEuropeanCountry } from "@/lib/europe";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
@@ -32,6 +34,185 @@ async function failOnAdminClubError<T extends { error: { message: string } | nul
   if (result.error) {
     redirect(`/admin/club-verification?error=${encodeURIComponent(`${message}: ${result.error.message}`)}`);
   }
+}
+
+async function failOnAdminClubsError<T extends { error: { message: string } | null | undefined }>(result: T, message: string) {
+  if (result.error) {
+    redirect(`/admin/clubs?error=${encodeURIComponent(`${message}: ${result.error.message}`)}`);
+  }
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+function nullableText(formData: FormData, key: string) {
+  return text(formData, key) || null;
+}
+
+function intValue(formData: FormData, key: string) {
+  const value = text(formData, key);
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function adminClubPayload(formData: FormData) {
+  const name = text(formData, "name");
+  const city = text(formData, "city");
+  const country = text(formData, "country");
+  const leagueId = text(formData, "league_id");
+  const region = regionForEuropeanCountry(country);
+
+  if (!name || !city || !country || !leagueId) {
+    redirect("/admin/clubs?error=Club name, city, country and league are required.");
+  }
+
+  if (!region) {
+    redirect("/admin/clubs?error=Choose a European country supported by the SVG map.");
+  }
+
+  const claimStatus = text(formData, "claim_status") || "unclaimed";
+  const allowedStatuses = new Set(["unclaimed", "pending", "verified", "disputed", "rejected"]);
+  if (!allowedStatuses.has(claimStatus)) {
+    redirect("/admin/clubs?error=Choose a valid club status.");
+  }
+
+  return {
+    name: name.slice(0, 160),
+    city: city.slice(0, 80),
+    country,
+    league_id: leagueId,
+    region_id: region.id,
+    division: nullableText(formData, "division"),
+    stadium: nullableText(formData, "stadium"),
+    logo_url: nullableText(formData, "logo_url"),
+    website: nullableText(formData, "website"),
+    contact_email: nullableText(formData, "contact_email"),
+    tier: intValue(formData, "tier"),
+    claim_status: claimStatus,
+    verified: claimStatus === "verified",
+    recruiting_active: formData.get("recruiting_active") === "on",
+    open_roster_spots: intValue(formData, "open_roster_spots") ?? 0,
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function deleteClubRecord(serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>, teamId: string, redirectBase = "/admin/clubs") {
+  const { data: team } = await serviceClient.from("teams").select("id, name, logo_url").eq("id", teamId).maybeSingle<{ id: string; name: string; logo_url: string | null }>();
+
+  if (!team) {
+    redirect(`${redirectBase}?error=Club not found.`);
+  }
+
+  const storagePaths = new Set<string>();
+  const logoPath = storagePathFromPublicUrl(team.logo_url);
+  if (logoPath) storagePaths.add(logoPath);
+
+  const { data: clubMedia } = await serviceClient.from("club_media").select("url").eq("team_id", team.id).returns<Array<{ url: string }>>();
+  (clubMedia ?? []).forEach((media) => {
+    const path = storagePathFromPublicUrl(media.url);
+    if (path) storagePaths.add(path);
+  });
+
+  const { data: watchlists } = await serviceClient.from("watchlists").select("id").eq("team_id", team.id).returns<Array<{ id: string }>>();
+  const watchlistIds = (watchlists ?? []).map((watchlist) => watchlist.id);
+
+  await failOnAdminClubsError(await serviceClient.from("conversations").delete().eq("team_id", team.id), "Could not delete club conversations");
+  await failOnAdminClubsError(await serviceClient.from("club_interest_notifications").delete().eq("team_id", team.id), "Could not delete club interest notifications");
+  await failOnAdminClubsError(await serviceClient.from("club_profile_views").delete().eq("team_id", team.id), "Could not delete club profile views");
+  if (watchlistIds.length) {
+    await failOnAdminClubsError(await serviceClient.from("watchlist_items").delete().in("watchlist_id", watchlistIds), "Could not delete club watchlist items");
+  }
+  await failOnAdminClubsError(await serviceClient.from("watchlists").delete().eq("team_id", team.id), "Could not delete club watchlists");
+  await failOnAdminClubsError(await serviceClient.from("club_disputes").delete().eq("team_id", team.id), "Could not delete club disputes");
+  await failOnAdminClubsError(await serviceClient.from("club_media").delete().eq("team_id", team.id), "Could not delete club media");
+  await failOnAdminClubsError(await serviceClient.from("club_members").delete().eq("team_id", team.id), "Could not delete club memberships");
+  await failOnAdminClubsError(await serviceClient.from("teams").delete().eq("id", team.id), "Could not delete club");
+
+  if (storagePaths.size) {
+    await serviceClient.storage.from(PROFILE_MEDIA_BUCKET).remove(Array.from(storagePaths));
+  }
+
+  return team;
+}
+
+export async function adminCreateClubAction(formData: FormData) {
+  await requireAdminProfile();
+  const serviceClient = createSupabaseServiceRoleClient();
+  const payload = adminClubPayload(formData);
+  const baseSlug = slugify(payload.name);
+  const id = `${baseSlug}-${randomUUID().slice(0, 8)}`;
+
+  const { error } = await serviceClient.from("teams").insert({
+    ...payload,
+    id,
+    slug: id,
+    claimed_at: payload.claim_status === "pending" || payload.claim_status === "verified" ? new Date().toISOString() : null,
+    claim_expires_at: null,
+    claimed_by: null,
+    pipeline_names_public: false
+  });
+
+  if (error) {
+    redirect(`/admin/clubs?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/clubs");
+  revalidatePath("/scouts");
+  revalidatePath("/teams");
+  redirect(`/admin/clubs?notice=${encodeURIComponent(`${payload.name} created.`)}`);
+}
+
+export async function adminUpdateClubAction(formData: FormData) {
+  await requireAdminProfile();
+  const teamId = text(formData, "team_id");
+  if (!teamId) redirect("/admin/clubs?error=Choose a club to update.");
+
+  const serviceClient = createSupabaseServiceRoleClient();
+  const payload = adminClubPayload(formData);
+  const { error } = await serviceClient.from("teams").update(payload).eq("id", teamId);
+
+  if (error) {
+    redirect(`/admin/clubs?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/clubs");
+  revalidatePath("/scouts");
+  revalidatePath("/teams");
+  revalidatePath(`/scouts/${teamId}`);
+  redirect(`/admin/clubs?notice=${encodeURIComponent(`${payload.name} updated.`)}`);
+}
+
+export async function adminDeleteClubAction(formData: FormData) {
+  await requireAdminProfile();
+  const teamId = text(formData, "team_id");
+  const confirmation = text(formData, "confirmation");
+
+  if (!teamId) redirect("/admin/clubs?error=Choose a club to delete.");
+  if (confirmation !== "DELETE CLUB") {
+    redirect("/admin/clubs?error=Type DELETE CLUB before deleting a club.");
+  }
+
+  const serviceClient = createSupabaseServiceRoleClient();
+  const team = await deleteClubRecord(serviceClient, teamId);
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/clubs");
+  revalidatePath("/scouts");
+  revalidatePath("/teams");
+  redirect(`/admin/clubs?notice=${encodeURIComponent(`${team.name} deleted.`)}`);
 }
 
 async function getPendingClubForAdminAction(teamId: string) {
@@ -350,9 +531,58 @@ export async function deleteAdminAccountAction(formData: FormData) {
 
   revalidatePath("/admin");
   revalidatePath("/admin/users");
-  revalidatePath("/admin/profiles");
   revalidatePath("/admin/players");
   revalidatePath("/scouts");
   revalidatePath("/teams");
   redirect("/admin/users?notice=Account deleted. The email can be reused for a new test account.");
+}
+
+export async function adminUpdateAccountTierAction(formData: FormData) {
+  await requireAdminProfile();
+  const profileId = text(formData, "profile_id");
+  const accountTier = text(formData, "account_tier");
+  const premiumExpiresAt = text(formData, "premium_expires_at");
+
+  if (!profileId) {
+    redirect("/admin/users?error=Choose an account to update.");
+  }
+
+  if (accountTier !== "free" && accountTier !== "premium") {
+    redirect("/admin/users?error=Choose either Free or Premium.");
+  }
+
+  const serviceClient = createSupabaseServiceRoleClient();
+  let expiresAt: string | null = null;
+  if (accountTier === "premium" && premiumExpiresAt) {
+    const expiryDate = new Date(`${premiumExpiresAt}T23:59:59.999Z`);
+    if (Number.isNaN(expiryDate.getTime())) {
+      redirect("/admin/users?error=Choose a valid premium expiry date.");
+    }
+    expiresAt = expiryDate.toISOString();
+  }
+
+  const { error } = await serviceClient
+    .from("profiles")
+    .update({
+      account_tier: accountTier,
+      premium_expires_at: expiresAt,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", profileId);
+
+  if (error) {
+    redirect(`/admin/users?error=${encodeURIComponent(error.message)}`);
+  }
+
+  await serviceClient.from("message_token_events").insert({
+    profile_id: profileId,
+    event_type: "admin_adjustment",
+    metadata: { account_tier: accountTier, premium_expires_at: expiresAt }
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/users");
+  revalidatePath("/dashboard");
+  revalidatePath("/messages");
+  redirect(`/admin/users?notice=${encodeURIComponent(`Account tier updated to ${accountTier}.`)}`);
 }

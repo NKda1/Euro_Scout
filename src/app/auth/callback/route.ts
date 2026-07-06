@@ -1,18 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
-import { getBaseUrl } from "@/lib/api";
+
+function safeNextPath(value: string | null) {
+  const next = value?.trim();
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/dashboard";
+  return next;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = safeNextPath(searchParams.get("next"));
 
-  const redirectTo = `${getBaseUrl()}${next}`;
+  const baseUrl = request.nextUrl.origin;
+  const redirectTo = `${baseUrl}${next}`;
   const errorRedirect = (msg: string) =>
-    NextResponse.redirect(`${getBaseUrl()}/auth/sign-in?error=${encodeURIComponent(msg)}`);
+    NextResponse.redirect(`${baseUrl}/auth/sign-in?error=${encodeURIComponent(msg)}`);
 
   // Build the redirect response first so we can attach session cookies to it
   const response = NextResponse.redirect(redirectTo);

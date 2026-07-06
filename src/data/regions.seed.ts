@@ -74,6 +74,30 @@ const regions: Region[] = [
     mapPathId: "DK"
   },
   {
+    id: "sweden",
+    name: "Sweden",
+    slug: "sweden",
+    countryCode: "SE",
+    countryScope: "Sweden",
+    mapPathId: "SE"
+  },
+  {
+    id: "finland",
+    name: "Finland",
+    slug: "finland",
+    countryCode: "FI",
+    countryScope: "Finland",
+    mapPathId: "FI"
+  },
+  {
+    id: "norway",
+    name: "Norway",
+    slug: "norway",
+    countryCode: "NO",
+    countryScope: "Norway",
+    mapPathId: "NO"
+  },
+  {
     id: "czech-republic",
     name: "Czech Republic",
     slug: "czech-republic",

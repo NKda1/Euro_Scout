@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthenticatedProfile } from "@/lib/auth";
+import { hasPremiumFeature } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 function text(formData: FormData, key: string) {
@@ -238,8 +239,11 @@ export async function updateWatchlistItemRecruitmentStatusAction(formData: FormD
 // ─── Export watchlist as CSV (premium gate stub) ──────────────────────────────
 
 export async function exportWatchlistCsvAction(watchlistId: string): Promise<string> {
-  // TODO: Gate behind premium subscription when billing is implemented — stub returns data for all club users
   const { serviceClient, profile, teamId } = await requireConnectedClub();
+
+  if (profile.role !== "admin" && !hasPremiumFeature(profile, "watchlist_export")) {
+    return "Premium feature,Upgrade to export watchlists from EuroScout Pro\n";
+  }
 
   if (profile.role !== "admin") {
     const { data: wl } = await serviceClient

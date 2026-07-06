@@ -63,10 +63,10 @@ export const campusPipelines: Record<CampusPipeline, {
   },
   bucs: {
     id: "bucs",
-    label: "BUCS Premier",
+    label: "BUCS",
     shortLabel: "BUCS",
     description: "UK university American football programs feeding European clubs.",
-    about: "BUCS American football covers UK university programs and is a strong fit for players balancing football with further studies. Some institutions may offer sport scholarships, bursaries or performance support packages.",
+    about: "BUCS American football covers UK university programs from Premier through lower divisions and is a strong fit for players balancing football with further studies. Some institutions may offer sport scholarships, bursaries or performance support packages.",
     logoPath: "/images/BUCS.png",
     country: "United Kingdom",
     teamCount: 15

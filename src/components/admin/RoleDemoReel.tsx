@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { markWelcomeTourSeenAction } from "@/app/actions/onboarding";
 import type { ReactNode } from "react";
 import type { UserRole } from "@/lib/auth";
 
@@ -26,23 +27,23 @@ const demoSteps: Record<DemoRole, DemoStep[]> = {
     },
     {
       label: "Profile",
-      title: "Add Football Details",
-      copy: "Position, nationality, measurements and playing pathway become the first discovery signals.",
-      metric: "5 fields",
-      action: "Add position"
+      title: "Add Metrics And Stats",
+      copy: "Position, nationality, combine metrics, season stats and playing pathway become the first discovery signals.",
+      metric: "Stats",
+      action: "Add numbers"
     },
     {
       label: "Proof",
-      title: "Film And Career",
-      copy: "The dashboard pushes players toward film, career history and photos after onboarding.",
-      metric: "Next step",
+      title: "Film, Photos And Share Link",
+      copy: "The dashboard pushes players toward film, career history, four photos and a public profile link they can send to clubs.",
+      metric: "4 photos",
       action: "Add film"
     },
     {
       label: "Launch",
-      title: "Publish And Respond",
-      copy: "Once live, players can see club interest, reply to messages and understand what recruiters are doing next.",
-      metric: "Interest",
+      title: "Respond And Book Calls",
+      copy: "Once live, players see club views, interest alerts, message tokens, call requests and notification updates.",
+      metric: "Alerts",
       action: "Reply"
     }
   ],
@@ -56,24 +57,24 @@ const demoSteps: Record<DemoRole, DemoStep[]> = {
     },
     {
       label: "Connect",
-      title: "Claim Or Join",
-      copy: "Existing teams can be claimed or joined, while missing teams can be requested with country and city.",
-      metric: "Verified",
-      action: "Claim club"
+      title: "Claim, Join Or Invite Staff",
+      copy: "Existing teams can be claimed or joined, missing teams can be requested, and owners can invite staff into the organisation.",
+      metric: "Staff",
+      action: "Invite"
     },
     {
       label: "Recruit",
-      title: "Watchlists And Interest",
-      copy: "After onboarding, clubs can build recruitment watchlists, express interest and start conversations with players.",
+      title: "Watchlists, Interest And Calls",
+      copy: "After onboarding, clubs can build watchlists, express interest, accept call requests and propose negotiation times.",
       metric: "3 prospects",
       action: "Express interest"
     },
     {
       label: "Trust",
-      title: "Message Recruits",
-      copy: "Logo, photos, videos and verification status support the real outcome: trusted club-to-player messaging.",
-      metric: "2 unread",
-      action: "Message"
+      title: "Control Messaging",
+      copy: "Club owners can keep direct messaging on or off, use premium messaging options and review analytics from one workbench.",
+      metric: "Toggle",
+      action: "Manage"
     }
   ],
   journalist: [
@@ -93,16 +94,16 @@ const demoSteps: Record<DemoRole, DemoStep[]> = {
     },
     {
       label: "Publish",
-      title: "First Article",
-      copy: "The dashboard guides journalists toward submitting their first article link.",
-      metric: "News",
+      title: "First Article With Thumbnail",
+      copy: "The dashboard guides journalists toward submitting links with a thumbnail image, excerpt and league context.",
+      metric: "Thumbnail",
       action: "Add story"
     },
     {
       label: "Reach",
-      title: "Appear In News",
-      copy: "Published articles sit alongside EuroScout news and league intelligence surfaces.",
-      metric: "Live feed",
+      title: "Measure Reach",
+      copy: "Published articles sit alongside EuroScout news, with share links and article-open analytics for the journalist.",
+      metric: "Opens",
       action: "Review"
     }
   ],
@@ -130,9 +131,9 @@ const demoSteps: Record<DemoRole, DemoStep[]> = {
     },
     {
       label: "Return",
-      title: "Read News",
-      copy: "The news surface gives fans a reason to come back between profile updates.",
-      metric: "News",
+      title: "Read News And Alerts",
+      copy: "The news and notification surfaces give fans a reason to come back between profile and club updates.",
+      metric: "Alerts",
       action: "Read"
     }
   ]
@@ -148,11 +149,13 @@ const roleLabel: Record<DemoRole, string> = {
 export default function RoleDemoReel({
   role,
   ctaHref,
-  ctaLabel = "Open form preview"
+  ctaLabel = "Open form preview",
+  markSeenOnCta = false
 }: {
   role: DemoRole;
   ctaHref?: string;
   ctaLabel?: string;
+  markSeenOnCta?: boolean;
 }) {
   const steps = useMemo(() => demoSteps[role], [role]);
   const [active, setActive] = useState(0);
@@ -193,16 +196,43 @@ export default function RoleDemoReel({
           ))}
         </div>
 
-        <Link href={ctaHref ?? `/onboarding?preview=1&role=${role}`} className="mt-6 inline-flex h-11 w-full items-center justify-center bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
-          {ctaLabel}
-        </Link>
+        {markSeenOnCta ? (
+          <form action={markWelcomeTourSeenAction} className="mt-6">
+            <input type="hidden" name="role" value={role} />
+            <button className="inline-flex h-11 w-full items-center justify-center bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
+              {ctaLabel}
+            </button>
+          </form>
+        ) : (
+          <Link href={ctaHref ?? `/onboarding?preview=1&role=${role}`} className="mt-6 inline-flex h-11 w-full items-center justify-center bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
+            {ctaLabel}
+          </Link>
+        )}
       </aside>
 
       <section className="relative isolate flex min-h-[680px] items-center justify-center overflow-hidden bg-slate-950 p-5 text-white sm:p-8">
         <div className="absolute inset-0 bg-[url('/images/euroscout-hero-line.jpeg')] bg-cover bg-center opacity-20" />
         <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(2,6,23,.96),rgba(127,29,29,.58))]" />
 
-        <div className="relative z-10 grid w-full max-w-[98rem] gap-6 2xl:grid-cols-[minmax(780px,1fr)_320px] 2xl:items-center">
+        <div className="relative z-10 w-full max-w-[98rem]">
+          <div className="mb-4 border border-white/15 bg-white/10 p-4 backdrop-blur">
+            <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)_auto] lg:items-center">
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-red-200">{activeStep.label}</p>
+                <h2 className="mt-1 text-xl font-black leading-tight sm:text-2xl">{activeStep.title}</h2>
+              </div>
+              <p className="text-sm font-semibold leading-6 text-slate-200 lg:text-center">{activeStep.copy}</p>
+              <div className="flex shrink-0 items-center gap-3 border border-white/10 bg-black/25 px-4 py-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-red-200">Signal</p>
+                  <p className="text-xl font-black">{activeStep.metric}</p>
+                </div>
+                <span className="hidden h-9 w-px bg-white/10 sm:block" />
+                <p className="text-sm font-black text-slate-200">{activeStep.action}</p>
+              </div>
+            </div>
+          </div>
+
           <div>
             <MockProductScreen role={role} active={active} />
             <div className="mt-5 grid gap-3 sm:grid-cols-4">
@@ -220,17 +250,6 @@ export default function RoleDemoReel({
                   />
                 </button>
               ))}
-            </div>
-          </div>
-
-          <div className="border border-white/15 bg-white/10 p-5 backdrop-blur 2xl:self-center">
-            <p className="text-xs font-black uppercase text-red-200">{activeStep.label}</p>
-            <h2 className="mt-2 text-3xl font-black">{activeStep.title}</h2>
-            <p className="mt-4 text-sm font-semibold leading-6 text-slate-200">{activeStep.copy}</p>
-            <div className="mt-6 border border-white/10 bg-black/25 p-4">
-              <p className="text-xs font-black uppercase text-red-200">Signal</p>
-              <p className="mt-2 text-3xl font-black">{activeStep.metric}</p>
-              <p className="mt-1 text-sm font-semibold text-slate-300">{activeStep.action}</p>
             </div>
           </div>
         </div>
@@ -280,7 +299,7 @@ function PlayerScene({ active }: { active: number }) {
 
   if (active === 1) {
     return (
-      <SceneGrid title="Add discovery signals" tag="Step 2">
+      <SceneGrid title="Add measurable signals" tag="Step 2">
         <Panel>
           <Field label="Primary position" value="Defensive Back" complete />
           <Field label="Height" value="6'1&quot;" complete />
@@ -296,18 +315,24 @@ function PlayerScene({ active }: { active: number }) {
               <div className="mt-3 flex gap-2">
                 <Badge>6 ft 1</Badge>
                 <Badge>88kg</Badge>
+                <Badge>Premium star</Badge>
               </div>
             </div>
           </div>
         </Panel>
-        <Readiness percent={55} items={["Position complete", "Measurements live", "Film still needed"]} />
+        <Panel>
+          <p className="text-xs font-black uppercase text-red-600">Combine + season</p>
+          <MiniTile label="40 yard" value="4.52s" />
+          <MiniTile label="Vertical" value="34in" />
+          <MiniTile label="INT" value="5" />
+        </Panel>
       </SceneGrid>
     );
   }
 
   if (active === 2) {
     return (
-      <SceneGrid title="Upload proof" tag="Step 3">
+      <SceneGrid title="Upload proof and share" tag="Step 3">
         <Panel className="sm:col-span-2">
           <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
             <div className="flex aspect-video items-center justify-center bg-slate-950 text-white">
@@ -318,39 +343,40 @@ function PlayerScene({ active }: { active: number }) {
               <Progress value={78} label="Uploading film" />
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
                 <MiniTile label="Games" value="8" />
-                <MiniTile label="Photos" value="3 / 4" />
-                <MiniTile label="Clips" value="12" />
+                <MiniTile label="Photos" value="4 / 4" />
+                <MiniTile label="Share link" value="Live" />
               </div>
             </div>
           </div>
         </Panel>
-        <Readiness percent={78} items={["Film uploading", "Career timeline started", "One photo slot open"]} />
+        <Readiness percent={78} items={["Film uploading", "Career timeline started", "Public link ready"]} />
       </SceneGrid>
     );
   }
 
   return (
-    <SceneGrid title="Publish and respond" tag="Step 4">
+    <SceneGrid title="Publish, respond and meet" tag="Step 4">
       <Panel>
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xl font-black">Profile readiness</p>
-            <p className="mt-1 text-sm font-bold text-slate-500">Clubs see stronger profiles first.</p>
+            <p className="text-xl font-black">Profile analytics</p>
+            <p className="mt-1 text-sm font-bold text-slate-500">See who viewed your player profile.</p>
           </div>
-          <span className="bg-emerald-100 px-3 py-2 text-sm font-black text-emerald-700">92%</span>
+          <span className="bg-emerald-100 px-3 py-2 text-sm font-black text-emerald-700">12 views</span>
         </div>
-        <Progress value={92} label="Ready to publish" />
-        <button className="mt-5 h-11 bg-red-600 px-5 text-sm font-black text-white">Publish profile</button>
+        <Progress value={92} label="Profile health" />
+        <button className="mt-5 h-11 bg-red-600 px-5 text-sm font-black text-white">Share profile</button>
       </Panel>
       <Panel>
-        <p className="text-xs font-black uppercase text-red-600">Club interest</p>
+        <p className="text-xs font-black uppercase text-red-600">Notifications</p>
         <InterestCard club="Berlin Rebels" status="Interested" />
-        <InterestCard club="Madrid Bravos" status="Watchlist" />
+        <InterestCard club="Saskatoon Hilltops" status="Call proposed" />
       </Panel>
       <Panel>
-        <p className="text-xs font-black uppercase text-red-600">Messages</p>
+        <p className="text-xs font-black uppercase text-red-600">Messages + call</p>
         <MessageBubble sender="Berlin Rebels" text="Can we schedule a call this week?" />
-        <MessageBubble sender="You" text="Yes, I am available Thursday." mine />
+        <MessageBubble sender="You" text="Yes. Confirm Thursday at 18:00." mine />
+        <Badge>3 free replies left</Badge>
       </Panel>
     </SceneGrid>
   );
@@ -376,7 +402,7 @@ function ClubScene({ active }: { active: number }) {
 
   if (active === 1) {
     return (
-      <SceneGrid title="Claim or request access" tag="Step 2">
+      <SceneGrid title="Claim access and staff" tag="Step 2">
         <Panel className="sm:col-span-2">
           <div className="flex items-center justify-between gap-3 border border-slate-200 p-4">
             <div>
@@ -387,7 +413,7 @@ function ClubScene({ active }: { active: number }) {
           </div>
           <Progress value={50} label="Verification review" />
         </Panel>
-        <Readiness percent={50} items={["Club selected", "Claim submitted", "Admin review next"]} />
+        <Readiness percent={50} items={["Club selected", "Claim submitted", "Staff invites available"]} />
       </SceneGrid>
     );
   }
@@ -408,19 +434,20 @@ function ClubScene({ active }: { active: number }) {
           <PlayerRow name="E. Novak" meta="OL - Czechia" action="Saved" />
         </Panel>
         <Panel>
-          <p className="text-xs font-black uppercase text-red-600">Express interest</p>
+          <p className="text-xs font-black uppercase text-red-600">Express interest + call</p>
           <p className="mt-3 text-lg font-black">Zion Clarke</p>
           <p className="text-sm font-bold text-slate-500">DB - United Kingdom</p>
           <button className="mt-4 h-10 w-full bg-red-600 text-sm font-black text-white">Express interest</button>
+          <button className="mt-2 h-10 w-full border border-slate-200 text-sm font-black text-slate-700">Accept call request</button>
         </Panel>
       </SceneGrid>
     );
   }
 
   return (
-    <SceneGrid title="Message recruits" tag="Step 4">
+    <SceneGrid title="Manage outreach" tag="Step 4">
       <Panel>
-        <p className="text-xs font-black uppercase text-red-600">Club media</p>
+        <p className="text-xs font-black uppercase text-red-600">Club controls</p>
         <div className="mt-4 grid grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((item) => (
             <div key={item} className="flex aspect-square items-center justify-center bg-slate-200 text-sm font-black text-slate-500">
@@ -428,13 +455,16 @@ function ClubScene({ active }: { active: number }) {
             </div>
           ))}
         </div>
-        <button className="mt-5 h-11 bg-red-600 px-5 text-sm font-black text-white">Update club profile</button>
+        <div className="mt-4 grid gap-2">
+          <MiniTile label="Messaging" value="On" />
+          <MiniTile label="Tokens" value="Premium" />
+        </div>
       </Panel>
       <Panel className="sm:col-span-2">
-        <p className="text-xs font-black uppercase text-red-600">Recruitment messages</p>
+        <p className="text-xs font-black uppercase text-red-600">Recruitment inbox</p>
         <MessageBubble sender="Berlin Rebels" text="We liked your senior film. Are you open to Germany?" />
         <MessageBubble sender="Zion Clarke" text="Yes, send me the role and contract details." mine />
-        <MessageBubble sender="Berlin Rebels" text="Added you to our DB priority watchlist." />
+        <MessageBubble sender="Bell alert" text="New call request and unread message." />
       </Panel>
     </SceneGrid>
   );
@@ -474,28 +504,33 @@ function JournalistScene({ active }: { active: number }) {
 
   if (active === 2) {
     return (
-      <SceneGrid title="Submit your first story" tag="Step 3">
+      <SceneGrid title="Publish with a thumbnail" tag="Step 3">
         <Panel className="sm:col-span-2">
           <Field label="Article title" value="Three prospects rising before camp" complete />
           <Field label="Source link" value="euroscout.news/prospects" complete />
+          <Field label="Thumbnail upload" value="prospects-cover.jpg" complete />
           <Progress value={84} label="Editorial readiness" />
         </Panel>
         <Panel>
           <p className="text-xs font-black uppercase text-red-600">Status</p>
-          <p className="mt-3 text-2xl font-black">Draft saved</p>
+          <p className="mt-3 text-2xl font-black">Ready to publish</p>
         </Panel>
       </SceneGrid>
     );
   }
 
   return (
-    <SceneGrid title="Appear in news" tag="Step 4">
+    <SceneGrid title="Share and measure" tag="Step 4">
       <Panel className="sm:col-span-2">
         <NewsRow title="Three prospects rising before camp" source="Maya Bennett" />
         <NewsRow title="Club notes from the GFL combine" source="EuroScout Desk" />
-        <NewsRow title="Recruitment windows to watch" source="Maya Bennett" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Badge>Profile share link</Badge>
+          <Badge>86 article opens</Badge>
+          <Badge>Bell alerts</Badge>
+        </div>
       </Panel>
-      <Readiness percent={94} items={["Article reviewed", "Byline visible", "News feed ready"]} />
+      <Readiness percent={94} items={["Byline shareable", "News feed ready", "Analytics live"]} />
     </SceneGrid>
   );
 }
@@ -557,7 +592,7 @@ function FanScene({ active }: { active: number }) {
         <NewsRow title="New club profiles published" source="Platform update" />
         <NewsRow title="Campus to Pro tracker opens" source="EuroScout Pro" />
       </Panel>
-      <Readiness percent={100} items={["Directory ready", "Club pages ready", "News ready"]} />
+      <Readiness percent={100} items={["Directory ready", "Club pages ready", "Notification center ready"]} />
     </SceneGrid>
   );
 }

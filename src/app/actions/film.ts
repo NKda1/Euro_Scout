@@ -23,7 +23,7 @@ function detectFilmProvider(url: string): FilmProvider {
 
   if (normalized.includes("youtube.com") || normalized.includes("youtube-nocookie.com") || normalized.includes("youtu.be")) return "youtube";
   if (normalized.includes("vimeo.com")) return "vimeo";
-  if (normalized.includes("hudl.com")) return "hudl";
+  if (normalized.includes("hudl.com") || normalized.includes("hudl")) return "hudl";
 
   return "external";
 }
@@ -56,6 +56,8 @@ export async function saveFilmLinkAction(formData: FormData) {
   const id = text(formData, "film_id");
   const rawUrl = text(formData, "url");
   const url = normalizeFilmUrl(rawUrl);
+  const rawThumbnailUrl = text(formData, "thumbnail_url");
+  const thumbnailUrl = rawThumbnailUrl ? normalizeFilmUrl(rawThumbnailUrl) : null;
   const filmType = text(formData, "film_type") || "highlights";
   const isDefault = formData.get("is_default") === "on";
 
@@ -72,6 +74,19 @@ export async function saveFilmLinkAction(formData: FormData) {
   if (!["http:", "https:"].includes(parsedUrl.protocol)) {
     redirect("/account?error=Film URL must start with http or https.");
   }
+
+  if (thumbnailUrl) {
+    let parsedThumbnailUrl: URL;
+    try {
+      parsedThumbnailUrl = new URL(thumbnailUrl);
+    } catch {
+      redirect("/account?error=Enter a valid film thumbnail URL.");
+    }
+    if (!["http:", "https:"].includes(parsedThumbnailUrl.protocol)) {
+      redirect("/account?error=Film thumbnail URL must start with http or https.");
+    }
+  }
+
   const provider = detectFilmProvider(url);
   const label = text(formData, "label") || `${filmProviderLabel(provider)} film`;
 
@@ -85,6 +100,7 @@ export async function saveFilmLinkAction(formData: FormData) {
     provider,
     film_type: filmType,
     label,
+    thumbnail_url: thumbnailUrl,
     is_default: isDefault,
     updated_at: new Date().toISOString()
   };
@@ -98,7 +114,6 @@ export async function saveFilmLinkAction(formData: FormData) {
   }
 
   revalidatePath("/account");
-  revalidatePath("/account/edit");
   revalidatePath(`/players/${profile.id}`);
   redirect("/account?notice=Film link saved.");
 }
@@ -119,7 +134,6 @@ export async function deleteFilmLinkAction(formData: FormData) {
 
   await serviceClient.from("film_links").delete().eq("id", id).eq("player_profile_id", playerProfile.id);
   revalidatePath("/account");
-  revalidatePath("/account/edit");
   revalidatePath(`/players/${profile.id}`);
   redirect("/account?notice=Film link removed.");
 }
@@ -168,7 +182,8 @@ export async function trackFilmClickAction(formData: FormData) {
       film_link_id: film.id,
       player_profile_id: film.player_profile_id,
       viewer_profile_id: user?.id ?? null,
-      viewer_role: viewerRole
+      viewer_role: viewerRole,
+      event_type: "open"
     });
   }
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { markWelcomeTourSeenAction } from "@/app/actions/onboarding";
 import RoleDemoReel from "@/components/admin/RoleDemoReel";
 import { getAuthenticatedProfile, isUserRole, type UserRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -37,6 +38,10 @@ export default async function WelcomePage({ searchParams }: WelcomePageProps) {
     redirect("/dashboard");
   }
 
+  if (profile?.welcome_tour_seen) {
+    redirect(`/onboarding?role=${profile.role !== "admin" ? profile.role : "player"}`);
+  }
+
   return (
     <main className="app-surface min-h-screen">
       <section className="mx-auto max-w-[112rem] px-4 py-8 sm:px-6 lg:px-8">
@@ -50,9 +55,12 @@ export default async function WelcomePage({ searchParams }: WelcomePageProps) {
               This short tour shows what happens after sign-up: profiles, messaging, watchlists, interest signals and the next actions for each account type.
             </p>
           </div>
-          <Link href={`/onboarding?role=${role}`} className="inline-flex h-11 items-center justify-center bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
-            Skip tour and start onboarding
-          </Link>
+          <form action={markWelcomeTourSeenAction}>
+            <input type="hidden" name="role" value={role} />
+            <button className="inline-flex h-11 items-center justify-center bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
+              Skip tour and start onboarding
+            </button>
+          </form>
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -71,7 +79,7 @@ export default async function WelcomePage({ searchParams }: WelcomePageProps) {
           ))}
         </div>
 
-        <RoleDemoReel role={role} ctaHref={`/onboarding?role=${role}`} ctaLabel="Start onboarding" />
+        <RoleDemoReel role={role} ctaHref={`/onboarding?role=${role}`} ctaLabel="Start onboarding" markSeenOnCta />
       </section>
     </main>
   );

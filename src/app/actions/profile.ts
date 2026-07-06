@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { getAuthenticatedUser, isReservedAdminEmail, isUserRole, splitName, type UserRole } from "@/lib/auth";
 import { getCampusConference, getCampusTeam, isCampusPipeline, type CampusPipeline } from "@/lib/campus-to-pro";
+import { getClubCreationRegion } from "@/lib/club-regions";
+import { regionForEuropeanCountry } from "@/lib/europe";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 function text(formData: FormData, key: string) {
@@ -362,6 +364,8 @@ export async function completeOnboardingAction(formData: FormData) {
     redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
   }
 
+  await serviceClient.from("profiles").update({ welcome_tour_seen: true }).eq("id", user.id);
+
   if (roleValue === "player") {
     const playerProfileId = await upsertPlayerProfile(supabase, serviceClient, user.id, formData);
     await replaceCareerTimeline(serviceClient, playerProfileId, formData);
@@ -422,14 +426,30 @@ export async function completeOnboardingAction(formData: FormData) {
       });
     } else if (teamNameRequest) {
       await requireNoExistingClubMembership(serviceClient, user.id, "/onboarding");
-      const country = text(formData, "new_team_country");
+      const submittedRegionId = text(formData, "new_team_region_id");
+      const selectedRegion = getClubCreationRegion(submittedRegionId);
+      const country = text(formData, "new_team_country") ?? selectedRegion?.country ?? null;
       const city = text(formData, "new_team_city");
       const leagueId = text(formData, "new_team_league_id");
-      const regionId = text(formData, "new_team_region_id");
+      const regionId = selectedRegion?.id ?? submittedRegionId ?? regionForEuropeanCountry(country)?.id;
+      const division = text(formData, "new_team_division");
       const stadium = text(formData, "new_team_stadium");
 
-      if (!country || !city || !leagueId || !regionId) {
-        redirect("/onboarding?error=Club name, city, country, league and region are required.");
+      if (!country || !city || !leagueId || !regionId || !division) {
+        redirect("/onboarding?error=Club name, city, country or region, league and division are required.");
+      }
+
+      const [{ data: league }, { data: region }] = await Promise.all([
+        serviceClient.from("leagues").select("id").eq("id", leagueId).maybeSingle<{ id: string }>(),
+        serviceClient.from("regions").select("id").eq("id", regionId).maybeSingle<{ id: string }>()
+      ]);
+
+      if (!league) {
+        redirect("/onboarding?error=That league is not available yet. Run the lower-division league seed first.");
+      }
+
+      if (!region) {
+        redirect("/onboarding?error=That club region is not available yet. Run the lower-division region seed first.");
       }
 
       const now = new Date().toISOString();
@@ -445,6 +465,7 @@ export async function completeOnboardingAction(formData: FormData) {
           region_id: regionId,
           city,
           country,
+          division,
           stadium,
           claim_status: "pending",
           claimed_at: now,
@@ -453,6 +474,7 @@ export async function completeOnboardingAction(formData: FormData) {
           recruiting_active: false,
           open_roster_spots: 0,
           pipeline_names_public: false,
+          pipeline_type: leagueId === "bucs" ? "bucs" : null,
           verified: false
         })
         .select("id")
@@ -481,6 +503,9 @@ export async function completeOnboardingAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/scouts");
   revalidatePath(`/scouts/${user.id}`);
+  revalidatePath("/teams");
+  revalidatePath("/leagues");
+  revalidatePath("/campus-to-pro");
   redirect("/dashboard?onboarded=1");
 }
 
@@ -530,7 +555,6 @@ export async function updateAccountAction(formData: FormData) {
   }
 
   revalidatePath("/account");
-  revalidatePath("/profiles");
   revalidatePath("/players");
   redirect("/account");
 }

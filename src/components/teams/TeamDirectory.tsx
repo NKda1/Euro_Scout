@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import type { Team } from "@/types";
+import type { League } from "@/types";
 import SearchBar from "@/components/ui/SearchBar";
 import TeamGrid from "@/components/teams/TeamGrid";
-import { leagues, marketTierLabels, type MarketTier } from "@/lib/data";
+import { leagues as seededLeagues, marketTierLabels, type MarketTier } from "@/lib/data";
 
-export default function TeamDirectory({ teams }: { teams: Team[] }) {
+export default function TeamDirectory({ teams, leagues = seededLeagues }: { teams: Team[]; leagues?: League[] }) {
   const [query, setQuery] = useState("");
   const [marketTier, setMarketTier] = useState<MarketTier | "all">("all");
   const [leagueId, setLeagueId] = useState("all");
@@ -26,7 +27,7 @@ export default function TeamDirectory({ teams }: { teams: Team[] }) {
 
       return matchesTier && matchesLeague && matchesQuery;
     });
-  }, [leagueId, marketTier, query, teams]);
+  }, [leagueId, leagues, marketTier, query, teams]);
 
   return (
     <section className="space-y-6">

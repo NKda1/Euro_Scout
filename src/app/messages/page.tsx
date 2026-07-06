@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { requireOnboardedProfile, roleLabel, type Profile } from "@/lib/auth";
 import { countUnreadMessages, getDisplayProfile, profileInitials, type MessageRow } from "@/lib/messaging";
+import { isPremiumActive } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { EmptyState, Notice } from "@/components/ui/StateDisplay";
 
@@ -37,12 +38,20 @@ interface ConversationGroup {
   latestAt: string;
 }
 
+interface MessageTokenWalletRow {
+  weekly_limit: number;
+  tokens_remaining: number;
+  window_ends_at: string;
+}
+
+const DEFAULT_FREE_CONVERSATION_TOKENS = 5;
+
 function Avatar({ profile, className = "h-12 w-12" }: { profile: Profile | null; className?: string }) {
   const name = profile?.display_name ?? "Member";
 
   return (
     <div
-      className={`${className} flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-900 bg-cover bg-center text-sm font-black text-white shadow-sm`}
+      className={`${className} flex shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-900 bg-cover bg-center text-sm font-black text-white shadow-sm dark:border-white/10`}
       style={profile?.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.48)), url(${profile.avatar_url})` } : undefined}
     >
       {profile?.avatar_url ? "" : profileInitials(name)}
@@ -63,6 +72,15 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
   const { profile } = await requireOnboardedProfile();
   const { error } = await searchParams;
   const serviceClient = createSupabaseServiceRoleClient();
+  const isPremium = isPremiumActive(profile);
+  const { data: tokenWallet } = isPremium
+    ? { data: null as MessageTokenWalletRow | null }
+    : await serviceClient
+        .from("message_token_wallets")
+        .select("weekly_limit, tokens_remaining, window_ends_at")
+        .eq("profile_id", profile.id)
+        .maybeSingle<MessageTokenWalletRow>();
+
   const { data: participantRows } = await serviceClient
     .from("conversation_participants")
     .select("conversation_id, last_seen_at")
@@ -167,22 +185,39 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
     }, 0);
   }
 
+  const tokenWindowEnded = tokenWallet ? new Date(tokenWallet.window_ends_at).getTime() <= Date.now() : false;
+  const freeTokenLimit = tokenWallet?.weekly_limit ?? DEFAULT_FREE_CONVERSATION_TOKENS;
+  const freeTokensRemaining = tokenWindowEnded ? freeTokenLimit : tokenWallet?.tokens_remaining ?? freeTokenLimit;
+  const tokenRefreshLabel = !tokenWallet
+    ? "7-day window starts with your first conversation."
+    : tokenWindowEnded
+      ? "Refreshes now on your next conversation start."
+      : `Refreshes ${formatTime(tokenWallet.window_ends_at)} on a 7-day cycle.`;
+
   return (
-    <main className="min-h-screen bg-[#090909] text-white">
+    <main className="app-surface min-h-screen">
       <section className="mx-auto max-w-[92rem] px-4 py-10 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-4 border-b border-white/10 pb-8 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-8 dark:border-white/10 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-red-500">Messages</p>
-            <h1 className="mt-3 text-4xl font-black tracking-tight text-white">Inbox</h1>
-            <p className="mt-2 text-sm font-semibold text-white/45">
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 dark:text-white">Inbox</h1>
+            <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-white/45">
               Player and club conversations, kept to authorised participants.
             </p>
           </div>
-          {totalUnread ? (
-            <div className="w-fit border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-black text-red-200">
-              {totalUnread} unread
+          <div className="flex flex-col gap-3 sm:items-end">
+            {totalUnread ? (
+              <div className="w-fit border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+                {totalUnread} unread
+              </div>
+            ) : null}
+            <div className="w-fit border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
+              <p className="font-black text-slate-950 dark:text-white">{isPremium ? "Unlimited messaging" : `${freeTokensRemaining}/${freeTokenLimit} conversation starts`}</p>
+              <p className="mt-1 text-xs font-bold text-slate-500 dark:text-white/45">
+                {isPremium ? "Premium account active" : `3 replies included per thread. ${tokenRefreshLabel}`}
+              </p>
             </div>
-          ) : null}
+          </div>
         </div>
         {error ? (
           <div className="mt-6">
@@ -191,7 +226,7 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
             </Notice>
           </div>
         ) : null}
-        <div className="mt-8 overflow-hidden border border-white/10 bg-[#111]">
+        <div className="mt-8 overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#111] dark:shadow-none">
           {visibleConversationGroups.map((group, index) => {
             const conversation = group.conversation;
             const participants = participantsByConversation.get(conversation.id) ?? [];
@@ -204,39 +239,39 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
               <Link
                 key={group.key}
                 href={`/messages/${conversation.id}`}
-                className={`grid gap-4 p-4 transition hover:bg-white/[0.04] sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center ${
-                  index === 0 ? "" : "border-t border-white/10"
+                className={`grid gap-4 p-4 transition hover:bg-slate-50 dark:hover:bg-white/[0.04] sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center ${
+                  index === 0 ? "" : "border-t border-slate-200 dark:border-white/10"
                 }`}
               >
                 <Avatar profile={displayProfile} />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate text-base font-black text-white">
+                    <p className="truncate text-base font-black text-slate-950 dark:text-white">
                       {displayProfile?.display_name ?? conversation.subject}
                     </p>
                     {displayProfile ? (
-                      <span className="border border-white/10 px-2 py-0.5 text-[11px] font-black uppercase text-white/40">
+                      <span className="border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-black uppercase text-slate-500 dark:border-white/10 dark:bg-transparent dark:text-white/40">
                         {roleLabel(displayProfile.role)}
                       </span>
                     ) : null}
                     {conversation.team_id ? (
-                      <span className="border border-blue-400/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-black uppercase text-blue-200">
+                      <span className="border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-black uppercase text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200">
                         Club inbox
                       </span>
                     ) : null}
                     {group.conversationIds.length > 1 ? (
-                      <span className="border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-black uppercase text-amber-200">
+                      <span className="border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-black uppercase text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
                         Merged view
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-1 truncate text-sm font-bold text-white/70">{conversation.subject}</p>
-                  <p className="mt-1 truncate text-sm font-semibold text-white/40">
+                  <p className="mt-1 truncate text-sm font-bold text-slate-700 dark:text-white/70">{conversation.subject}</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-slate-500 dark:text-white/40">
                     {latestMessage ? `${latestSender?.display_name ?? "Member"}: ${latestMessage.body}` : "No messages yet."}
                   </p>
                 </div>
                 <div className="flex items-center justify-between gap-3 sm:block sm:text-right">
-                  <p className="text-xs font-bold text-white/35">{formatTime(latestMessage?.created_at ?? conversation.updated_at)}</p>
+                  <p className="text-xs font-bold text-slate-400 dark:text-white/35">{formatTime(latestMessage?.created_at ?? conversation.updated_at)}</p>
                   {unreadCount ? (
                     <span className="mt-0 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-black text-white sm:mt-2">
                       {unreadCount}

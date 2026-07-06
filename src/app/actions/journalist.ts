@@ -2,12 +2,31 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireOnboardedProfile } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+
+const PROFILE_MEDIA_BUCKET = "profile-media";
+const MAX_THUMBNAIL_BYTES = 7 * 1024 * 1024;
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 function text(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   return value || null;
+}
+
+function fileValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return value instanceof File && value.size > 0 ? value : null;
+}
+
+function safeFileName(name: string) {
+  const cleaned = name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return cleaned || "article-thumbnail";
 }
 
 function requireUrl(value: string | null, label: string) {
@@ -31,8 +50,40 @@ function optionalUrl(value: string | null, label: string) {
   return requireUrl(value, label);
 }
 
+async function uploadArticleThumbnail(params: {
+  supabase: SupabaseClient;
+  profileId: string;
+  file: File | null;
+}) {
+  const { supabase, profileId, file } = params;
+  if (!file) return null;
+
+  if (!IMAGE_TYPES.has(file.type)) {
+    redirect("/account?error=Upload a JPG, PNG, WebP or GIF thumbnail.");
+  }
+
+  if (file.size > MAX_THUMBNAIL_BYTES) {
+    redirect("/account?error=Article thumbnails must be 7MB or smaller.");
+  }
+
+  const extension = safeFileName(file.name).split(".").pop() || "jpg";
+  const path = `${profileId}/journalist-thumbnails/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage.from(PROFILE_MEDIA_BUCKET).upload(path, file, {
+    cacheControl: "31536000",
+    contentType: file.type,
+    upsert: false
+  });
+
+  if (error) {
+    redirect(`/account?error=${encodeURIComponent(error.message)}`);
+  }
+
+  const { data } = supabase.storage.from(PROFILE_MEDIA_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export async function publishJournalistArticleAction(formData: FormData) {
-  const { profile } = await requireOnboardedProfile();
+  const { profile, supabase } = await requireOnboardedProfile();
 
   if (profile.role !== "journalist" && profile.role !== "admin") {
     redirect("/account?error=Only journalist accounts can publish news links.");
@@ -41,7 +92,12 @@ export async function publishJournalistArticleAction(formData: FormData) {
   const title = text(formData, "title");
   const excerpt = text(formData, "excerpt");
   const articleUrl = requireUrl(text(formData, "article_url"), "Article link");
-  const thumbnailUrl = optionalUrl(text(formData, "thumbnail_url"), "Thumbnail link");
+  const uploadedThumbnailUrl = await uploadArticleThumbnail({
+    supabase,
+    profileId: profile.id,
+    file: fileValue(formData, "thumbnail_file")
+  });
+  const thumbnailUrl = uploadedThumbnailUrl ?? optionalUrl(text(formData, "thumbnail_url"), "Thumbnail link");
   const status = formData.get("save_as_draft") === "on" ? "draft" : "published";
   const leagueIds = formData
     .getAll("league_ids")

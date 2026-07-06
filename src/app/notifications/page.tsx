@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Bell, Eye, Inbox, ShieldAlert, Star, Users } from "lucide-react";
+import { BarChart3, Bell, Eye, Inbox, PhoneCall, ShieldAlert, Star, UserPlus, Users } from "lucide-react";
 import { requireOnboardedProfile } from "@/lib/auth";
 import { getNotificationSummary } from "@/lib/notifications";
 import { EmptyState } from "@/components/ui/StateDisplay";
@@ -43,8 +43,8 @@ function NotificationCard({
 }
 
 export default async function NotificationsPage() {
-  const { profile } = await requireOnboardedProfile();
-  const summary = await getNotificationSummary(profile);
+  const { profile, user } = await requireOnboardedProfile();
+  const summary = await getNotificationSummary(profile, user.email);
 
   const cards = [
     {
@@ -55,8 +55,24 @@ export default async function NotificationsPage() {
       label: "Open inbox",
       icon: Inbox
     },
+    {
+      title: "Call bookings",
+      description: "Video call requests, accepted meeting times and negotiation slots connected to your account.",
+      count: summary.callRequests,
+      href: "/account",
+      label: "Open call threads",
+      icon: PhoneCall
+    },
     ...(profile.role === "club"
       ? [
+          {
+            title: "Staff invites",
+            description: "Pending invitations to join a club organisation and work from its shared team account.",
+            count: summary.staffInvites,
+            href: "/dashboard",
+            label: "Review invites",
+            icon: UserPlus
+          },
           {
             title: "Club interest",
             description: "Players who expressed interest in your club and recruitment activity around your team.",
@@ -79,11 +95,23 @@ export default async function NotificationsPage() {
       ? [
           {
             title: "Profile views",
-            description: "Authenticated profile views from clubs, journalists, admins and other players this week.",
+            description: "Authenticated profile views from clubs, journalists and other players this week.",
             count: summary.profileViews,
             href: "/analytics",
             label: "View profile analytics",
             icon: Eye
+          }
+        ]
+      : []),
+    ...(profile.role === "journalist"
+      ? [
+          {
+            title: "Article engagement",
+            description: "Outbound article opens from your EuroScout journalist links in the last seven days.",
+            count: summary.articleEngagement,
+            href: "/analytics",
+            label: "Open article analytics",
+            icon: BarChart3
           }
         ]
       : []),

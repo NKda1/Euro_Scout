@@ -1,14 +1,33 @@
 import type { Metadata } from "next";
 import LeagueDirectory from "@/components/leagues/LeagueDirectory";
 import LeagueLogoCarousel from "@/components/leagues/LeagueLogoCarousel";
-import { leagues, teams } from "@/lib/data";
+import { teams } from "@/lib/data";
+import { mergeDirectoryLeagues, type DbLeagueForDirectory } from "@/lib/directory-data";
+import { dbTeamToDirectoryTeam, type DbTeamForDirectory } from "@/lib/europe";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "League Directories | EuroScout Pro",
   description: "Browse the European American football league directories indexed by EuroScout Pro."
 };
 
-export default function LeaguesPage() {
+export default async function LeaguesPage() {
+  const supabase = createSupabaseServiceRoleClient();
+  const [{ data: dbTeams }, { data: dbLeagues }] = await Promise.all([
+    supabase
+      .from("teams")
+      .select("id, name, slug, league_id, region_id, city, country, division, stadium, logo_url, tier, claim_status, claimed_at, claim_expires_at, claimed_by, website, contact_email, open_roster_spots, recruiting_active")
+      .returns<DbTeamForDirectory[]>(),
+    supabase
+      .from("leagues")
+      .select("id, name, slug, country_scope, region_ids, tier, status, team_count, description, short_code")
+      .returns<DbLeagueForDirectory[]>()
+  ]);
+  const mergedTeams = Array.from(
+    new Map([...teams, ...(dbTeams ?? []).map(dbTeamToDirectoryTeam).filter((team): team is NonNullable<typeof team> => Boolean(team))].map((team) => [team.id, team])).values()
+  );
+  const mergedLeagues = mergeDirectoryLeagues(dbLeagues ?? [], mergedTeams);
+
   return (
     <main className="app-surface">
       <section className="mx-auto max-w-[92rem] px-4 py-10 sm:px-6 lg:px-8">
@@ -34,7 +53,7 @@ export default function LeaguesPage() {
           </p>
         </div>
 
-        <LeagueDirectory leagues={leagues} teams={teams} />
+        <LeagueDirectory leagues={mergedLeagues} teams={mergedTeams} />
 
       </section>
     </main>
