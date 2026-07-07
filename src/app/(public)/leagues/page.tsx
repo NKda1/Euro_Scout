@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import LeagueDirectory from "@/components/leagues/LeagueDirectory";
 import LeagueLogoCarousel from "@/components/leagues/LeagueLogoCarousel";
-import { teams } from "@/lib/data";
-import { mergeDirectoryLeagues, type DbLeagueForDirectory } from "@/lib/directory-data";
-import { dbTeamToDirectoryTeam, type DbTeamForDirectory } from "@/lib/europe";
-import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { getCachedPublicDirectoryData } from "@/lib/public-cache";
 
 export const metadata: Metadata = {
   title: "League Directories | EuroScout Pro",
@@ -12,21 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default async function LeaguesPage() {
-  const supabase = createSupabaseServiceRoleClient();
-  const [{ data: dbTeams }, { data: dbLeagues }] = await Promise.all([
-    supabase
-      .from("teams")
-      .select("id, name, slug, league_id, region_id, city, country, division, stadium, logo_url, tier, claim_status, claimed_at, claim_expires_at, claimed_by, website, contact_email, open_roster_spots, recruiting_active")
-      .returns<DbTeamForDirectory[]>(),
-    supabase
-      .from("leagues")
-      .select("id, name, slug, country_scope, region_ids, tier, status, team_count, description, short_code")
-      .returns<DbLeagueForDirectory[]>()
-  ]);
-  const mergedTeams = Array.from(
-    new Map([...teams, ...(dbTeams ?? []).map(dbTeamToDirectoryTeam).filter((team): team is NonNullable<typeof team> => Boolean(team))].map((team) => [team.id, team])).values()
-  );
-  const mergedLeagues = mergeDirectoryLeagues(dbLeagues ?? [], mergedTeams);
+  const { teams, leagues } = await getCachedPublicDirectoryData();
 
   return (
     <main className="app-surface">
@@ -53,7 +36,7 @@ export default async function LeaguesPage() {
           </p>
         </div>
 
-        <LeagueDirectory leagues={mergedLeagues} teams={mergedTeams} />
+        <LeagueDirectory leagues={leagues} teams={teams} />
 
       </section>
     </main>

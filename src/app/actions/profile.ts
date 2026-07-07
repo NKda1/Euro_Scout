@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { getAuthenticatedUser, isReservedAdminEmail, isUserRole, splitName, type UserRole } from "@/lib/auth";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cache-tags";
 import { getCampusConference, getCampusTeam, isCampusPipeline, type CampusPipeline } from "@/lib/campus-to-pro";
 import { getClubCreationRegion } from "@/lib/club-regions";
 import { regionForEuropeanCountry } from "@/lib/europe";
@@ -104,6 +105,13 @@ function requireAllowedRole(role: UserRole, email?: string | null, redirectPath 
   if (role === "admin" && !isReservedAdminEmail(email)) {
     redirect(`${redirectPath}?error=The admin role is reserved for the EuroScout owner account.`);
   }
+}
+
+function revalidatePublicDirectoryCaches() {
+  revalidateTag(PUBLIC_CACHE_TAGS.clubs);
+  revalidateTag(PUBLIC_CACHE_TAGS.teams);
+  revalidateTag(PUBLIC_CACHE_TAGS.leagues);
+  revalidateTag(PUBLIC_CACHE_TAGS.directory);
 }
 
 async function resolvePlayerPipeline(
@@ -506,6 +514,9 @@ export async function completeOnboardingAction(formData: FormData) {
   revalidatePath("/teams");
   revalidatePath("/leagues");
   revalidatePath("/campus-to-pro");
+  if (roleValue === "club") {
+    revalidatePublicDirectoryCaches();
+  }
   redirect("/dashboard?onboarded=1");
 }
 

@@ -1,14 +1,22 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { isReservedAdminEmail, requireAdminProfile } from "@/lib/auth";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cache-tags";
 import { isCampusPipeline } from "@/lib/campus-to-pro";
 import { regionForEuropeanCountry } from "@/lib/europe";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
+
+function revalidatePublicDirectoryCaches() {
+  revalidateTag(PUBLIC_CACHE_TAGS.clubs);
+  revalidateTag(PUBLIC_CACHE_TAGS.teams);
+  revalidateTag(PUBLIC_CACHE_TAGS.leagues);
+  revalidateTag(PUBLIC_CACHE_TAGS.directory);
+}
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -169,6 +177,7 @@ export async function adminCreateClubAction(formData: FormData) {
   revalidatePath("/admin/clubs");
   revalidatePath("/scouts");
   revalidatePath("/teams");
+  revalidatePublicDirectoryCaches();
   redirect(`/admin/clubs?notice=${encodeURIComponent(`${payload.name} created.`)}`);
 }
 
@@ -191,6 +200,7 @@ export async function adminUpdateClubAction(formData: FormData) {
   revalidatePath("/scouts");
   revalidatePath("/teams");
   revalidatePath(`/scouts/${teamId}`);
+  revalidatePublicDirectoryCaches();
   redirect(`/admin/clubs?notice=${encodeURIComponent(`${payload.name} updated.`)}`);
 }
 
@@ -212,6 +222,7 @@ export async function adminDeleteClubAction(formData: FormData) {
   revalidatePath("/admin/clubs");
   revalidatePath("/scouts");
   revalidatePath("/teams");
+  revalidatePublicDirectoryCaches();
   redirect(`/admin/clubs?notice=${encodeURIComponent(`${team.name} deleted.`)}`);
 }
 
@@ -285,6 +296,7 @@ export async function verifyClubClaimAction(formData: FormData) {
   revalidatePath("/scouts");
   revalidatePath(`/scouts/${team.id}`);
   revalidatePath(`/teams/${team.id}`);
+  revalidatePublicDirectoryCaches();
   redirect(`/admin/club-verification?notice=${encodeURIComponent(`${team.name} verified.`)}`);
 }
 
@@ -338,6 +350,7 @@ export async function declineAndDeleteClubClaimAction(formData: FormData) {
   revalidatePath("/admin/club-verification");
   revalidatePath("/scouts");
   revalidatePath("/teams");
+  revalidatePublicDirectoryCaches();
   redirect(`/admin/club-verification?notice=${encodeURIComponent(`${team.name} declined and deleted.`)}`);
 }
 
@@ -393,6 +406,7 @@ export async function deleteCampusClubAction(formData: FormData) {
   revalidatePath("/campus-to-pro");
   revalidatePath("/scouts");
   revalidatePath("/teams");
+  revalidatePublicDirectoryCaches();
   redirect(`/admin/club-verification?notice=${encodeURIComponent(`${team.name} deleted from Campus to Pro.`)}`);
 }
 
@@ -534,6 +548,7 @@ export async function deleteAdminAccountAction(formData: FormData) {
   revalidatePath("/admin/players");
   revalidatePath("/scouts");
   revalidatePath("/teams");
+  revalidatePublicDirectoryCaches();
   redirect("/admin/users?notice=Account deleted. The email can be reused for a new test account.");
 }
 

@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { getAuthenticatedProfile } from "@/lib/auth";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cache-tags";
 import { regionForEuropeanCountry } from "@/lib/europe";
 import { hasPremiumFeature } from "@/lib/premium";
 import { createStaffInviteToken, hashStaffInviteToken, staffInvitePath } from "@/lib/staff-invites";
@@ -13,6 +14,13 @@ import type { ClubRole } from "@/types";
 const PROFILE_MEDIA_BUCKET = "profile-media";
 const MAX_MEDIA_IMAGE_BYTES = 7 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+function revalidatePublicClubCaches() {
+  revalidateTag(PUBLIC_CACHE_TAGS.clubs);
+  revalidateTag(PUBLIC_CACHE_TAGS.teams);
+  revalidateTag(PUBLIC_CACHE_TAGS.leagues);
+  revalidateTag(PUBLIC_CACHE_TAGS.directory);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -236,6 +244,7 @@ export async function claimTeamAction(teamId: string) {
   revalidatePath("/scouts");
   revalidatePath("/watchlists");
   revalidatePath(`/scouts/${teamId}`);
+  revalidatePublicClubCaches();
   redirect("/account?notice=Club claimed. Your public club profile and club shortlist are ready.");
 }
 
@@ -321,6 +330,7 @@ export async function requestNewTeamFromAccountAction(formData: FormData) {
   revalidatePath("/teams");
   revalidatePath("/watchlists");
   revalidatePath(`/scouts/${team.id}`);
+  revalidatePublicClubCaches();
   redirect("/account?notice=Club created. Your public club profile and club shortlist are ready.");
 }
 
@@ -372,6 +382,7 @@ export async function updateClubProfileFromAccountAction(formData: FormData) {
   revalidatePath("/scouts");
   revalidatePath(`/scouts/${teamId}`);
   revalidatePath(`/teams/${teamId}`);
+  revalidatePublicClubCaches();
   redirect("/account?notice=Club profile saved.");
 }
 
@@ -480,6 +491,7 @@ export async function updateClubProfileAction(
 
   revalidatePath(`/scouts/${teamId}`);
   revalidatePath(`/teams/${teamId}`);
+  revalidatePublicClubCaches();
 }
 
 // ─── Require club member (any role) ──────────────────────────────────────────
@@ -585,6 +597,7 @@ export async function uploadClubLogoAction(formData: FormData) {
   revalidatePath("/scouts");
   revalidatePath(`/scouts/${teamId}`);
   revalidatePath(`/teams/${teamId}`);
+  revalidatePublicClubCaches();
   redirect("/account?notice=Club logo updated.");
 }
 

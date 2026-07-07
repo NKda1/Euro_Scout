@@ -1,97 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import type { Profile } from "@/lib/auth";
+import { getCachedPublicClubDirectory, type PublicClubDirectoryItem } from "@/lib/public-cache";
 
 export const metadata: Metadata = {
   title: "Club Directory | EuroScout Pro",
   description: "Browse verified and active clubs on EuroScout Pro."
 };
 
-interface ClaimedTeamRow {
-  id: string;
-  name: string;
-  city: string | null;
-  country: string | null;
-  logo_url: string | null;
-  claim_status: string | null;
-  recruiting_active: boolean | null;
-  claimed_by: string | null;
-}
-
-interface OwnerRow {
-  profile_id: string;
-  team_id: string;
-  club_role: string;
-  profiles: Profile | null;
-}
-
 export default async function ClubDirectoryPage() {
-  const supabase = createSupabaseServiceRoleClient();
+  let clubs: PublicClubDirectoryItem[] = [];
+  let error: Error | null = null;
 
-  const { data: teams, error } = await supabase
-    .from("teams")
-    .select("id, name, city, country, logo_url, claim_status, recruiting_active, claimed_by")
-    .in("claim_status", ["pending", "verified"])
-    .order("updated_at", { ascending: false })
-    .returns<ClaimedTeamRow[]>();
-
-  const teamIds = (teams ?? []).map((team) => team.id);
-  const claimedByIds = (teams ?? []).map((team) => team.claimed_by).filter(Boolean) as string[];
-
-  const { data: ownerRows } = teamIds.length
-    ? await supabase
-        .from("club_members")
-        .select(
-          `
-            profile_id,
-            team_id,
-            club_role,
-            profiles!profile_id (
-              id,
-              role,
-              display_name,
-              headline,
-              bio,
-              location,
-              avatar_url,
-              is_public,
-              onboarding_complete,
-              created_at,
-              updated_at
-            )
-          `
-        )
-        .in("team_id", teamIds)
-        .eq("club_role", "owner")
-        .returns<OwnerRow[]>()
-    : { data: [] as OwnerRow[] };
-
-  const missingOwnerProfileIds = claimedByIds.filter(
-    (profileId) => !(ownerRows ?? []).some((owner) => owner.profile_id === profileId)
-  );
-
-  const { data: fallbackProfiles } = missingOwnerProfileIds.length
-    ? await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", missingOwnerProfileIds)
-        .returns<Profile[]>()
-    : { data: [] as Profile[] };
-
-  const ownerByTeam = new Map((ownerRows ?? []).map((owner) => [owner.team_id, owner]));
-  const profileById = new Map((fallbackProfiles ?? []).map((profile) => [profile.id, profile]));
-
-  const clubs = (teams ?? []).map((team) => {
-    const owner = ownerByTeam.get(team.id);
-    const profile = owner?.profiles ?? (team.claimed_by ? profileById.get(team.claimed_by) ?? null : null);
-
-    return {
-      team,
-      profile,
-      profileId: owner?.profile_id ?? team.claimed_by
-    };
-  });
+  try {
+    clubs = await getCachedPublicClubDirectory();
+  } catch (caught) {
+    error = caught instanceof Error ? caught : new Error("Unable to load club directory.");
+    clubs = [];
+  }
 
   return (
     <main className="app-surface min-h-screen">
