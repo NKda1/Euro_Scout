@@ -3,7 +3,7 @@ import { routes } from "@/constants/routes";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-slate-200 bg-white dark:border-white/10 dark:bg-[#090909]">
+    <footer className="site-footer border-t border-slate-200 bg-white dark:border-white/10 dark:bg-[#090909]">
       <div className="mx-auto flex max-w-[92rem] flex-col gap-4 px-4 py-8 text-sm text-slate-500 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
         <div>
           <p className="font-bold text-slate-800 dark:text-white">EuroScout Pro</p>
@@ -24,6 +24,15 @@ export default function Footer() {
           </Link>
           <Link href={routes.news} className="hover:text-red-700 dark:hover:text-red-300">
             News
+          </Link>
+          <Link href="/privacy" className="hover:text-red-700 dark:hover:text-red-300">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-red-700 dark:hover:text-red-300">
+            Terms
+          </Link>
+          <Link href="/cookies" className="hover:text-red-700 dark:hover:text-red-300">
+            Cookies
           </Link>
         </div>
       </div>

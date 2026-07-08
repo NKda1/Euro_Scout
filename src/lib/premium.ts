@@ -6,6 +6,7 @@ export type PremiumFeatureKey =
   | "unlimited_messaging"
   | "advanced_analytics"
   | "premium_profile_signal"
+  | "advanced_team_search"
   | "expanded_watchlists"
   | "watchlist_export"
   | "club_direct_messaging_control"
@@ -42,6 +43,13 @@ export const PREMIUM_FEATURES: PremiumFeatureDefinition[] = [
     standard: "Normal public profile listing.",
     premium: "Premium star and higher-trust visual signals on public profile surfaces.",
     roles: ["player", "club"]
+  },
+  {
+    key: "advanced_team_search",
+    label: "Advanced team search",
+    standard: "3 advanced recruiting searches every 7 days.",
+    premium: "Unlimited roster-needs, recruiting-status and availability filtering.",
+    roles: ["player", "club", "fan"]
   },
   {
     key: "expanded_watchlists",

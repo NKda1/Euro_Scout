@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { getAuthenticatedProfile } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -31,6 +32,8 @@ export async function reportProfileAction(formData: FormData) {
   if (!profile?.onboarding_complete) {
     redirect("/welcome");
   }
+
+  await enforceActionRateLimit(`profile-report:${profile.id}`, 5, 24 * 60 * 60_000, returnPath);
 
   if (!reportedProfileId || reportedProfileId === profile.id) {
     redirect(withMessage(returnPath, "error", "Choose another profile to report."));

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { adminDeleteClubAction, adminUpdateClubAction } from "@/app/actions/admin";
+import { adminDeleteClubAction, adminReleaseClubToSeedAction, adminUpdateClubAction } from "@/app/actions/admin";
 import { leagues } from "@/lib/data";
 import { europeanCountries, regionForEuropeanCountry } from "@/lib/europe";
 
@@ -278,6 +278,19 @@ export default function AdminClubsList({ clubs, memberCounts }: AdminClubsListPr
               <ClubEditFields club={club} />
               <button className="h-11 bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700">
                 Save changes
+              </button>
+            </form>
+            <form action={adminReleaseClubToSeedAction} className="mt-6 border-t border-amber-200 pt-5 dark:border-amber-500/25">
+              <input type="hidden" name="team_id" value={club.id} />
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                Release keeps the seeded club record, league, country, city and slug, but clears dummy ownership, staff, invites, messages, calls, watchlists, media, analytics and claim state.
+              </div>
+              <label>
+                <span className={labelClass}>Release confirmation</span>
+                <textarea name="confirmation" rows={2} placeholder="Type RELEASE CLUB" className={textareaClass} />
+              </label>
+              <button className="mt-3 h-11 border border-amber-300 px-5 text-sm font-black uppercase text-amber-800 transition hover:bg-amber-50 dark:border-amber-500/40 dark:text-amber-100 dark:hover:bg-amber-500/10">
+                Release back to seed state
               </button>
             </form>
             <form action={adminDeleteClubAction} className="mt-6 border-t border-red-200 pt-5 dark:border-red-500/25">

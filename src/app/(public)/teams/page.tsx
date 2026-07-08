@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import TeamDirectory from "@/components/teams/TeamDirectory";
+import { getTeamSearchTokenState } from "@/app/actions/team-search";
 import { getCachedPublicDirectoryData } from "@/lib/public-cache";
 
 export const metadata: Metadata = {
@@ -8,7 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default async function TeamsPage() {
-  const { teams, leagues } = await getCachedPublicDirectoryData();
+  const [{ teams, leagues }, searchTokenState] = await Promise.all([
+    getCachedPublicDirectoryData(),
+    getTeamSearchTokenState()
+  ]);
 
   return (
     <main className="app-surface">
@@ -17,10 +21,10 @@ export default async function TeamsPage() {
           <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Team directories</p>
           <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">Explore European American football teams.</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
-            Browse clubs by city and country across EuroScout Pro.
+            Browse clubs by city, country, roster needs and recruiting status across EuroScout Pro.
           </p>
         </div>
-        <TeamDirectory teams={teams} leagues={leagues} />
+        <TeamDirectory teams={teams} leagues={leagues} searchTokenState={searchTokenState} />
       </section>
     </main>
   );

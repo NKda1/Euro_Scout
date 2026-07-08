@@ -65,6 +65,7 @@ export interface DbTeamForDirectory {
   contact_email: string | null;
   open_roster_spots: number | null;
   recruiting_active: boolean | null;
+  roster_needs: string[] | null;
 }
 
 function tierToMarketTier(tier: number | null, leagueId: string) {
@@ -98,6 +99,7 @@ export function dbTeamToDirectoryTeam(team: DbTeamForDirectory): Team | null {
     website: team.website,
     contact_email: team.contact_email,
     open_roster_spots: team.open_roster_spots,
-    recruiting_active: team.recruiting_active
+    recruiting_active: team.recruiting_active,
+    roster_needs: team.roster_needs
   };
 }

@@ -1,6 +1,6 @@
-# EuroScout Pro MVP
+# EuroScout Pro
 
-A European American football scouting platform MVP built with Next.js, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, and Supabase-ready (not connected).
+A European American football scouting and recruitment platform built with Next.js, TypeScript, Tailwind CSS, Supabase, Daily and Stripe-ready premium infrastructure.
 
 ## Features
 - Interactive Europe SVG map on homepage
@@ -16,17 +16,21 @@ A European American football scouting platform MVP built with Next.js, TypeScrip
 - Supabase-ready
 
 ## Getting Started
+
 1. Install dependencies: `npm install`
-2. Run dev server: `npm run dev`
-3. Add your Supabase env vars to `.env`
+2. Copy `.env.example` to `.env.local`
+3. Add local Supabase, Daily and Stripe values
+4. Run dev server: `npm run dev`
+5. Validate before deploy: `npm run typecheck`, `npm run lint`, `npm run build`
 
 ## Project Structure
 See `/src` for all app, API, data, types, lib, constants, and styles.
 
-## Environment Variables
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+## Deployment
+
+Use [docs/deployment-readiness.md](docs/deployment-readiness.md) before pushing to production.
+
+Core environment variables are listed in `.env.example`.
 
 ## License
 MIT

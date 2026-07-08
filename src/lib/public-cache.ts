@@ -13,9 +13,12 @@ export { PUBLIC_CACHE_TAGS };
 
 const PUBLIC_DIRECTORY_REVALIDATE_SECONDS = 300;
 const PUBLIC_CLUBS_REVALIDATE_SECONDS = 600;
+const retiredDirectoryTeamIds = new Set([
+  "brunel-burners-0a6c6408"
+]);
 
 export const directoryTeamSelect =
-  "id, name, slug, league_id, region_id, city, country, division, stadium, logo_url, tier, claim_status, claimed_at, claim_expires_at, claimed_by, website, contact_email, open_roster_spots, recruiting_active";
+  "id, name, slug, league_id, region_id, city, country, division, stadium, logo_url, tier, claim_status, claimed_at, claim_expires_at, claimed_by, website, contact_email, open_roster_spots, recruiting_active, roster_needs";
 
 export const directoryLeagueSelect = "id, name, slug, country_scope, region_ids, tier, status, team_count, description, short_code";
 
@@ -61,6 +64,62 @@ export interface PublicClubDirectoryItem {
   profileId: string | null | undefined;
 }
 
+function canonicalTeamKey(team: Pick<Team, "name" | "leagueId">) {
+  return `${team.leagueId}:${team.name
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")}`;
+}
+
+function canonicalCountry(country: string) {
+  const normalized = country.trim().toLowerCase();
+  if (normalized === "uk" || normalized === "england" || normalized === "scotland" || normalized === "wales") {
+    return "united-kingdom";
+  }
+
+  return normalized
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function canonicalTeamCountryKey(team: Pick<Team, "name" | "country">) {
+  return `${team.name
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")}:${canonicalCountry(team.country)}`;
+}
+
+function mergeDirectoryTeams(dbTeams: DbTeamForDirectory[]) {
+  const byId = new Map(seedTeams.map((team) => [team.id, team]));
+  const seededCanonicalIds = new Map(seedTeams.map((team) => [canonicalTeamKey(team), team.id]));
+  const seededCountryIds = new Map(seedTeams.map((team) => [canonicalTeamCountryKey(team), team.id]));
+
+  for (const dbTeam of dbTeams) {
+    if (retiredDirectoryTeamIds.has(dbTeam.id)) continue;
+
+    const team = dbTeamToDirectoryTeam(dbTeam);
+    if (!team) continue;
+
+    const seededId = seededCanonicalIds.get(canonicalTeamKey(team));
+    const seededCountryId = seededCountryIds.get(canonicalTeamCountryKey(team));
+    if ((seededId && seededId !== team.id) || (seededCountryId && seededCountryId !== team.id)) {
+      continue;
+    }
+
+    byId.set(team.id, team);
+  }
+
+  return Array.from(byId.values());
+}
+
 const getCachedDirectoryRows = unstable_cache(
   async (): Promise<DirectoryRows> => {
     const supabase = createSupabaseServiceRoleClient();
@@ -77,7 +136,7 @@ const getCachedDirectoryRows = unstable_cache(
       dbLeagues: dbLeagues ?? []
     };
   },
-  ["public-directory-rows-v1"],
+  ["public-directory-rows-v4"],
   {
     revalidate: PUBLIC_DIRECTORY_REVALIDATE_SECONDS,
     tags: [PUBLIC_CACHE_TAGS.directory, PUBLIC_CACHE_TAGS.teams, PUBLIC_CACHE_TAGS.leagues]
@@ -86,16 +145,7 @@ const getCachedDirectoryRows = unstable_cache(
 
 export async function getCachedPublicDirectoryData(): Promise<PublicDirectoryData> {
   const { dbTeams, dbLeagues } = await getCachedDirectoryRows();
-  const mergedTeams = Array.from(
-    new Map(
-      [
-        ...seedTeams,
-        ...dbTeams
-          .map(dbTeamToDirectoryTeam)
-          .filter((team): team is NonNullable<typeof team> => Boolean(team))
-      ].map((team) => [team.id, team])
-    ).values()
-  );
+  const mergedTeams = mergeDirectoryTeams(dbTeams);
   const mergedLeagues = mergeDirectoryLeagues(dbLeagues, mergedTeams);
 
   return {
@@ -111,17 +161,7 @@ export async function getCachedHomeMapData(): Promise<HomeMapData> {
   const europeanRegions = mergeEuropeanRegions(seedRegions);
   const mapLeagues = seedLeagues.filter((league) => league.tier === "continental" || league.tier === "premier");
   const mapLeagueIds = new Set(mapLeagues.map((league) => league.id));
-  const mergedTeams = Array.from(
-    new Map(
-      [
-        ...seedTeams,
-        ...dbTeams
-          .filter((team) => mapLeagueIds.has(team.league_id))
-          .map(dbTeamToDirectoryTeam)
-          .filter((team): team is NonNullable<typeof team> => Boolean(team))
-      ].map((team) => [team.id, team])
-    ).values()
-  );
+  const mergedTeams = mergeDirectoryTeams(dbTeams.filter((team) => mapLeagueIds.has(team.league_id)));
   const visibleRegions = europeanRegions.filter((region) =>
     mapLeagues.some((league) => league.regionIds.includes(region.id)) || mergedTeams.some((team) => team.regionId === region.id)
   );

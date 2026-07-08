@@ -20,7 +20,7 @@ export default function PageTransition({ children }: { children: ReactNode }) {
     <div
       key={pathname}
       ref={ref}
-      className="animate-page-enter"
+      className="site-page-shell animate-page-enter"
       onAnimationEnd={() => {
         if (ref.current) {
           // Remove the animation so the frozen transform is no longer applied,

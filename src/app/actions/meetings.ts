@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { requireOnboardedProfile, type Profile } from "@/lib/auth";
 import { buildDailyJoinUrl, createDailyMeetingToken, createDailyRoom } from "@/lib/daily";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -333,6 +334,8 @@ export async function requestClubCallAction(formData: FormData) {
     redirectWithError(returnPath, "Choose a club before requesting a call.");
   }
 
+  await enforceActionRateLimit(`call-request:${profile.id}`, 8, 60 * 60_000, returnPath);
+
   if (!proposedStartAt) {
     redirectWithError(returnPath, "Choose a preferred call time.");
   }
@@ -445,6 +448,8 @@ export async function requestPlayerCallAction(formData: FormData) {
   if (!teamId || !targetProfileId) {
     redirectWithError(returnPath, "Choose a club and player before requesting a call.");
   }
+
+  await enforceActionRateLimit(`call-invite:${profile.id}`, 12, 60 * 60_000, returnPath);
 
   if (targetProfileId === profile.id) {
     redirectWithError(returnPath, "You cannot request a call with yourself.");

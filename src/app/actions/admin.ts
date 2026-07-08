@@ -151,6 +151,75 @@ async function deleteClubRecord(serviceClient: ReturnType<typeof createSupabaseS
   return team;
 }
 
+async function releaseClubToSeedRecord(serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>, teamId: string) {
+  const { data: team } = await serviceClient.from("teams").select("id, name, logo_url").eq("id", teamId).maybeSingle<{ id: string; name: string; logo_url: string | null }>();
+
+  if (!team) {
+    redirect("/admin/clubs?error=Club not found.");
+  }
+
+  const storagePaths = new Set<string>();
+  const logoPath = storagePathFromPublicUrl(team.logo_url);
+  if (logoPath) storagePaths.add(logoPath);
+
+  const { data: clubMedia } = await serviceClient.from("club_media").select("url").eq("team_id", team.id).returns<Array<{ url: string }>>();
+  (clubMedia ?? []).forEach((media) => {
+    const path = storagePathFromPublicUrl(media.url);
+    if (path) storagePaths.add(path);
+  });
+
+  const { data: watchlists } = await serviceClient.from("watchlists").select("id").eq("team_id", team.id).returns<Array<{ id: string }>>();
+  const watchlistIds = (watchlists ?? []).map((watchlist) => watchlist.id);
+
+  await failOnAdminClubsError(await serviceClient.from("meeting_requests").delete().eq("team_id", team.id), "Could not clear club call requests");
+  await failOnAdminClubsError(await serviceClient.from("club_staff_invites").delete().eq("team_id", team.id), "Could not clear club staff invites");
+  await failOnAdminClubsError(await serviceClient.from("club_join_requests").delete().eq("team_id", team.id), "Could not clear club join requests");
+  await failOnAdminClubsError(await serviceClient.from("conversations").delete().eq("team_id", team.id), "Could not clear club conversations");
+  await failOnAdminClubsError(await serviceClient.from("club_interest_notifications").delete().eq("team_id", team.id), "Could not clear club interest notifications");
+  await failOnAdminClubsError(await serviceClient.from("club_profile_views").delete().eq("team_id", team.id), "Could not clear club profile views");
+  if (watchlistIds.length) {
+    await failOnAdminClubsError(await serviceClient.from("watchlist_items").delete().in("watchlist_id", watchlistIds), "Could not clear club watchlist items");
+  }
+  await failOnAdminClubsError(await serviceClient.from("watchlists").delete().eq("team_id", team.id), "Could not clear club watchlists");
+  await failOnAdminClubsError(await serviceClient.from("club_disputes").delete().eq("team_id", team.id), "Could not clear club disputes");
+  await failOnAdminClubsError(await serviceClient.from("club_media").delete().eq("team_id", team.id), "Could not clear club media");
+  await failOnAdminClubsError(await serviceClient.from("club_members").delete().eq("team_id", team.id), "Could not clear club memberships");
+
+  await failOnAdminClubsError(
+    await serviceClient
+      .from("teams")
+      .update({
+        claim_status: "unclaimed",
+        claimed_at: null,
+        claim_expires_at: null,
+        claimed_by: null,
+        verified: false,
+        logo_url: null,
+        website: null,
+        contact_email: null,
+        open_roster_spots: 0,
+        recruiting_active: false,
+        direct_messaging_enabled: true,
+        pipeline_names_public: false,
+        roster_needs: [],
+        pass_run_percentage: null,
+        passing_yards: null,
+        rushing_yards: null,
+        touchdowns_scored: null,
+        league_position: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", team.id),
+    "Could not release club to seed state"
+  );
+
+  if (storagePaths.size) {
+    await serviceClient.storage.from(PROFILE_MEDIA_BUCKET).remove(Array.from(storagePaths));
+  }
+
+  return team;
+}
+
 export async function adminCreateClubAction(formData: FormData) {
   await requireAdminProfile();
   const serviceClient = createSupabaseServiceRoleClient();
@@ -224,6 +293,32 @@ export async function adminDeleteClubAction(formData: FormData) {
   revalidatePath("/teams");
   revalidatePublicDirectoryCaches();
   redirect(`/admin/clubs?notice=${encodeURIComponent(`${team.name} deleted.`)}`);
+}
+
+export async function adminReleaseClubToSeedAction(formData: FormData) {
+  await requireAdminProfile();
+  const teamId = text(formData, "team_id");
+  const confirmation = text(formData, "confirmation");
+
+  if (!teamId) redirect("/admin/clubs?error=Choose a club to release.");
+  if (confirmation !== "RELEASE CLUB") {
+    redirect("/admin/clubs?error=Type RELEASE CLUB before releasing a club back to seed state.");
+  }
+
+  const serviceClient = createSupabaseServiceRoleClient();
+  const team = await releaseClubToSeedRecord(serviceClient, teamId);
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/clubs");
+  revalidatePath("/admin/club-verification");
+  revalidatePath("/campus-to-pro");
+  revalidatePath("/scouts");
+  revalidatePath("/teams");
+  revalidatePath(`/scouts/${team.id}`);
+  revalidatePath(`/teams/${team.id}`);
+  revalidatePublicDirectoryCaches();
+  redirect(`/admin/clubs?notice=${encodeURIComponent(`${team.name} released back to seed state.`)}`);
 }
 
 async function getPendingClubForAdminAction(teamId: string) {

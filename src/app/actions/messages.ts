@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { enforceActionRateLimit, getActionRateLimit } from "@/lib/action-rate-limit";
 import { getAuthenticatedProfile, type Profile } from "@/lib/auth";
 import { isPremiumActive } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -479,6 +480,8 @@ export async function startConversationAction(formData: FormData) {
     redirect("/onboarding");
   }
 
+  await enforceActionRateLimit(`conversation-start:${profile.id}`, 10, 60 * 60_000, "/messages");
+
   const serviceClient = createSupabaseServiceRoleClient();
   const targetProfileId = text(formData, "target_profile_id");
   const teamId = text(formData, "team_id") || null;
@@ -625,6 +628,11 @@ export async function sendMessageAction(
 
   if (profile.role !== "player" && profile.role !== "club") {
     return { ok: false, error: "Only player and club accounts can send messages." };
+  }
+
+  const messageRateLimit = await getActionRateLimit(`message-send:${profile.id}`, 40, 60_000);
+  if (!messageRateLimit.allowed) {
+    return { ok: false, error: "You are sending messages too quickly. Please wait a minute and try again." };
   }
 
   const serviceClient = createSupabaseServiceRoleClient();
