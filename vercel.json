@@ -3,7 +3,8 @@
   "crons": [
     {
       "path": "/api/cron/open-meeting-rooms",
-      "schedule": "* * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
+
