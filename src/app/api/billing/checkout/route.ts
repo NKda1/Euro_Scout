@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { BILLING_PLANS, createStripeCheckoutSession, planForRole, stripeConfigured, type BillingPlanKey } from "@/lib/billing";
+import { createStripeCheckoutSession, stripeConfigured } from "@/lib/billing";
+import { BILLING_PLANS, SHARED_PREMIUM_PRICE_ENV, planForRole, type BillingPlanKey } from "@/lib/billing-plans";
+import { isPremiumActive } from "@/lib/premium";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/auth";
 
@@ -40,9 +42,13 @@ export async function GET(request: NextRequest) {
     return accountRedirect(request, { error: "Premium checkout is not available for this account type yet." });
   }
 
+  if (isPremiumActive(profile)) {
+    return NextResponse.redirect(new URL("/api/billing/portal", request.nextUrl.origin));
+  }
+
   if (!stripeConfigured(plan)) {
     return accountRedirect(request, {
-      notice: `Stripe checkout stub is ready for ${BILLING_PLANS[plan].label}. Add STRIPE_SECRET_KEY and ${BILLING_PLANS[plan].priceEnv} to enable live checkout.`
+      notice: `Stripe checkout stub is ready for ${BILLING_PLANS[plan].label}. Add STRIPE_SECRET_KEY and ${SHARED_PREMIUM_PRICE_ENV} to enable live checkout.`
     });
   }
 

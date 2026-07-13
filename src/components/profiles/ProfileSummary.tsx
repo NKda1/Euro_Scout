@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { startConversationAction } from "@/app/actions/messages";
-import { requestPlayerCallAction } from "@/app/actions/meetings";
 import { createPlayerProfileNoteAction } from "@/app/actions/player-notes";
-import { reportProfileAction } from "@/app/actions/profile-reports";
 import HudlFilmViewer, { type FilmLink } from "@/components/players/HudlFilmViewer";
+import InvitePlayerToCallButton from "@/components/players/InvitePlayerToCallButton";
 import PlayerPhotoGallery from "@/components/players/PlayerPhotoGallery";
 import PublicNotesPanel, { type PublicPlayerNote } from "@/components/players/PublicNotesPanel";
 import CareerStatsPanel from "@/components/profiles/CareerStatsPanel";
@@ -20,7 +19,6 @@ interface ProfileSummaryProps {
   roleProfile?: Record<string, unknown> | null;
   showEditLink?: boolean;
   showMessageButton?: boolean;
-  showReportButton?: boolean;
   backHref?: string;
   backLabel?: string;
   filmLinks?: FilmLink[];
@@ -102,7 +100,6 @@ export default function ProfileSummary({
   roleProfile,
   showEditLink,
   showMessageButton,
-  showReportButton,
   backHref = "/players",
   backLabel = "Back to players",
   filmLinks = [],
@@ -226,21 +223,55 @@ export default function ProfileSummary({
         <div className="space-y-8 xl:border-r xl:border-slate-200 xl:pr-10 dark:xl:border-white/10">
           <section>
             <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Profile</p>
-            <div className="mt-5 border border-slate-200 bg-white p-5 dark:border-white/15 dark:bg-[#1a1a1a]">
-              <p className="text-base font-semibold leading-7 text-slate-600 dark:text-white/65">
-                {profile.bio ?? "This profile is ready for more detail. Account controls can update this public profile at any time."}
-              </p>
-              <div className="mt-5 grid gap-px overflow-hidden border border-slate-200 bg-slate-200 text-sm dark:border-white/10 dark:bg-white/10 sm:grid-cols-3">
-                {[
-                  ["Current team", currentTeam?.name],
-                  ["Current league", currentLeagueName],
-                  ["Bio", profile.bio]
-                ].map(([label, item]) => (
-                  <div key={label} className="bg-white p-4 dark:bg-[#111]">
-                    <p className="text-xs font-black uppercase text-slate-500 dark:text-white/35">{label}</p>
-                    <p className="mt-2 truncate font-black text-slate-950 dark:text-white">{value(item)}</p>
+            <div className="mt-5 space-y-5">
+              <div className="border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 dark:border-white/15 dark:from-[#1a1a1a] dark:to-[#111]">
+                <p className="text-base font-semibold leading-7 text-slate-600 dark:text-white/65">
+                  {profile.bio ?? "This profile is ready for more detail. Account controls can update this public profile at any time."}
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {/* Current Team Card */}
+                <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-indigo-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-indigo-500/40">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-indigo-500/5 opacity-0 transition group-hover:opacity-100 dark:to-indigo-500/10" />
+                  <div className="relative p-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <svg className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Current Team</p>
+                    </div>
+                    <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{currentTeam?.name ?? "Not listed"}</p>
                   </div>
-                ))}
+                </div>
+
+                {/* Current League Card */}
+                <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-purple-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-purple-500/40">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 transition group-hover:opacity-100 dark:to-purple-500/10" />
+                  <div className="relative p-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <svg className="h-5 w-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                      </svg>
+                      <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Current League</p>
+                    </div>
+                    <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{currentLeagueName ?? "Not listed"}</p>
+                  </div>
+                </div>
+
+                {/* Bio Status Card */}
+                <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-amber-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-amber-500/40">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/5 opacity-0 transition group-hover:opacity-100 dark:to-amber-500/10" />
+                  <div className="relative p-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Bio</p>
+                    </div>
+                    <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{profile.bio ? "Complete" : "Not listed"}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -382,29 +413,14 @@ export default function ProfileSummary({
                 </Link>
               )}
               {isPlayer && showMessageButton && viewerTeamId ? (
-                <form action={requestPlayerCallAction} className="grid gap-3 border-t border-slate-200 pt-4 dark:border-white/10">
-                  <input type="hidden" name="target_profile_id" value={profile.id} />
-                  <input type="hidden" name="team_id" value={viewerTeamId} />
-                  <input type="hidden" name="return_to" value={`/players/${profile.id}`} />
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35">Preferred call time</span>
-                    <input name="proposed_start_at" type="datetime-local" required className="h-11 w-full border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35">Alternative time</span>
-                    <input name="proposed_alternative_at" type="datetime-local" className="h-11 w-full border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white" />
-                  </label>
-                  <textarea
-                    name="request_note"
-                    rows={3}
-                    maxLength={500}
-                    placeholder="Agenda: role fit, contract details, film review, scholarship route..."
-                    className="w-full border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white dark:placeholder:text-white/25"
+                <div className="border-t border-slate-200 pt-4 dark:border-white/10">
+                  <InvitePlayerToCallButton
+                    targetProfileId={profile.id}
+                    playerDisplayName={profile.display_name}
+                    teamId={viewerTeamId}
+                    returnTo={`/players/${profile.id}`}
                   />
-                  <button className="h-11 w-full border border-red-300 px-4 text-sm font-black uppercase text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-200 dark:hover:bg-red-500/10">
-                    Invite to video call
-                  </button>
-                </form>
+                </div>
               ) : null}
               {isPlayer && showMessageButton && viewerTeamId ? (
                 <form action={createPlayerProfileNoteAction} className="border-t border-slate-200 pt-4 dark:border-white/10">
@@ -422,33 +438,6 @@ export default function ProfileSummary({
               ) : null}
             </div>
           </Panel>
-
-          {showReportButton ? (
-            <Panel eyebrow="Report Profile">
-              <form action={reportProfileAction} className="space-y-3">
-                <input type="hidden" name="reported_profile_id" value={profile.id} />
-                <input type="hidden" name="return_path" value={`/players/${profile.id}`} />
-                <label className="block">
-                  <span className="mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35">Reason</span>
-                  <select name="reason" required className="h-11 w-full border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none dark:border-white/10 dark:bg-black/35 dark:text-white">
-                    <option value="">Choose reason</option>
-                    <option value="impersonation">Possible impersonation</option>
-                    <option value="misleading_profile">Misleading profile</option>
-                    <option value="unsafe_contact">Unsafe contact</option>
-                    <option value="spam">Spam or abuse</option>
-                    <option value="other">Other concern</option>
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35">Details</span>
-                  <textarea name="details" rows={3} maxLength={2000} className="w-full border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white" />
-                </label>
-                <button className="h-11 w-full border border-red-300 px-4 text-sm font-black uppercase text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-200 dark:hover:bg-red-500/10">
-                  Submit report
-                </button>
-              </form>
-            </Panel>
-          ) : null}
         </aside>
       </div>
     </article>

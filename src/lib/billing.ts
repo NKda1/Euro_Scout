@@ -1,40 +1,18 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getBaseUrl } from "@/lib/api";
-import type { UserRole } from "@/lib/auth";
+import { BILLING_PLANS, SHARED_PREMIUM_PRICE_ENV, type BillingPlanKey } from "@/lib/billing-plans";
 
-export type BillingPlanKey = "player_premium" | "club_premium" | "journalist_premium";
-
-export const BILLING_PLANS: Record<BillingPlanKey, { label: string; role: Exclude<UserRole, "admin" | "fan">; priceEnv: string }> = {
-  player_premium: {
-    label: "Player Premium",
-    role: "player",
-    priceEnv: "STRIPE_PLAYER_PREMIUM_PRICE_ID"
-  },
-  club_premium: {
-    label: "Club Premium",
-    role: "club",
-    priceEnv: "STRIPE_CLUB_PREMIUM_PRICE_ID"
-  },
-  journalist_premium: {
-    label: "Journalist Premium",
-    role: "journalist",
-    priceEnv: "STRIPE_JOURNALIST_PREMIUM_PRICE_ID"
-  }
-};
-
-export function planForRole(role: UserRole): BillingPlanKey | null {
-  if (role === "player") return "player_premium";
-  if (role === "club") return "club_premium";
-  if (role === "journalist") return "journalist_premium";
-  return null;
+export function stripeSecretKey() {
+  const key = process.env.STRIPE_SECRET_KEY?.trim() ?? "";
+  return /^(sk|rk)_(test|live|sandbox)_/.test(key) ? key : "";
 }
 
 export function stripePlanPriceId(plan: BillingPlanKey) {
-  return process.env[BILLING_PLANS[plan].priceEnv] ?? "";
+  return process.env[SHARED_PREMIUM_PRICE_ENV] || process.env[BILLING_PLANS[plan].priceEnv] || "";
 }
 
 export function stripeConfigured(plan: BillingPlanKey) {
-  return Boolean(process.env.STRIPE_SECRET_KEY && stripePlanPriceId(plan));
+  return Boolean(stripeSecretKey() && stripePlanPriceId(plan));
 }
 
 export function billingReturnUrls(baseUrl = getBaseUrl()) {
@@ -44,17 +22,21 @@ export function billingReturnUrls(baseUrl = getBaseUrl()) {
   };
 }
 
+export function portalReturnUrl(baseUrl = getBaseUrl()) {
+  return `${baseUrl}/account?notice=${encodeURIComponent("Subscription updated successfully.")}`;
+}
+
 export async function createStripeCheckoutSession(params: {
   plan: BillingPlanKey;
   profileId: string;
   email?: string | null;
   baseUrl: string;
 }) {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const secretKey = stripeSecretKey();
   const priceId = stripePlanPriceId(params.plan);
 
   if (!secretKey || !priceId) {
-    return { url: null, error: "Stripe checkout is not configured yet." };
+    return { url: null, error: "Stripe checkout needs a server-side sk_ or rk_ key and a recurring Premium price ID." };
   }
 
   const { successUrl, cancelUrl } = billingReturnUrls(params.baseUrl);

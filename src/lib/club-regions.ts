@@ -10,6 +10,15 @@ export const clubCreationRegions: ClubCreationRegion[] = [
   { id: "andorra", label: "Andorra", country: "Andorra", countryCode: "AD" },
   { id: "armenia", label: "Armenia", country: "Armenia", countryCode: "AM" },
   { id: "austria", label: "Austria", country: "Austria", countryCode: "AT" },
+  { id: "canada", label: "Canada", country: "Canada", countryCode: "CA" },
+  { id: "ca-ab", label: "Alberta", country: "Canada", countryCode: "CA" },
+  { id: "ca-bc", label: "British Columbia", country: "Canada", countryCode: "CA" },
+  { id: "ca-mb", label: "Manitoba", country: "Canada", countryCode: "CA" },
+  { id: "ca-nb", label: "New Brunswick", country: "Canada", countryCode: "CA" },
+  { id: "ca-ns", label: "Nova Scotia", country: "Canada", countryCode: "CA" },
+  { id: "ca-on", label: "Ontario", country: "Canada", countryCode: "CA" },
+  { id: "ca-qc", label: "Quebec", country: "Canada", countryCode: "CA" },
+  { id: "ca-sk", label: "Saskatchewan", country: "Canada", countryCode: "CA" },
   { id: "azerbaijan", label: "Azerbaijan", country: "Azerbaijan", countryCode: "AZ" },
   { id: "belarus", label: "Belarus", country: "Belarus", countryCode: "BY" },
   { id: "belgium", label: "Belgium", country: "Belgium", countryCode: "BE" },
@@ -71,5 +80,5 @@ export function getClubCreationRegion(regionId: string | null | undefined) {
 export function countryCodeForClubCountry(country: string | null | undefined) {
   if (!country) return null;
   const normalized = country.trim().toLowerCase();
-  return clubCreationRegions.find((region) => region.label.toLowerCase() === normalized && region.country.toLowerCase() === normalized)?.countryCode ?? null;
+  return clubCreationRegions.find((region) => region.country.toLowerCase() === normalized)?.countryCode ?? null;
 }

@@ -140,7 +140,7 @@ export default async function AdminClubsPage({ searchParams }: AdminClubsPagePro
         <AdminPageHeader
           eyebrow="Admin Clubs"
           title="Manage league directory clubs."
-          description="Create, edit and delete club records that power club profiles, team directories and the home SVG market map."
+          description="Create, edit and delete club records that power club profiles, club directory and the home SVG market map."
         />
 
         {error ? <p className="border border-red-300 bg-red-50 p-4 text-sm font-black text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">{error}</p> : null}

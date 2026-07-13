@@ -4,7 +4,7 @@ import { Activity, BarChart3, CalendarCheck, Download, Eye, Film, MessageSquare,
 import AdminAnalyticsCharts from "@/components/analytics/AdminAnalyticsCharts";
 import { EmptyState } from "@/components/ui/StateDisplay";
 import { requireOnboardedProfile, roleLabel, userRoles, type UserRole } from "@/lib/auth";
-import { BILLING_PLANS, planForRole } from "@/lib/billing";
+import { BILLING_PLANS, planForRole } from "@/lib/billing-plans";
 import { isPremiumActive } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 

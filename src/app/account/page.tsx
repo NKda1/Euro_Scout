@@ -28,6 +28,9 @@ import {
 } from "@/app/actions/meetings";
 import { reviewPlayerProfileNoteAction } from "@/app/actions/player-notes";
 import { updateAccountAction } from "@/app/actions/profile";
+import AccountManagement from "@/components/account/AccountManagement";
+import AccountQuickNav from "@/components/account/AccountQuickNav";
+import AccountSection from "@/components/account/AccountSection";
 import CareerStatsBuilder from "@/components/account/CareerStatsBuilder";
 import CareerTimelineBuilder from "@/components/account/CareerTimelineBuilder";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
@@ -42,7 +45,7 @@ import { campusPipelines, campusTeams } from "@/lib/campus-to-pro";
 import { leagues, teams } from "@/lib/data";
 import { countUnreadMessages, type MessageRow } from "@/lib/messaging";
 import { getRoleProfile } from "@/lib/profile-data";
-import { BILLING_PLANS, planForRole } from "@/lib/billing";
+import { BILLING_PLANS, planForRole } from "@/lib/billing-plans";
 import { accountTierLabel, isPremiumActive, premiumExpiryLabel, rolePremiumFeatures } from "@/lib/premium";
 import { isStaffInvitePath } from "@/lib/staff-invites";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -386,17 +389,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Panel({ eyebrow, title, children }: { eyebrow: string; title?: string; children: React.ReactNode }) {
+function Panel({ eyebrow, title, id, defaultOpen, badge, children }: { eyebrow: string; title?: string; id?: string; defaultOpen?: boolean; badge?: string | number | null; children: React.ReactNode }) {
   return (
-    <section className="border-b border-slate-200 bg-white px-4 py-5 dark:border-white/10 dark:bg-[#111] sm:px-5">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-500">{eyebrow}</p>
-          {title ? <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">{title}</h2> : null}
-        </div>
-      </div>
+    <AccountSection eyebrow={eyebrow} title={title ?? eyebrow} id={id} defaultOpen={defaultOpen} badge={badge}>
       {children}
-    </section>
+    </AccountSection>
   );
 }
 
@@ -912,8 +909,41 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </Link>
           ) : null}
 
-          {profile.role !== "admin" ? (
-            <Panel eyebrow="Membership" title={`${accountTierLabel(profile)} account`}>
+          {profile.role === "player" ? (
+            <AccountQuickNav items={[
+              { id: "billing", label: "Billing" },
+              { id: "profile", label: "Profile" },
+              { id: "calls", label: "Video Calls", badge: pendingMeetingCount || null },
+              { id: "notes", label: "Club Notes", badge: (playerNoteReviews ?? []).length || null },
+              { id: "media", label: "Media" },
+              { id: "views", label: "Profile Views" },
+            ]} />
+          ) : profile.role === "club" && team ? (
+            <AccountQuickNav items={[
+              { id: "billing", label: "Billing" },
+              { id: "workbench", label: "Quick Actions" },
+              { id: "interest", label: "Interest", badge: newInterestCount || null },
+              { id: "calls", label: "Video Calls", badge: pendingMeetingCount || null },
+              { id: "club-profile", label: "Club Profile" },
+              { id: "staff", label: "Staff" },
+              { id: "messaging", label: "Messaging" },
+              { id: "club-media", label: "Media" },
+            ]} />
+          ) : null}
+
+          {(profile.role === "player" || profile.role === "club") && billingPlan ? (
+            <Panel id="billing" eyebrow="Account Management" title="Subscription & Billing">
+              <AccountManagement
+                isPremium={isPremiumAccount}
+                billingPlan={billingPlan}
+                accountTier={accountTierLabel(profile)}
+                premiumExpiryText={isPremiumAccount ? premiumExpiryLabel(profile) : undefined}
+              />
+            </Panel>
+          ) : null}
+
+          {profile.role !== "admin" && (profile.role !== "player" && profile.role !== "club") ? (
+            <Panel id="billing" eyebrow="Membership" title={`${accountTierLabel(profile)} account`}>
               <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
                 <div className={`rounded-lg border p-5 ${isPremiumAccount ? "border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10" : "border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-black/20"}`}>
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500 dark:text-white/35">Current tier</p>
@@ -952,7 +982,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "club" && team ? (
-            <Panel eyebrow="Club Workbench" title="Recruiting command center">
+            <Panel id="workbench" eyebrow="Club Workbench" title="Recruiting command center">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {[
                   ["Watchlists", "/watchlists", `${clubWatchlistCount ?? 0} shortlist${clubWatchlistCount === 1 ? "" : "s"}`, "bg-red-600 text-white hover:bg-red-700"],
@@ -970,7 +1000,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "club" && team ? (
-            <Panel eyebrow="Interest Notifications" title={newInterestCount ? `${newInterestCount} new player interest${newInterestCount === 1 ? "" : "s"}` : "Player interest"}>
+            <Panel id="interest" eyebrow="Interest Notifications" title={newInterestCount ? `${newInterestCount} new player interest${newInterestCount === 1 ? "" : "s"}` : "Player interest"}>
               {(clubInterestNotifications ?? []).length ? (
                 <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-black/20">
                   {(clubInterestNotifications ?? []).map((interest) => {
@@ -1016,6 +1046,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           {(profile.role === "player" || (profile.role === "club" && team)) ? (
             <Panel
+              id="calls"
               eyebrow="Video Calls"
               title={profile.role === "club" ? (pendingMeetingCount ? `${pendingMeetingCount} pending call request${pendingMeetingCount === 1 ? "" : "s"}` : "Club call requests") : "Your club call requests"}
             >
@@ -1049,146 +1080,157 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                         : "border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/35";
 
                     return (
-                      <div key={meeting.id} className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-black/20">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="flex min-w-0 gap-3">
-                            <div
-                              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-slate-100 bg-cover bg-center text-sm font-black text-slate-500 dark:bg-white/10 dark:text-white/55"
-                              style={avatarUrl ? { backgroundImage: `linear-gradient(180deg, transparent, rgba(0,0,0,.65)), url(${avatarUrl})` } : undefined}
-                            >
-                              {avatarUrl ? "" : initials(counterpartName)}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="truncate text-sm font-black text-slate-950 dark:text-white">{counterpartName}</p>
-                                <span className={`rounded border px-2 py-0.5 text-[10px] font-black uppercase ${statusClass}`}>
-                                  {statusLabel}
-                                </span>
-                              </div>
-                              <p className="mt-1 truncate text-xs font-semibold text-slate-500 dark:text-white/40">{counterpartDetail}</p>
-                              <div className="mt-3 grid gap-2 text-xs font-semibold text-slate-500 dark:text-white/45 sm:grid-cols-2">
-                                <p>Preferred: <span className="text-slate-700 dark:text-white/70">{formatMeetingTime(meeting.proposed_start_at)}</span></p>
-                                <p>Alternative: <span className="text-slate-700 dark:text-white/70">{formatMeetingTime(meeting.proposed_alternative_at)}</span></p>
-                                {meeting.scheduled_at ? (
-                                  <p className="sm:col-span-2">Confirmed: <span className="text-slate-700 dark:text-white/70">{formatMeetingTime(meeting.scheduled_at)}</span></p>
-                                ) : null}
-                              </div>
-                              {meeting.request_reason ? (
-                                <p className="mt-3 w-fit rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-black uppercase text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200">
-                                  {meeting.request_reason}
-                                </p>
-                              ) : null}
-                              {meeting.request_note ? (
-                                <p className="mt-3 max-w-3xl whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-600 dark:border-white/10 dark:bg-black/25 dark:text-white/55">
-                                  {meeting.request_note}
-                                </p>
-                              ) : null}
-                              {meeting.club_response_note ? (
-                                <p className="mt-3 max-w-3xl whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold leading-6 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100/75">
-                                  {meeting.club_response_note}
-                                </p>
-                              ) : null}
-                            </div>
+                      <div key={meeting.id} className="rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-black/20">
+                        {/* Compact header row */}
+                        <div className="flex items-center gap-3 px-3 py-2.5">
+                          <div
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 bg-cover bg-center text-[11px] font-black text-slate-500 dark:bg-white/10 dark:text-white/55"
+                            style={avatarUrl ? { backgroundImage: `linear-gradient(180deg, transparent, rgba(0,0,0,.65)), url(${avatarUrl})` } : undefined}
+                          >
+                            {avatarUrl ? "" : initials(counterpartName)}
                           </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="text-sm font-black text-slate-950 dark:text-white">{counterpartName}</p>
+                              <span className={`rounded border px-1.5 py-px text-[10px] font-black uppercase ${statusClass}`}>{statusLabel}</span>
+                              {meeting.request_reason ? (
+                                <span className="rounded border border-red-200 bg-red-50 px-1.5 py-px text-[10px] font-black uppercase text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200">
+                                  {meeting.request_reason}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500 dark:text-white/40">{counterpartDetail}</p>
+                          </div>
+                          {meeting.conversation_id ? (
+                            <Link href={`/messages/${meeting.conversation_id}`} className="shrink-0 rounded-md border border-slate-200 px-2.5 py-1.5 text-[10px] font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/40 dark:hover:border-red-500/35 dark:hover:text-white">
+                              Inbox
+                            </Link>
+                          ) : null}
+                        </div>
 
-                          <div className="grid shrink-0 gap-2 sm:min-w-72">
+                        {/* Compact time row */}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 px-3 py-2 dark:border-white/[0.06]">
+                          <span className="text-[11px] font-semibold text-slate-500 dark:text-white/40">
+                            Preferred <span className="font-bold text-slate-700 dark:text-white/70">{formatMeetingTime(meeting.proposed_start_at)}</span>
+                          </span>
+                          {meeting.proposed_alternative_at ? (
+                            <span className="text-[11px] font-semibold text-slate-500 dark:text-white/40">
+                              Alt <span className="font-bold text-slate-700 dark:text-white/70">{formatMeetingTime(meeting.proposed_alternative_at)}</span>
+                            </span>
+                          ) : null}
+                          {meeting.scheduled_at ? (
+                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              Confirmed <span className="font-bold">{formatMeetingTime(meeting.scheduled_at)}</span>
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* Notes (condensed) */}
+                        {(meeting.request_note || meeting.club_response_note) ? (
+                          <div className="space-y-1.5 border-t border-slate-100 px-3 py-2 dark:border-white/[0.06]">
+                            {meeting.request_note ? (
+                              <p className="line-clamp-2 text-xs font-semibold leading-5 text-slate-500 dark:text-white/45">
+                                {meeting.request_note}
+                              </p>
+                            ) : null}
+                            {meeting.club_response_note ? (
+                              <p className="line-clamp-2 text-xs font-semibold leading-5 text-blue-600 dark:text-blue-300/70">
+                                {meeting.club_response_note}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        {/* Action area */}
+                        {(canClubRespond || canPlayerConfirm || isAccepted || isOpenMeeting) ? (
+                          <div className="border-t border-slate-100 px-3 py-2.5 dark:border-white/[0.06]">
                             {canClubRespond ? (
-                              <>
-                                <form action={acceptMeetingRequestAction} className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-black/25">
+                              <div className="grid gap-2">
+                                <form action={acceptMeetingRequestAction} className="grid grid-cols-[1fr_auto] items-end gap-2">
                                   <input type="hidden" name="meeting_request_id" value={meeting.id} />
                                   <input type="hidden" name="return_to" value="/account" />
-                                  <label className="grid gap-1">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-white/35">Final time</span>
+                                  <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr]">
                                     <input name="scheduled_at" type="datetime-local" required defaultValue={toDatetimeLocal(confirmedTime)} className={inputClass} />
-                                  </label>
-                                  <select name="duration_minutes" defaultValue={meeting.scheduled_duration_minutes ?? 30} className={inputClass}>
-                                    <option value="15">15 min</option>
-                                    <option value="30">30 min</option>
-                                    <option value="45">45 min</option>
-                                    <option value="60">60 min</option>
-                                  </select>
-                                  <textarea
-                                    name="club_response_note"
-                                    rows={2}
-                                    maxLength={500}
-                                    placeholder="Optional note for the player"
-                                    className={textareaClass}
-                                  />
-                                  <button className="h-10 rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
-                                    Send final time
+                                    <select name="duration_minutes" defaultValue={meeting.scheduled_duration_minutes ?? 30} className={inputClass}>
+                                      <option value="15">15 min</option>
+                                      <option value="30">30 min</option>
+                                      <option value="45">45 min</option>
+                                      <option value="60">60 min</option>
+                                    </select>
+                                    <input name="club_response_note" type="text" maxLength={200} placeholder="Optional note…" className={inputClass} />
+                                  </div>
+                                  <button className="h-11 rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700 whitespace-nowrap">
+                                    Confirm time
                                   </button>
                                 </form>
-                                <form action={declineMeetingRequestAction}>
+                                <form action={declineMeetingRequestAction} className="w-full">
                                   <input type="hidden" name="meeting_request_id" value={meeting.id} />
                                   <input type="hidden" name="return_to" value="/account" />
-                                  <button className={meetingSecondaryButtonClass}>
+                                  <button className="h-8 w-full rounded-md border border-slate-200 px-4 text-[10px] font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/40">
                                     Decline
                                   </button>
                                 </form>
-                              </>
+                              </div>
                             ) : null}
 
                             {canPlayerConfirm ? (
-                              <>
-                                <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold leading-5 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100/75">
-                                  The club has sent a final call time. Confirm it to lock the booking.
+                              <div className="grid gap-2">
+                                <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  Club proposed a final time — confirm to lock the booking.
                                 </p>
-                                <form action={confirmMeetingTimeAction} className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-black/25">
-                                  <input type="hidden" name="meeting_request_id" value={meeting.id} />
-                                  <input type="hidden" name="return_to" value="/account" />
-                                  <input type="hidden" name="duration_minutes" value={meeting.scheduled_duration_minutes ?? 30} />
-                                  <p className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-black text-slate-950 dark:border-white/10 dark:bg-black/25 dark:text-white">
-                                    {formatMeetingTime(confirmedTime)}
-                                  </p>
-                                  <button className="h-10 rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
-                                    Confirm final time
-                                  </button>
-                                </form>
-                                <form action={declineMeetingRequestAction}>
-                                  <input type="hidden" name="meeting_request_id" value={meeting.id} />
-                                  <input type="hidden" name="return_to" value="/account" />
-                                  <button className={meetingSecondaryButtonClass}>
-                                    Decline invite
-                                  </button>
-                                </form>
-                              </>
+                                <div className="flex items-center gap-2">
+                                  <form action={confirmMeetingTimeAction} className="flex-1">
+                                    <input type="hidden" name="meeting_request_id" value={meeting.id} />
+                                    <input type="hidden" name="return_to" value="/account" />
+                                    <input type="hidden" name="duration_minutes" value={meeting.scheduled_duration_minutes ?? 30} />
+                                    <button className="h-9 w-full rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
+                                      Confirm — {formatMeetingTime(confirmedTime)}
+                                    </button>
+                                  </form>
+                                  <form action={declineMeetingRequestAction}>
+                                    <input type="hidden" name="meeting_request_id" value={meeting.id} />
+                                    <input type="hidden" name="return_to" value="/account" />
+                                    <button className="h-9 rounded-md border border-slate-200 px-3 text-[10px] font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/40">
+                                      Decline
+                                    </button>
+                                  </form>
+                                </div>
+                              </div>
                             ) : null}
 
                             {isAccepted ? (
-                              <>
-                                <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-bold leading-5 text-slate-500 dark:border-white/10 dark:bg-black/25 dark:text-white/45">
-                                  Daily room opens 5 minutes before the confirmed time.
-                                </p>
-                                <form action={createMeetingJoinLinkAction}>
+                              <div className="flex flex-wrap gap-2">
+                                <form action={createMeetingJoinLinkAction} className="flex-1">
                                   <input type="hidden" name="meeting_request_id" value={meeting.id} />
                                   <input type="hidden" name="return_to" value="/account" />
-                                  <button className="h-10 w-full rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
+                                  <button className="h-9 w-full rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
                                     Join call
                                   </button>
                                 </form>
-                                <Link href={`/meetings/${meeting.id}/room`} className={meetingSecondaryButtonClass}>
-                                  Open call room
+                                <Link href={`/meetings/${meeting.id}/room`} className="inline-flex h-9 items-center rounded-md border border-slate-200 px-3 text-[10px] font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/40">
+                                  Open room
                                 </Link>
-                              </>
+                                <form action={cancelMeetingRequestAction}>
+                                  <input type="hidden" name="meeting_request_id" value={meeting.id} />
+                                  <input type="hidden" name="return_to" value="/account" />
+                                  <button className="h-9 rounded-md border border-red-200 px-3 text-[10px] font-black uppercase text-red-600 transition hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:text-red-300">
+                                    Cancel
+                                  </button>
+                                </form>
+                              </div>
                             ) : null}
 
-                            {meeting.conversation_id ? (
-                              <Link href={`/messages/${meeting.conversation_id}`} className={meetingSecondaryButtonClass}>
-                                Open inbox
-                              </Link>
-                            ) : null}
-
-                            {isOpenMeeting ? (
-                              <form action={cancelMeetingRequestAction}>
+                            {isOpenMeeting && !isAccepted && !canClubRespond && !canPlayerConfirm ? (
+                              <form action={cancelMeetingRequestAction} className="w-full">
                                 <input type="hidden" name="meeting_request_id" value={meeting.id} />
                                 <input type="hidden" name="return_to" value="/account" />
-                                <button className={meetingDangerButtonClass}>
+                                <button className="h-8 w-full rounded-md border border-red-200 bg-red-50 px-4 text-[10px] font-black uppercase text-red-700 transition hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
                                   Cancel call
                                 </button>
                               </form>
                             ) : null}
                           </div>
-                        </div>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -1204,7 +1246,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "player" ? (
-            <Panel eyebrow="Player Workbench" title="Profile command center">
+            <Panel id="workbench" eyebrow="Player Workbench" title="Profile command center">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {[
                   ["Public preview", publicHref, "View as public", "bg-red-600 text-white hover:bg-red-700"],
@@ -1222,7 +1264,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "player" ? (
-            <Panel eyebrow="Profile Views" title="Who has viewed your account">
+            <Panel id="views" defaultOpen={false} eyebrow="Profile Views" title="Who has viewed your account">
               {profileViewsError ? (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-200">
                   Profile view tracking needs the `src/db/013_player_profile_views.sql` Supabase migration.
@@ -1292,24 +1334,24 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </Panel>
           ) : null}
 
-          <Panel eyebrow="Profile Photo" title="Upload profile picture">
-            <div className="grid gap-4 md:grid-cols-[112px_minmax(0,1fr)] md:items-center">
+          <Panel id="profile" eyebrow="Profile Controls" title="Edit your profile">
+            <div className="mb-6 grid gap-4 md:grid-cols-[112px_minmax(0,1fr)] md:items-center">
               <div
                 className="flex aspect-square items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-4xl font-black"
                 style={profile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.58)), url(${profile.avatar_url})` } : undefined}
               >
                 {profile.avatar_url ? "" : initials(profile.display_name)}
               </div>
-              <form action={uploadAvatarAction} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <input name="avatar" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required className={fileClass} />
-                <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
-                  Upload PFP
-                </button>
-              </form>
+              <div>
+                <p className={labelClass}>Profile photo</p>
+                <form action={uploadAvatarAction} className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <input name="avatar" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required className={fileClass} />
+                  <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
+                    Upload
+                  </button>
+                </form>
+              </div>
             </div>
-          </Panel>
-
-          <Panel eyebrow="Profile Controls" title="Edit public account metrics">
             <form action={updateAccountAction} className="grid gap-4 md:grid-cols-2">
               <input type="hidden" name="role" value={profile.role} />
               <Field label="Display name">
@@ -1437,7 +1479,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           </Panel>
 
           {profile.role === "journalist" ? (
-            <Panel eyebrow="Journalist Desk" title="Publish article links">
+            <Panel id="journalist" eyebrow="Journalist Desk" title="Publish article links">
               {journalistArticlesError ? (
                 <div className="mb-5 rounded-lg border border-amber-500/35 bg-amber-500/10 p-4 text-sm font-bold text-amber-200">
                   Journalist publishing needs the `src/db/012_journalist_articles.sql` Supabase migration.
@@ -1447,8 +1489,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 {[
                   ["Links", String(journalistArticles?.length ?? 0), "Submitted"],
                   ["Published", String(journalistPublishedCount), "Live on news"],
-                  ["Article opens", String(journalistOpenCount ?? 0), "All time"],
-                  ["Last 7 days", String(journalistWeekOpenCount ?? 0), "Recent opens"]
+                  ["Article opens", isPremiumAccount ? String(journalistOpenCount ?? 0) : "Pro", isPremiumAccount ? "All time" : "Premium analytics"],
+                  ["Last 7 days", isPremiumAccount ? String(journalistWeekOpenCount ?? 0) : "Pro", isPremiumAccount ? "Recent opens" : "Premium analytics"]
                 ].map(([label, value, helper]) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/25">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-white/35">{label}</p>
@@ -1456,8 +1498,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                     <p className="mt-1 text-xs font-bold text-slate-500 dark:text-white/40">{helper}</p>
                   </div>
                 ))}
-                <Link href="/analytics" className="inline-flex h-11 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 md:col-span-4 md:w-fit">
-                  Open article analytics
+                <Link href={isPremiumAccount ? "/analytics" : billingPlan ? `/api/billing/checkout?plan=${billingPlan}` : "/account"} className="inline-flex h-11 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 md:col-span-4 md:w-fit">
+                  {isPremiumAccount ? "Open article analytics" : "Upgrade for article analytics"}
                 </Link>
               </div>
               <form action={publishJournalistArticleAction} encType="multipart/form-data" className="grid gap-4">
@@ -1467,12 +1509,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <Field label="Article link">
                   <input name="article_url" required type="url" placeholder="https://your-publication.com/article" className={inputClass} />
                 </Field>
-                <Field label="Thumbnail image link">
-                  <input name="thumbnail_url" type="url" placeholder="https://your-publication.com/image.jpg" className={inputClass} />
-                </Field>
-                <Field label="Upload thumbnail">
-                  <input name="thumbnail_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" className={fileClass} />
-                </Field>
+                {isPremiumAccount ? (
+                  <Field label="Upload thumbnail">
+                    <input name="thumbnail_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" className={fileClass} />
+                  </Field>
+                ) : (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                    Article thumbnails are included with Premium. Standard journalist accounts can still publish clean text links.
+                  </div>
+                )}
                 <Field label="Short preview">
                   <textarea
                     name="excerpt"
@@ -1556,7 +1601,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           {profile.role === "player" ? (
             <>
-              <Panel eyebrow="Club Notes" title="Review notes before they appear publicly">
+              <Panel id="notes" eyebrow="Club Notes" title="Review notes before they appear publicly">
                 {(playerNoteReviews ?? []).length ? (
                   <div className="divide-y divide-white/10 border border-white/10 bg-black/20">
                     {(playerNoteReviews ?? []).map((note) => (
@@ -1592,13 +1637,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   </div>
                 )}
               </Panel>
-              <PlayerPhotoManager photoUrls={playerPhotoUrls} />
-              <FilmLinksManager filmLinks={filmLinks ?? []} />
+              <Panel id="media" defaultOpen={false} eyebrow="Profile Media" title="Photos & film reel">
+                <PlayerPhotoManager photoUrls={playerPhotoUrls} />
+                <FilmLinksManager filmLinks={filmLinks ?? []} />
+              </Panel>
             </>
           ) : null}
 
           {profile.role === "club" ? (
-            <Panel eyebrow="Organisation Access" title={team ? "Manage your club connection" : "Request to join an organisation"}>
+            <Panel id="organisation" eyebrow="Organisation Access" title={team ? "Manage your club connection" : "Request to join an organisation"}>
               {team ? (
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                   <div>
@@ -1686,31 +1733,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "club" && team ? (
-            <Panel eyebrow="Club Brand" title="Upload club logo">
-              <div className="grid gap-5 md:grid-cols-[140px_minmax(0,1fr)] md:items-center">
-                <div
-                  className="flex aspect-square items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-4xl font-black"
-                  style={team.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.58)), url(${team.logo_url})` } : undefined}
-                >
-                  {team.logo_url ? "" : initials(team.name)}
-                </div>
-                {isClubOwner ? (
-                  <form action={uploadClubLogoAction} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                    <input type="hidden" name="team_id" value={team.id} />
-                    <input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required className={fileClass} />
-                    <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
-                      Upload logo
-                    </button>
-                  </form>
-                ) : (
-                  <p className="text-sm font-semibold text-white/45">Only the club owner can update the club logo.</p>
-                )}
-              </div>
-            </Panel>
-          ) : null}
-
-          {profile.role === "club" && team ? (
-            <Panel eyebrow="Messaging Access" title="Control player direct messages">
+            <Panel id="messaging" eyebrow="Messaging Access" title="Control player direct messages">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                 <div>
                   <p className="text-sm font-semibold leading-6 text-slate-600 dark:text-white/50">
@@ -1746,7 +1769,29 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "club" && team ? (
-            <Panel eyebrow="Club Profile" title="Edit public club metrics">
+            <Panel id="club-profile" eyebrow="Club Profile" title="Edit public club metrics">
+              <div className="mb-6 grid gap-5 md:grid-cols-[140px_minmax(0,1fr)] md:items-center">
+                <div
+                  className="flex aspect-square items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-4xl font-black"
+                  style={team.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.58)), url(${team.logo_url})` } : undefined}
+                >
+                  {team.logo_url ? "" : initials(team.name)}
+                </div>
+                {isClubOwner ? (
+                  <div>
+                    <p className={labelClass}>Club logo</p>
+                    <form action={uploadClubLogoAction} className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <input type="hidden" name="team_id" value={team.id} />
+                      <input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required className={fileClass} />
+                      <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
+                        Upload logo
+                      </button>
+                    </form>
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-slate-500 dark:text-white/45">Only the club owner can update the club logo.</p>
+                )}
+              </div>
               <form action={updateClubProfileFromAccountAction} className="grid gap-4 md:grid-cols-2">
                 <input type="hidden" name="team_id" value={team.id} />
                 <Field label="Club name">
@@ -1795,13 +1840,13 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "club" && team ? (
-            <Panel eyebrow="Club Media" title="Manage public club media">
+            <Panel id="club-media" defaultOpen={false} eyebrow="Club Media" title="Manage public club media">
               <ClubMediaSection scoutId={team.id} teamId={team.id} media={clubMedia ?? []} isMember returnTo="/account" />
             </Panel>
           ) : null}
 
           {profile.role === "club" && team ? (
-            <Panel eyebrow="Staff Directory" title="Manage club staff">
+            <Panel id="staff" eyebrow="Staff Directory" title="Manage club staff">
               <div className="space-y-3">
                 {staff.map((staffMember) => {
                   const staffProfile = staffMember.profiles;

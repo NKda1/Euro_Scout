@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { requireOnboardedProfile, type Profile } from "@/lib/auth";
 import { buildDailyJoinUrl, createDailyMeetingToken, createDailyRoom } from "@/lib/daily";
+import { hasPremiumFeature } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 type ServiceClient = ReturnType<typeof createSupabaseServiceRoleClient>;
@@ -443,6 +444,10 @@ export async function requestPlayerCallAction(formData: FormData) {
 
   if (profile.role !== "club" && profile.role !== "admin") {
     redirectWithError(returnPath, "Only club accounts can invite players to video calls.");
+  }
+
+  if (!hasPremiumFeature(profile, "club_call_negotiation_tools")) {
+    redirectWithError(returnPath, "Inviting players to video calls is a premium club feature. Players can still request calls with your club.");
   }
 
   if (!teamId || !targetProfileId) {

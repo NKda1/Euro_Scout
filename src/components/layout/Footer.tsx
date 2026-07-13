@@ -17,7 +17,7 @@ export default function Footer() {
             League directories
           </Link>
           <Link href={routes.teams} className="hover:text-red-700 dark:hover:text-red-300">
-            Team directories
+            Club directory
           </Link>
           <Link href={routes.campusToPro} className="hover:text-red-700 dark:hover:text-red-300">
             Campus to Pro

@@ -94,8 +94,6 @@ export default async function NewsPage() {
           <EmptyState
             title="No journalist articles yet"
             description="Published links will appear here with thumbnails, bylines, league tags and short previews."
-            actionHref="/dashboard"
-            actionLabel="Open dashboard"
           />
         )}
       </section>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import {
   acceptMeetingRequestAction,
   cancelMeetingRequestAction,
@@ -189,50 +190,50 @@ export default async function ConversationPage({ params, searchParams }: Convers
     .returns<MeetingRequestRow[]>();
 
   return (
-    <main className="app-surface">
-      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <Link href="/messages" className="text-sm font-black text-red-600 hover:text-red-700">
-          ← Back to messages
-        </Link>
-        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
-          <div className="border-b border-slate-200 p-4 dark:border-white/10 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-4">
-                <div
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-900 bg-cover bg-center text-sm font-black text-white"
-                  style={displayProfile?.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.48)), url(${displayProfile.avatar_url})` } : undefined}
-                >
-                  {displayProfile?.avatar_url ? "" : profileInitials(displayProfile?.display_name ?? "Member")}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-black uppercase tracking-[0.24em] text-red-600">Conversation</p>
-                  <h1 className="mt-2 truncate text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">{conversation.subject}</h1>
-                  <p className="mt-1 truncate text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    With {otherProfiles.map((item) => `${item.display_name} (${roleLabel(item.role)})`).join(", ") || "EuroScout member"}
-                  </p>
-                </div>
-              </div>
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Conversation header */}
+      <div className="shrink-0 border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <Link
+            href="/messages"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white lg:hidden"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-900 bg-cover bg-center text-xs font-black text-white"
+            style={displayProfile?.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.48)), url(${displayProfile.avatar_url})` } : undefined}
+          >
+            {displayProfile?.avatar_url ? "" : profileInitials(displayProfile?.display_name ?? "Member")}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-sm font-black text-slate-950 dark:text-white">{conversation.subject}</h1>
               {conversation.team_id ? (
-                <span className="w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200">
-                  Shared club inbox
+                <span className="shrink-0 rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-black uppercase text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200">
+                  Club inbox
                 </span>
               ) : null}
             </div>
+            <p className="mt-0.5 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {otherProfiles.map((item) => `${item.display_name} (${roleLabel(item.role)})`).join(", ") || "EuroScout member"}
+            </p>
           </div>
-          {error ? (
-            <p className="mx-6 mt-6 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">{error}</p>
-          ) : null}
-          {notice ? (
-            <p className="mx-6 mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</p>
-          ) : null}
-          {meetingRequests?.length ? (
-            <section className="mx-4 mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20 sm:mx-6">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600">Call bookings</p>
-                <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-white/45">
-                  Manage call times and join links directly from this inbox.
-                </p>
-              </div>
+        </div>
+        {error ? (
+          <p className="mx-4 mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">{error}</p>
+        ) : null}
+        {notice ? (
+          <p className="mx-4 mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</p>
+        ) : null}
+      </div>
+
+      {/* Call bookings — compact scrollable section */}
+      {meetingRequests?.length ? (
+        <div className="shrink-0 overflow-y-auto border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-black/20" style={{ maxHeight: "240px" }}>
+          <div className="p-3">
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-red-500">Call Bookings</p>
+            <div className="space-y-1.5">
               {meetingRequests.map((meeting) => {
                 const isPending = meeting.status === "pending";
                 const isClubProposed = meeting.status === "club_proposed";
@@ -242,6 +243,7 @@ export default async function ConversationPage({ params, searchParams }: Convers
                 const canClubRespond = !isAdminAudit && (profile.role === "club" || profile.role === "admin") && isPending && isPlayerRequest;
                 const canPlayerConfirm = !isAdminAudit && profile.role === "player" && (isClubProposed || (isPending && !isPlayerRequest));
                 const confirmedTime = meeting.scheduled_at ?? meeting.proposed_start_at;
+                const statusLabel = isClubProposed ? "awaiting player" : meeting.status.replace("_", " ");
                 const statusClass = isAccepted
                   ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200"
                   : isClubProposed
@@ -251,133 +253,135 @@ export default async function ConversationPage({ params, searchParams }: Convers
                       : "border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/45";
 
                 return (
-                  <div key={meeting.id} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase ${statusClass}`}>
-                            {isClubProposed ? "awaiting player" : meeting.status.replace("_", " ")}
-                          </span>
-                          {meeting.request_reason ? (
-                            <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-black uppercase text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
-                              {meeting.request_reason}
-                            </span>
-                          ) : null}
-                        </div>
-                        <h2 className="mt-3 text-xl font-black text-slate-950 dark:text-white">
-                          {meeting.teams?.name ?? "Club"} x {meeting.profiles?.display_name ?? "Player"}
-                        </h2>
-                        <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-500 dark:text-white/45 sm:grid-cols-2">
-                          <p>Preferred: <span className="text-slate-900 dark:text-white/75">{formatMeetingTime(meeting.proposed_start_at)}</span></p>
-                          <p>Backup: <span className="text-slate-900 dark:text-white/75">{formatMeetingTime(meeting.proposed_alternative_at)}</span></p>
-                          {meeting.scheduled_at ? (
-                            <p className="sm:col-span-2">Final: <span className="text-slate-900 dark:text-white/75">{formatMeetingTime(meeting.scheduled_at)}</span></p>
-                          ) : null}
-                        </div>
+                  <div key={meeting.id} className="rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.04]">
+                    {/* Header row */}
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <span className={`shrink-0 rounded border px-1.5 py-px text-[10px] font-black uppercase ${statusClass}`}>{statusLabel}</span>
+                      <p className="min-w-0 flex-1 truncate text-xs font-black text-slate-950 dark:text-white">
+                        {meeting.teams?.name ?? "Club"} × {meeting.profiles?.display_name ?? "Player"}
+                      </p>
+                      {meeting.request_reason ? (
+                        <span className="shrink-0 rounded border border-red-200 bg-red-50 px-1.5 py-px text-[10px] font-black uppercase text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
+                          {meeting.request_reason}
+                        </span>
+                      ) : null}
+                    </div>
+                    {/* Times row */}
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 border-t border-slate-100 px-3 py-1.5 dark:border-white/[0.06]">
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-white/40">
+                        Preferred <span className="font-bold text-slate-700 dark:text-white/70">{formatMeetingTime(meeting.proposed_start_at)}</span>
+                      </span>
+                      {meeting.proposed_alternative_at ? (
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-white/40">
+                          Alt <span className="font-bold text-slate-700 dark:text-white/70">{formatMeetingTime(meeting.proposed_alternative_at)}</span>
+                        </span>
+                      ) : null}
+                      {meeting.scheduled_at ? (
+                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                          Confirmed {formatMeetingTime(meeting.scheduled_at)}
+                        </span>
+                      ) : null}
+                    </div>
+                    {/* Notes */}
+                    {(meeting.request_note || meeting.club_response_note) ? (
+                      <div className="border-t border-slate-100 px-3 py-1.5 dark:border-white/[0.06]">
                         {meeting.request_note ? (
-                          <p className="mt-3 whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-600 dark:border-white/10 dark:bg-black/25 dark:text-white/55">
-                            {meeting.request_note}
-                          </p>
+                          <p className="line-clamp-2 text-[11px] font-semibold leading-5 text-slate-500 dark:text-white/40">{meeting.request_note}</p>
                         ) : null}
                         {meeting.club_response_note ? (
-                          <p className="mt-3 whitespace-pre-wrap rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold leading-6 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-100">
-                            {meeting.club_response_note}
-                          </p>
+                          <p className="line-clamp-2 text-[11px] font-semibold leading-5 text-blue-600 dark:text-blue-300/70">{meeting.club_response_note}</p>
                         ) : null}
                       </div>
-
-                      <div className="grid content-start gap-2">
+                    ) : null}
+                    {/* Actions */}
+                    {(canClubRespond || canPlayerConfirm || isAccepted || (isOpen && !isAdminAudit)) ? (
+                      <div className="border-t border-slate-100 px-3 py-2 dark:border-white/[0.06]">
                         {canClubRespond ? (
-                          <>
-                            <form action={acceptMeetingRequestAction} className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-black/25">
+                          <div className="space-y-1.5">
+                            <form action={acceptMeetingRequestAction} className="flex flex-wrap items-end gap-2">
                               <input type="hidden" name="meeting_request_id" value={meeting.id} />
                               <input type="hidden" name="return_to" value={`/messages/${conversation.id}`} />
-                              <input name="scheduled_at" type="datetime-local" required defaultValue={toDatetimeLocal(confirmedTime)} className={callInputClass} />
-                              <select name="duration_minutes" defaultValue={meeting.scheduled_duration_minutes ?? 30} className={callInputClass}>
+                              <input name="scheduled_at" type="datetime-local" required defaultValue={toDatetimeLocal(confirmedTime)} className={`${callInputClass} min-w-36 flex-1`} />
+                              <select name="duration_minutes" defaultValue={meeting.scheduled_duration_minutes ?? 30} className={`${callInputClass} w-24`}>
                                 <option value="15">15 min</option>
                                 <option value="30">30 min</option>
                                 <option value="45">45 min</option>
                                 <option value="60">60 min</option>
                               </select>
-                              <textarea
-                                name="club_response_note"
-                                rows={2}
-                                maxLength={500}
-                                placeholder="Optional note for the player"
-                                className="min-h-20 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-red-500 dark:border-white/10 dark:bg-black/30 dark:text-white dark:placeholder:text-white/25"
-                              />
-                              <button className="h-10 rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
-                                Send final time
+                              <input name="club_response_note" type="text" maxLength={200} placeholder="Note (optional)" className={`${callInputClass} min-w-36 flex-1`} />
+                              <button className="h-11 whitespace-nowrap rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
+                                Confirm time
                               </button>
                             </form>
                             <form action={declineMeetingRequestAction}>
                               <input type="hidden" name="meeting_request_id" value={meeting.id} />
                               <input type="hidden" name="return_to" value={`/messages/${conversation.id}`} />
-                              <button className="h-10 w-full rounded-lg border border-slate-200 px-4 text-xs font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/45 dark:hover:border-red-500/35 dark:hover:text-white">
+                              <button className="h-8 w-full rounded-md border border-slate-200 px-4 text-[10px] font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/45">
                                 Decline
                               </button>
                             </form>
-                          </>
+                          </div>
                         ) : null}
-
                         {canPlayerConfirm ? (
-                          <>
-                            <form action={confirmMeetingTimeAction} className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-black/25">
+                          <div className="flex gap-2">
+                            <form action={confirmMeetingTimeAction} className="flex-1">
                               <input type="hidden" name="meeting_request_id" value={meeting.id} />
                               <input type="hidden" name="return_to" value={`/messages/${conversation.id}`} />
                               <input type="hidden" name="duration_minutes" value={meeting.scheduled_duration_minutes ?? 30} />
-                              <p className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-black text-slate-950 dark:border-white/10 dark:bg-black/30 dark:text-white">
-                                {formatMeetingTime(confirmedTime)}
-                              </p>
-                              <button className="h-10 rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
-                                Confirm final time
+                              <button className="h-9 w-full rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
+                                Confirm — {formatMeetingTime(confirmedTime)}
                               </button>
                             </form>
                             <form action={declineMeetingRequestAction}>
                               <input type="hidden" name="meeting_request_id" value={meeting.id} />
                               <input type="hidden" name="return_to" value={`/messages/${conversation.id}`} />
-                              <button className="h-10 w-full rounded-lg border border-slate-200 px-4 text-xs font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/45 dark:hover:border-red-500/35 dark:hover:text-white">
-                                Decline final time
+                              <button className="h-9 rounded-md border border-slate-200 px-3 text-[10px] font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/45">
+                                Decline
                               </button>
                             </form>
-                          </>
+                          </div>
                         ) : null}
-
                         {isAccepted ? (
-                          <>
-                            <p className="rounded-lg border border-slate-200 bg-white p-3 text-xs font-bold leading-5 text-slate-500 dark:border-white/10 dark:bg-black/25 dark:text-white/45">
-                              The Daily SFU room opens 5 minutes before the confirmed call.
-                            </p>
-                            <form action={createMeetingJoinLinkAction}>
+                          <div className="flex flex-wrap gap-2">
+                            <form action={createMeetingJoinLinkAction} className="flex-1">
                               <input type="hidden" name="meeting_request_id" value={meeting.id} />
                               <input type="hidden" name="return_to" value={`/messages/${conversation.id}`} />
-                              <button className="h-10 w-full rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
+                              <button className="h-9 w-full rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
                                 Join call
                               </button>
                             </form>
-                            <Link href={`/meetings/${meeting.id}/room`} className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-xs font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/45 dark:hover:border-red-500/35 dark:hover:text-white">
-                              Open call room
+                            <Link href={`/meetings/${meeting.id}/room`} className="inline-flex h-9 items-center rounded-md border border-slate-200 px-3 text-[10px] font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/45">
+                              Open room
                             </Link>
-                          </>
+                            <form action={cancelMeetingRequestAction}>
+                              <input type="hidden" name="meeting_request_id" value={meeting.id} />
+                              <input type="hidden" name="return_to" value={`/messages/${conversation.id}`} />
+                              <button className="h-9 rounded-md border border-red-200 px-3 text-[10px] font-black uppercase text-red-600 transition hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:text-red-200">
+                                Cancel
+                              </button>
+                            </form>
+                          </div>
                         ) : null}
-
-                        {isOpen && !isAdminAudit ? (
+                        {isOpen && !isAccepted && !canClubRespond && !canPlayerConfirm && !isAdminAudit ? (
                           <form action={cancelMeetingRequestAction}>
                             <input type="hidden" name="meeting_request_id" value={meeting.id} />
                             <input type="hidden" name="return_to" value={`/messages/${conversation.id}`} />
-                            <button className="h-10 w-full rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-black uppercase text-red-700 transition hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+                            <button className="h-8 w-full rounded-md border border-red-200 bg-red-50 px-4 text-[10px] font-black uppercase text-red-700 transition hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
                               Cancel call
                             </button>
                           </form>
                         ) : null}
                       </div>
-                    </div>
+                    ) : null}
                   </div>
                 );
               })}
-            </section>
-          ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
           <MessageThread
+            className="flex-1 min-h-0"
             conversationId={conversation.id}
             conversationTeamId={conversation.team_id}
             initialMessages={messages ?? []}
@@ -391,8 +395,6 @@ export default async function ConversationPage({ params, searchParams }: Convers
             isAdminAudit={isAdminAudit}
             flagged={flagged === "1"}
           />
-        </div>
-      </section>
-    </main>
+    </div>
   );
 }

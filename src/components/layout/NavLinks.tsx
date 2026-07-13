@@ -31,11 +31,10 @@ export default function NavLinks({ isSignedIn, isAdmin }: NavLinksProps) {
     <div className="flex min-w-0 items-center gap-1 border border-slate-200 bg-white px-2 py-2 dark:border-white/10 dark:bg-[#111] xl:gap-1.5">
       <Link href={routes.home} className={linkCls(routes.home)}>Home</Link>
       <Link href={routes.leagues} className={linkCls(routes.leagues)}>League directories</Link>
-      <Link href={routes.teams} className={linkCls(routes.teams)}>Team directories</Link>
+      <Link href={routes.teams} className={linkCls(routes.teams)}>Club directory</Link>
       <Link href={routes.players} className={linkCls(routes.players)}>Players</Link>
       <Link href={routes.campusToPro} className={linkCls(routes.campusToPro, "hidden xl:inline-flex")}>Campus to Pro</Link>
       <Link href={routes.news} className={linkCls(routes.news, "hidden xl:inline-flex")}>News</Link>
-      <Link href={routes.scouts} className={linkCls(routes.scouts)}>Clubs</Link>
       {isSignedIn && (
         <>
           <Link href={routes.messages} className={linkCls(routes.messages, "hidden xl:inline-flex")}>

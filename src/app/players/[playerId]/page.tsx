@@ -191,7 +191,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           backLabel="Back to players"
           showEditLink={user?.id === profile.id}
           showMessageButton={Boolean(user && currentProfile?.role === "club" && user.id !== profile.id)}
-          showReportButton={Boolean(user && user.id !== profile.id)}
           filmLinks={[]}
         />
       </main>
@@ -284,7 +283,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
         backLabel="Back to players"
         showEditLink={user?.id === player.profile_id}
         showMessageButton={Boolean(user && currentProfile?.role === "club" && user.id !== player.profile_id)}
-        showReportButton={Boolean(user && user.id !== player.profile_id)}
         filmLinks={filmLinks ?? []}
         careerEntries={careerEntries ?? []}
         publicNotes={publicNotes}

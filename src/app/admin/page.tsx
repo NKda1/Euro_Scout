@@ -287,7 +287,7 @@ export default async function AdminDashboardPage() {
                 <Link href="/admin/preview/onboarding-demo/fan" className="bg-red-600 px-3 py-2 text-center text-xs font-black text-white transition hover:bg-red-700">Demo tour</Link>
                 <Link href="/onboarding?preview=1&role=fan" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Form preview</Link>
                 <Link href="/" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Home page</Link>
-                <Link href="/teams" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Team directories</Link>
+                <Link href="/teams" className="border border-slate-200 px-3 py-2 text-center text-xs font-black text-slate-700 transition hover:border-red-300 dark:border-white/10 dark:text-slate-200">Club directory</Link>
               </div>
             </div>
           </div>

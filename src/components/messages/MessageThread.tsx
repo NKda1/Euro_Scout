@@ -27,6 +27,7 @@ interface MessageThreadProps {
   replyAllowanceRemaining: number | null;
   isAdminAudit: boolean;
   flagged?: boolean;
+  className?: string;
 }
 
 function sortMessages(items: Message[]) {
@@ -58,7 +59,8 @@ export default function MessageThread({
   replyAllowanceLimit,
   replyAllowanceRemaining,
   isAdminAudit,
-  flagged
+  flagged,
+  className
 }: MessageThreadProps) {
   const [messages, setMessages] = useState<Message[]>(sortMessages(initialMessages));
   const [profileMap] = useState<Map<string, Profile>>(new Map(profiles.map((p) => [p.id, p])));
@@ -224,29 +226,32 @@ export default function MessageThread({
   }
 
   return (
-    <>
-      {isClubInbox && (
-        <div className="mx-4 mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200 sm:mx-6">
-          Club inbox: authorised club members can see this thread.
+    <div className={`flex flex-col ${className ?? ""}`}>
+      {/* Compact info bar */}
+      {(isClubInbox || flagged || !isAdminAudit) ? (
+        <div className="shrink-0 flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-white/10 dark:bg-black/20">
+          {isClubInbox && (
+            <p className="text-[11px] font-bold text-blue-600 dark:text-blue-300">
+              Club inbox: authorised club members can see this thread.
+            </p>
+          )}
+          {flagged && (
+            <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+              Contact flagged — admin team will review.
+            </p>
+          )}
+          {!isAdminAudit && (
+            <p className="text-[11px] font-bold text-slate-400 dark:text-white/30">
+              {isPremiumMessaging
+                ? "Premium: unlimited replies."
+                : `${remainingReplies ?? replyAllowanceLimit}/${replyAllowanceLimit} replies remaining in this thread.`}
+            </p>
+          )}
         </div>
-      )}
-
-      {flagged && (
-        <div className="mx-4 mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-xs font-bold text-green-700 dark:border-green-400/30 dark:bg-green-500/10 dark:text-green-200 sm:mx-6">
-          Contact flagged. The admin team will review your report.
-        </div>
-      )}
-
-      {!isAdminAudit && (
-        <div className="mx-4 mt-4 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 sm:mx-6">
-          {isPremiumMessaging
-            ? "Premium messaging: unlimited replies in this conversation."
-            : `${remainingReplies ?? replyAllowanceLimit}/${replyAllowanceLimit} free replies left in this conversation.`}
-        </div>
-      )}
+      ) : null}
 
       {/* Message list */}
-      <div className="max-h-[62vh] min-h-[48vh] space-y-5 overflow-y-auto bg-slate-50/70 p-4 pb-3 dark:bg-black/10 sm:p-6">
+      <div className="flex-1 min-h-0 space-y-5 overflow-y-auto bg-slate-50/70 p-4 dark:bg-black/10 sm:p-5">
         {messages.map((message) => {
           const sender = profileMap.get(message.sender_profile_id);
           const isMine = message.sender_profile_id === currentProfileId;
@@ -296,9 +301,9 @@ export default function MessageThread({
         <div ref={bottomRef} />
       </div>
 
-      {/* Send form — sticky on mobile */}
+      {/* Send form / Admin notice */}
       {isAdminAudit ? (
-        <div className="border-t border-slate-200 p-6 dark:border-white/10">
+        <div className="shrink-0 border-t border-slate-200 p-4 dark:border-white/10">
           <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
             Admin audit view. You can read this thread but cannot send messages unless you are a participant.
           </p>
@@ -306,34 +311,35 @@ export default function MessageThread({
       ) : (
         <form
           onSubmit={handleSend}
-          className="sticky bottom-0 border-t border-slate-200 bg-white/95 p-3 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:p-4"
+          className="shrink-0 border-t border-slate-200 bg-white px-3 pb-3 pt-2.5 dark:border-white/10 dark:bg-[#111]"
         >
           {sendError && (
-            <p className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
+            <p className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
               {sendError}
             </p>
           )}
-          <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-white/[0.04] sm:flex-row sm:items-end">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend(e as unknown as React.FormEvent);
-                }
-              }}
-              placeholder="Write a message..."
-              rows={2}
-              className="min-h-[56px] w-full flex-1 resize-none border-0 bg-transparent px-3 py-3 text-base font-semibold text-slate-900 outline-none dark:text-white dark:placeholder:text-slate-500 sm:text-sm"
-            />
+          <div className="flex items-end gap-2">
+            <div className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-black/20">
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend(e as unknown as React.FormEvent);
+                  }
+                }}
+                placeholder="Write a message… (Enter to send)"
+                rows={2}
+                className="w-full resize-none bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-white/30"
+              />
+            </div>
             <button
               type="submit"
               disabled={sending || !body.trim()}
-              className="inline-flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 disabled:opacity-50 sm:h-11 sm:w-auto"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-40"
             >
               <SendHorizontal className="h-4 w-4" aria-hidden />
-              {sending ? "Sending" : "Send"}
             </button>
           </div>
         </form>
@@ -385,6 +391,6 @@ export default function MessageThread({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

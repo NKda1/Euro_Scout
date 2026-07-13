@@ -12,8 +12,8 @@ import ClubPipelineSection, { type PipelinePlayer } from "@/components/scouts/Cl
 import ClubProfileHealthCard from "@/components/scouts/ClubProfileHealthCard";
 import ClubStatsVisualPanel from "@/components/scouts/ClubStatsVisualPanel";
 import ShareProfileButton from "@/components/profiles/ShareProfileButton";
+import FlagClubButton from "@/components/scouts/FlagClubButton";
 import TrustSignals, { lastActiveLabel } from "@/components/ui/TrustSignals";
-import { flagClubAccountAction } from "@/app/actions/club-flags";
 import { absoluteUrl, jsonLdScript, truncateMeta } from "@/lib/seo";
 
 interface ClubProfilePageProps {
@@ -537,19 +537,51 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
 
             <section>
               <p className="text-sm font-black uppercase text-red-500">Club Profile</p>
-              <div className="mt-5 border border-slate-200 bg-white p-5 dark:border-white/15 dark:bg-[#1a1a1a]">
-                <p className="text-base font-semibold leading-7 text-slate-600 dark:text-white/65">{profileText}</p>
-                <div className="mt-5 grid gap-px overflow-hidden border border-slate-200 bg-slate-200 text-sm dark:border-white/10 dark:bg-white/10 sm:grid-cols-3">
-                  {[
-                    ["Stadium", team?.stadium ?? "—"],
-                    ["Website", team?.website ? team.website.replace(/^https?:\/\//, "") : "—"],
-                    ["Contact", team?.contact_email ?? "—"]
-                  ].map(([label, value]) => (
-                    <div key={label} className="bg-white p-4 dark:bg-[#111]">
-                      <p className="text-xs font-black uppercase text-slate-500 dark:text-white/35">{label}</p>
-                      <p className="mt-2 truncate font-black text-slate-950 dark:text-white">{value}</p>
+              <div className="mt-5 space-y-5">
+                <div className="border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 dark:border-white/15 dark:from-[#1a1a1a] dark:to-[#111]">
+                  <p className="text-base font-semibold leading-7 text-slate-600 dark:text-white/65">{profileText}</p>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {/* Stadium Card */}
+                  <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-red-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-red-500/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-red-500/0 to-red-500/5 opacity-0 transition group-hover:opacity-100 dark:to-red-500/10" />
+                    <div className="relative p-5">
+                      <div className="mb-3 flex items-center gap-2">
+                        <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Stadium</p>
+                      </div>
+                      <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{team?.stadium ?? "Not listed"}</p>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Website Card */}
+                  <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-blue-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-blue-500/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 transition group-hover:opacity-100 dark:to-blue-500/10" />
+                    <div className="relative p-5">
+                      <div className="mb-3 flex items-center gap-2">
+                        <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Website</p>
+                      </div>
+                      {team?.website ? (
+                        <a
+                          href={team.website.startsWith('http') ? team.website : `https://${team.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block truncate text-lg font-black leading-tight text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          {team.website.replace(/^https?:\/\//, "")}
+                        </a>
+                      ) : (
+                        <p className="text-lg font-black leading-tight text-slate-400 dark:text-white/30">Not listed</p>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </section>
@@ -658,10 +690,22 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
               </section>
 
               <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
-                <p className="text-sm font-black uppercase text-red-500">Share Club</p>
-                <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-white/45">
-                  Copy this club profile link for players, staff and external recruiting conversations.
-                </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black uppercase text-red-500">Share Club</p>
+                    <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-white/45">
+                      Copy this club profile link for players, staff and external recruiting conversations.
+                    </p>
+                  </div>
+                  {clubCanBeFlagged && teamId && (
+                    <FlagClubButton
+                      teamId={teamId}
+                      scoutId={scoutId}
+                      canFlag={canFlagClub}
+                      isMember={isMember}
+                    />
+                  )}
+                </div>
                 <ShareProfileButton
                   path={teamId ? `/scouts/${teamId}` : `/scouts/${scoutId}`}
                   title={`${teamName} | EuroScout Pro`}
@@ -669,55 +713,6 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                   className="mt-5 w-full"
                 />
               </section>
-
-              {clubCanBeFlagged ? (
-                <section className="border border-amber-200 bg-amber-50 p-7 dark:border-amber-500/25 dark:bg-amber-500/10">
-                  <p className="text-sm font-black uppercase text-amber-700 dark:text-amber-300">Flag club account</p>
-                  <p className="mt-3 text-sm font-semibold leading-6 text-amber-900/70 dark:text-amber-100/70">
-                    Report this club if the claimed owner does not appear connected to the organisation.
-                  </p>
-
-                  {canFlagClub && teamId ? (
-                    <form action={flagClubAccountAction} className="mt-5 space-y-3">
-                      <input type="hidden" name="team_id" value={teamId} />
-                      <input type="hidden" name="return_path" value={`/scouts/${scoutId}`} />
-                      <select
-                        name="reason"
-                        required
-                        defaultValue=""
-                        className="h-12 w-full border border-amber-200 bg-white px-3 text-sm font-black text-slate-900 outline-none transition focus:border-amber-500 dark:border-amber-400/25 dark:bg-black/35 dark:text-white"
-                      >
-                        <option value="" disabled>Choose a reason</option>
-                        <option value="not_affiliated">Owner is not affiliated</option>
-                        <option value="wrong_owner">Wrong owner or staff member</option>
-                        <option value="impersonation">Possible impersonation</option>
-                        <option value="duplicate_claim">Duplicate club claim</option>
-                        <option value="other">Other concern</option>
-                      </select>
-                      <textarea
-                        name="details"
-                        rows={4}
-                        placeholder="Add context for the admin review team..."
-                        className="w-full border border-amber-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 dark:border-amber-400/25 dark:bg-black/35 dark:text-white dark:placeholder:text-white/25"
-                      />
-                      <button className="h-12 w-full bg-amber-600 px-5 text-sm font-black uppercase text-white transition hover:bg-amber-700">
-                        Submit flag
-                      </button>
-                    </form>
-                  ) : isMember ? (
-                    <p className="mt-5 border border-amber-200 bg-white/70 p-4 text-sm font-bold text-amber-900/70 dark:border-amber-400/20 dark:bg-black/25 dark:text-amber-100/65">
-                      Club staff cannot flag their own club account.
-                    </p>
-                  ) : (
-                    <Link
-                      href={`/auth/sign-in?return_url=/scouts/${scoutId}`}
-                      className="mt-5 inline-flex h-12 w-full items-center justify-center bg-amber-600 px-5 text-sm font-black uppercase text-white transition hover:bg-amber-700"
-                    >
-                      Sign in to flag
-                    </Link>
-                  )}
-                </section>
-              ) : null}
 
               {team && (
                 <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">

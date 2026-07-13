@@ -44,7 +44,7 @@ export default function MobileMenu({ isSignedIn, isAdmin, notificationCount = 0 
               League directories
             </Link>
             <Link href={routes.teams} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-              Team directories
+              Club directory
             </Link>
             <Link href={routes.players} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
               Players
@@ -54,9 +54,6 @@ export default function MobileMenu({ isSignedIn, isAdmin, notificationCount = 0 
             </Link>
             <Link href={routes.news} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
               News
-            </Link>
-            <Link href={routes.scouts} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-              Clubs
             </Link>
             {isSignedIn && (
               <>

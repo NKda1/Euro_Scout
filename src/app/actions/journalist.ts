@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireOnboardedProfile } from "@/lib/auth";
+import { hasPremiumFeature } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
@@ -92,12 +93,18 @@ export async function publishJournalistArticleAction(formData: FormData) {
   const title = text(formData, "title");
   const excerpt = text(formData, "excerpt");
   const articleUrl = requireUrl(text(formData, "article_url"), "Article link");
+  const thumbnailFile = fileValue(formData, "thumbnail_file");
+  const thumbnailLink = text(formData, "thumbnail_url");
+  if ((thumbnailFile || thumbnailLink) && !hasPremiumFeature(profile, "journalist_thumbnail_posts")) {
+    redirect("/account?error=Article thumbnails are a premium journalist feature. Publish without a thumbnail or upgrade to Premium.");
+  }
+
   const uploadedThumbnailUrl = await uploadArticleThumbnail({
     supabase,
     profileId: profile.id,
-    file: fileValue(formData, "thumbnail_file")
+    file: thumbnailFile
   });
-  const thumbnailUrl = uploadedThumbnailUrl ?? optionalUrl(text(formData, "thumbnail_url"), "Thumbnail link");
+  const thumbnailUrl = uploadedThumbnailUrl ?? optionalUrl(thumbnailLink, "Thumbnail link");
   const status = formData.get("save_as_draft") === "on" ? "draft" : "published";
   const leagueIds = formData
     .getAll("league_ids")
