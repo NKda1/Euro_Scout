@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 interface PlayerPhotoGalleryProps {
   photoUrls: string[];
@@ -28,12 +29,24 @@ export default function PlayerPhotoGallery({ photoUrls, canRemove = false }: Pla
     });
   }
 
+  // Keyboard navigation
+  useEffect(() => {
+    if (activeIndex === null) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft") showPreviousPhoto();
+      else if (e.key === "ArrowRight") showNextPhoto();
+      else if (e.key === "Escape") setActiveIndex(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeIndex]);
+
   return (
     <>
-      <div className="mt-5 grid snap-x grid-flow-col auto-cols-[minmax(13rem,1fr)] gap-3 overflow-x-auto pb-2 sm:grid-flow-row sm:grid-cols-4 sm:overflow-visible sm:pb-0">
+      {/* Photo grid */}
+      <div className="mt-5 grid snap-x grid-flow-col auto-cols-[minmax(13rem,1fr)] gap-2 overflow-x-auto pb-2 sm:grid-flow-row sm:grid-cols-4 sm:overflow-visible sm:pb-0">
         {Array.from({ length: MAX_PLAYER_PHOTOS }).map((_, slot) => {
           const photo = photos[slot];
-
           return (
             <div
               key={photo ?? slot}
@@ -44,15 +57,23 @@ export default function PlayerPhotoGallery({ photoUrls, canRemove = false }: Pla
                   <button
                     type="button"
                     onClick={() => setActiveIndex(slot)}
-                    className="absolute inset-0 bg-cover bg-center transition hover:scale-[1.03]"
-                    style={{ backgroundImage: `linear-gradient(180deg, transparent, rgba(0,0,0,.72)), url(${photo})` }}
+                    className="absolute inset-0 bg-cover bg-center transition duration-300 hover:scale-[1.04]"
+                    style={{ backgroundImage: `linear-gradient(180deg, transparent 50%, rgba(0,0,0,.75)), url(${photo})` }}
                     aria-label={`Open player photo ${slot + 1}`}
                   />
+                  {/* Slot number badge */}
+                  <span className="pointer-events-none absolute bottom-2 left-2 z-10 text-[10px] font-black uppercase tracking-widest text-white/60">
+                    Photo {slot + 1}
+                  </span>
                   {canRemove ? (
                     <form action="/api/account/player-photos/remove" method="post" className="absolute right-2 top-2 z-10">
                       <input type="hidden" name="photo_url" value={photo} />
-                      <button className="flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-sm text-white transition hover:bg-red-600" title="Remove picture">
-                        x
+                      <button
+                        className="flex h-7 w-7 items-center justify-center bg-black/70 text-xs font-black text-white transition hover:bg-red-600"
+                        title="Remove photo"
+                        aria-label="Remove photo"
+                      >
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </form>
                   ) : null}
@@ -65,43 +86,79 @@ export default function PlayerPhotoGallery({ photoUrls, canRemove = false }: Pla
         })}
       </div>
 
+      {/* Lightbox */}
       {activePhoto ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4" role="dialog" aria-modal="true">
-          <div className="relative w-full max-w-4xl border border-white/10 bg-[#111] p-3 shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Photo viewer"
+          onClick={(e) => { if (e.target === e.currentTarget) setActiveIndex(null); }}
+        >
+          {/* Close */}
+          <button
+            type="button"
+            onClick={() => setActiveIndex(null)}
+            className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center border border-white/20 bg-black/60 text-white backdrop-blur-sm transition hover:border-red-500 hover:bg-red-600"
+            aria-label="Close photo viewer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          {/* Counter */}
+          {photos.length > 1 && activeIndex !== null && (
+            <div className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+              {photos.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setActiveIndex(i)}
+                  aria-label={`Go to photo ${i + 1}`}
+                  className={`h-1 transition-all duration-200 ${
+                    i === activeIndex ? "w-8 bg-white" : "w-3 bg-white/30 hover:bg-white/60"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Prev */}
+          {photos.length > 1 ? (
             <button
               type="button"
-              onClick={() => setActiveIndex(null)}
-              className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/75 text-xl font-black text-white transition hover:bg-red-600"
-              aria-label="Close photo viewer"
+              onClick={showPreviousPhoto}
+              className="absolute left-4 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center border border-white/20 bg-black/60 text-white backdrop-blur-sm transition hover:border-red-500 hover:bg-red-600"
+              aria-label="Previous photo"
             >
-              x
+              <ChevronLeft className="h-5 w-5" />
             </button>
-            {photos.length > 1 ? (
-              <>
-                <button
-                  type="button"
-                  onClick={showPreviousPhoto}
-                  className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/75 text-2xl font-black text-white transition hover:bg-red-600"
-                  aria-label="Previous player photo"
-                >
-                  {"<"}
-                </button>
-                <button
-                  type="button"
-                  onClick={showNextPhoto}
-                  className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/75 text-2xl font-black text-white transition hover:bg-red-600"
-                  aria-label="Next player photo"
-                >
-                  {">"}
-                </button>
-              </>
-            ) : null}
+          ) : null}
+
+          {/* Next */}
+          {photos.length > 1 ? (
+            <button
+              type="button"
+              onClick={showNextPhoto}
+              className="absolute right-4 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center border border-white/20 bg-black/60 text-white backdrop-blur-sm transition hover:border-red-500 hover:bg-red-600"
+              aria-label="Next photo"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          ) : null}
+
+          {/* Main image */}
+          <div className="relative mx-16 max-h-[90vh] w-full max-w-4xl">
             <div
               className="h-[82vh] w-full bg-contain bg-center bg-no-repeat"
               style={{ backgroundImage: `url(${activePhoto})` }}
               role="img"
-              aria-label="Player profile gallery"
+              aria-label={`Player photo ${(activeIndex ?? 0) + 1} of ${photos.length}`}
             />
+            {activeIndex !== null && (
+              <div className="absolute bottom-0 left-0 border-t border-white/10 bg-black/60 px-4 py-2 text-xs font-black uppercase tracking-widest text-white/60 backdrop-blur-sm">
+                {activeIndex + 1} / {photos.length}
+              </div>
+            )}
           </div>
         </div>
       ) : null}

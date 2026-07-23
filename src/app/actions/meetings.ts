@@ -6,7 +6,9 @@ import { redirect } from "next/navigation";
 import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { requireOnboardedProfile, type Profile } from "@/lib/auth";
 import { buildDailyJoinUrl, createDailyMeetingToken, createDailyRoom } from "@/lib/daily";
+import { sendCallConfirmedEmail, sendCallRequestEmail } from "@/lib/email";
 import { hasPremiumFeature } from "@/lib/premium";
+import { sendPushToProfile, sendPushToProfiles } from "@/lib/push";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 type ServiceClient = ReturnType<typeof createSupabaseServiceRoleClient>;
@@ -34,6 +36,145 @@ interface MeetingRequest {
 
 const OPEN_MEETING_STATUSES = ["pending", "club_proposed", "accepted"];
 const ROOM_OPEN_BUFFER_MINUTES = 5;
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://euroscout.pro";
+
+/** Get the email + profile_id for a given auth uid. */
+async function getProfileContact(serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>, profileId: string) {
+  const { data } = await serviceClient
+    .from("profiles")
+    .select("id, display_name")
+    .eq("id", profileId)
+    .maybeSingle<{ id: string; display_name: string }>();
+  const { data: userData } = await serviceClient.auth.admin.getUserById(profileId);
+  return {
+    profileId: data?.id ?? profileId,
+    displayName: data?.display_name ?? "Member",
+    email: userData.user?.email ?? null,
+  };
+}
+
+/** Notify club staff that a player has requested a call. Fire-and-forget. */
+async function notifyClubCallRequest(params: {
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>;
+  clubMemberIds: string[];
+  playerName: string;
+  teamName: string;
+  reason: string;
+  preferredTime: string;
+  backupTime?: string | null;
+  note?: string | null;
+  conversationId: string | null;
+}) {
+  const { serviceClient, clubMemberIds, playerName, teamName, reason, preferredTime, backupTime, note, conversationId } = params;
+  const url = conversationId ? `${APP_URL}/messages/${conversationId}` : `${APP_URL}/account`;
+
+  await Promise.allSettled([
+    sendPushToProfiles(clubMemberIds, {
+      title: `Call request — ${teamName}`,
+      body: `${playerName} wants a video call. Reason: ${reason}`,
+      url: conversationId ? `/messages/${conversationId}` : "/account",
+      tag: "call-request",
+    }),
+    ...clubMemberIds.map(async (id) => {
+      const contact = await getProfileContact(serviceClient, id);
+      if (!contact.email) return;
+      return sendCallRequestEmail({
+        to: contact.email,
+        recipientName: contact.displayName,
+        senderName: playerName,
+        teamName,
+        reason,
+        preferredTime,
+        backupTime: backupTime ?? undefined,
+        note: note ?? undefined,
+        conversationUrl: url,
+      });
+    }),
+  ]);
+}
+
+/** Notify a player that a club has proposed a final call time. */
+async function notifyPlayerCallProposed(params: {
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>;
+  playerProfileId: string;
+  teamName: string;
+  scheduledTime: string;
+  conversationId: string | null;
+}) {
+  const { serviceClient, playerProfileId, teamName, scheduledTime, conversationId } = params;
+  const url = conversationId ? `${APP_URL}/messages/${conversationId}` : `${APP_URL}/account`;
+  const contact = await getProfileContact(serviceClient, playerProfileId);
+
+  await Promise.allSettled([
+    sendPushToProfile(playerProfileId, {
+      title: `${teamName} confirmed a call time`,
+      body: `Your call with ${teamName} is set for ${scheduledTime}. Confirm it now.`,
+      url: conversationId ? `/messages/${conversationId}` : "/account",
+      tag: "call-proposed",
+    }),
+    contact.email
+      ? sendCallRequestEmail({
+          to: contact.email,
+          recipientName: contact.displayName,
+          senderName: teamName,
+          teamName,
+          reason: "Club proposed a final call time",
+          preferredTime: scheduledTime,
+          conversationUrl: url,
+        })
+      : Promise.resolve(),
+  ]);
+}
+
+/** Notify both parties that a call has been confirmed. */
+async function notifyCallConfirmed(params: {
+  serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>;
+  playerProfileId: string;
+  clubMemberIds: string[];
+  playerName: string;
+  teamName: string;
+  scheduledTime: string;
+  conversationId: string | null;
+}) {
+  const { serviceClient, playerProfileId, clubMemberIds, playerName, teamName, scheduledTime, conversationId } = params;
+  const url = conversationId ? `${APP_URL}/messages/${conversationId}` : `${APP_URL}/account`;
+  const allIds = [playerProfileId, ...clubMemberIds];
+
+  const pushBody = `${teamName} × ${playerName} — ${scheduledTime}`;
+
+  await Promise.allSettled([
+    sendPushToProfiles(allIds, {
+      title: "Video call confirmed",
+      body: pushBody,
+      url: conversationId ? `/messages/${conversationId}` : "/account",
+      tag: "call-confirmed",
+    }),
+    (async () => {
+      const playerContact = await getProfileContact(serviceClient, playerProfileId);
+      if (playerContact.email) {
+        await sendCallConfirmedEmail({
+          to: playerContact.email,
+          recipientName: playerContact.displayName,
+          counterpartName: teamName,
+          scheduledTime,
+          conversationUrl: url,
+        });
+      }
+    })(),
+    ...clubMemberIds.map(async (id) => {
+      const contact = await getProfileContact(serviceClient, id);
+      if (!contact.email) return;
+      return sendCallConfirmedEmail({
+        to: contact.email,
+        recipientName: contact.displayName,
+        counterpartName: playerName,
+        scheduledTime,
+        conversationUrl: url,
+      });
+    }),
+  ]);
+}
 
 function text(formData: FormData, key: string, maxLength = 500) {
   const value = String(formData.get(key) ?? "").trim();
@@ -427,6 +568,20 @@ export async function requestClubCallAction(formData: FormData) {
   }
 
   revalidateMeetingPaths(meeting);
+
+  // Notify club staff about the new call request (fire-and-forget)
+  void notifyClubCallRequest({
+    serviceClient,
+    clubMemberIds: await getClubParticipantIds(serviceClient, teamId),
+    playerName: profile.display_name,
+    teamName: team.name,
+    reason: requestReason || "Video call",
+    preferredTime: formatMeetingTime(proposedStartAt),
+    backupTime: proposedAlternativeAt ? formatMeetingTime(proposedAlternativeAt) : null,
+    note: requestNote || null,
+    conversationId: meeting.conversation_id,
+  });
+
   redirect(`${returnPath}?notice=${encodeURIComponent("Call request sent. The club will confirm a final time in your inbox.")}`);
 }
 
@@ -567,6 +722,16 @@ export async function requestPlayerCallAction(formData: FormData) {
   }
 
   revalidateMeetingPaths(meeting);
+
+  // Notify the player about the club's call invite (fire-and-forget)
+  void notifyPlayerCallProposed({
+    serviceClient,
+    playerProfileId: targetProfileId,
+    teamName: team.name,
+    scheduledTime: formatMeetingTime(proposedStartAt),
+    conversationId: meeting.conversation_id,
+  });
+
   redirect(`${returnPath}?notice=${encodeURIComponent("Call invite sent. The player can confirm the final time from their inbox.")}`);
 }
 
@@ -640,6 +805,17 @@ export async function acceptMeetingRequestAction(formData: FormData) {
   }
 
   revalidateMeetingPaths(meeting);
+
+  // Notify player that club proposed a final time (fire-and-forget)
+  const acceptContext = await getMeetingContext(serviceClient, meeting.team_id, meeting.player_profile_id);
+  void notifyPlayerCallProposed({
+    serviceClient,
+    playerProfileId: meeting.player_profile_id,
+    teamName: acceptContext.teamName,
+    scheduledTime: formatMeetingTime(finalScheduledAt),
+    conversationId: meeting.conversation_id,
+  });
+
   redirect(`${returnPath}?notice=${encodeURIComponent("Final call time sent. The player can confirm it from their inbox.")}`);
 }
 
@@ -710,6 +886,18 @@ export async function confirmMeetingTimeAction(formData: FormData) {
   }
 
   revalidateMeetingPaths(meeting);
+
+  // Notify both parties that the call is confirmed (fire-and-forget)
+  void notifyCallConfirmed({
+    serviceClient,
+    playerProfileId: meeting.player_profile_id,
+    clubMemberIds: await getClubParticipantIds(serviceClient, meeting.team_id),
+    playerName: context.playerName,
+    teamName: context.teamName,
+    scheduledTime: formatMeetingTime(finalScheduledAt),
+    conversationId: meeting.conversation_id,
+  });
+
   redirect(`${returnPath}?notice=${encodeURIComponent("Call confirmed. The Daily room opens 5 minutes before the scheduled time.")}`);
 }
 

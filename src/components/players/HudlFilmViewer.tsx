@@ -62,15 +62,17 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
   }
 
   return (
-    <section className="overflow-hidden rounded-[1.75rem] border border-slate-800 bg-slate-950 shadow-xl shadow-slate-950/20">
-      <div className="flex flex-wrap gap-2 border-b border-white/10 p-4">
+    <section className="overflow-hidden border border-slate-800 bg-slate-950 shadow-xl shadow-slate-950/20">
+      <div className="flex flex-wrap gap-px border-b border-white/10 bg-white/[0.04]">
         {filmTabs.map((tab) => (
           <button
             key={tab.value}
             type="button"
             onClick={() => setActiveType(tab.value)}
-            className={`rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wide transition ${
-              activeType === tab.value ? "bg-red-600 text-white" : "bg-white/10 text-slate-300 hover:bg-white/15 hover:text-white"
+            className={`relative px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.1em] transition ${
+              activeType === tab.value
+                ? "bg-slate-950 text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-red-500"
+                : "text-slate-400 hover:bg-slate-950/60 hover:text-white"
             }`}
           >
             {tab.label}
@@ -98,7 +100,7 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
                 <button
                   type="button"
                   onClick={() => openTrackedFilm(activeFilm)}
-                  className="absolute bottom-6 right-6 inline-flex h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 shadow-xl transition hover:bg-red-50"
+                  className="absolute bottom-5 right-5 inline-flex h-10 items-center justify-center border border-white/20 bg-white px-5 text-xs font-black uppercase tracking-wide text-slate-950 shadow-xl transition hover:bg-red-50"
                 >
                   Open on {providerLabel}
                 </button>
@@ -111,7 +113,7 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
                 style={{ backgroundImage: `linear-gradient(180deg, rgba(2,6,23,.08), rgba(2,6,23,.86)), url(${activeThumbnailUrl})` }}
                 aria-label={`Preview ${activeFilm.label ?? providerLabel}`}
               >
-                <span className="m-6 inline-flex h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 shadow-xl transition group-hover:bg-red-50">
+                <span className="m-5 inline-flex h-10 items-center gap-2 border border-white/20 bg-white px-5 text-xs font-black uppercase tracking-wide text-slate-950 shadow-xl transition group-hover:bg-red-50">
                   Hover preview
                 </span>
               </button>
@@ -144,7 +146,7 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
               <button
                 type="button"
                 onClick={() => openTrackedFilm(activeFilm)}
-                className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-red-50"
+                className="mt-5 inline-flex h-10 items-center border border-white/20 bg-white px-5 text-xs font-black uppercase tracking-wide text-slate-950 transition hover:bg-red-50"
               >
                 Watch on {providerLabel}
               </button>
@@ -170,7 +172,7 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
           <button
             type="button"
             onClick={() => openTrackedFilm(activeFilm)}
-            className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-red-50"
+            className="inline-flex h-10 items-center border border-white/20 bg-white px-5 text-xs font-black uppercase tracking-wide text-slate-950 transition hover:bg-red-50"
           >
             Open on {providerLabel}
           </button>

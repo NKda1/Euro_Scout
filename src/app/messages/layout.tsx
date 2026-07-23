@@ -3,7 +3,7 @@ import { requireOnboardedProfile, type Profile } from "@/lib/auth";
 import { countUnreadMessages, getDisplayProfile, type MessageRow } from "@/lib/messaging";
 import { isPremiumActive } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import InboxSidebar, { type SidebarItem, type SidebarProfile, type TokenInfo } from "@/components/messages/InboxSidebar";
+import InboxSidebar, { type SidebarCallItem, type SidebarItem, type SidebarProfile, type TokenInfo } from "@/components/messages/InboxSidebar";
 
 interface ParticipantRow {
   conversation_id: string;
@@ -204,6 +204,82 @@ export default async function MessagesLayout({ children }: { children: ReactNode
     refreshLabel: tokenRefreshLabel,
   };
 
+  // --- Call items for sidebar panel ---
+  const playerProfileIdForCalls = profile.role === "player"
+    ? await serviceClient
+        .from("player_profiles")
+        .select("id")
+        .eq("profile_id", profile.id)
+        .maybeSingle<{ id: string }>()
+        .then(({ data }) => data?.id ?? null)
+    : null;
+
+  const clubTeamIdsForCalls = profile.role === "club"
+    ? await serviceClient
+        .from("club_members")
+        .select("team_id")
+        .eq("profile_id", profile.id)
+        .returns<Array<{ team_id: string }>>()
+        .then(({ data }) => (data ?? []).map((r) => r.team_id))
+    : [];
+
+  interface RawCallItem {
+    id: string;
+    team_id: string;
+    player_profile_id: string;
+    status: string;
+    request_reason: string | null;
+    proposed_start_at: string | null;
+    scheduled_at: string | null;
+    conversation_id: string | null;
+    teams: { id: string; name: string; logo_url: string | null } | null;
+    profiles: { id: string; display_name: string; avatar_url: string | null } | null;
+  }
+
+  let rawCallItems: RawCallItem[] = [];
+  if (playerProfileIdForCalls) {
+    const { data } = await serviceClient
+      .from("meeting_requests")
+      .select(`id, team_id, player_profile_id, status, request_reason, proposed_start_at, scheduled_at, conversation_id,
+        teams:meeting_requests_team_id_fkey(id, name, logo_url),
+        profiles:meeting_requests_player_profile_id_fkey(id, display_name, avatar_url)`)
+      .eq("player_profile_id", playerProfileIdForCalls)
+      .in("status", ["pending", "club_proposed", "accepted"])
+      .order("proposed_start_at", { ascending: true })
+      .limit(10)
+      .returns<RawCallItem[]>();
+    rawCallItems = data ?? [];
+  } else if (clubTeamIdsForCalls.length) {
+    const { data } = await serviceClient
+      .from("meeting_requests")
+      .select(`id, team_id, player_profile_id, status, request_reason, proposed_start_at, scheduled_at, conversation_id,
+        teams:meeting_requests_team_id_fkey(id, name, logo_url),
+        profiles:meeting_requests_player_profile_id_fkey(id, display_name, avatar_url)`)
+      .in("team_id", clubTeamIdsForCalls)
+      .in("status", ["pending", "club_proposed", "accepted"])
+      .order("proposed_start_at", { ascending: true })
+      .limit(10)
+      .returns<RawCallItem[]>();
+    rawCallItems = data ?? [];
+  }
+
+  const sidebarCallItems: SidebarCallItem[] = rawCallItems.map((r) => ({
+    id: r.id,
+    status: r.status,
+    reason: r.request_reason,
+    preferredAt: r.proposed_start_at,
+    scheduledAt: r.scheduled_at,
+    conversationId: r.conversation_id,
+    counterpartName:
+      profile.role === "player"
+        ? (r.teams?.name ?? "Club")
+        : (r.profiles?.display_name ?? "Player"),
+    counterpartAvatar:
+      profile.role === "player"
+        ? (r.teams?.logo_url ?? null)
+        : (r.profiles?.avatar_url ?? null),
+  }));
+
   return (
     <div className="flex h-[calc(100dvh-72px)] overflow-hidden bg-white dark:bg-[#090909]">
       <InboxSidebar
@@ -212,6 +288,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
         currentProfileId={profile.id}
         allConversationIds={conversationIds}
         tokenInfo={tokenInfo}
+        initialCallItems={sidebarCallItems}
       />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {children}
