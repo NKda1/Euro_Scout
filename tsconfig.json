@@ -19,7 +19,6 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "baseUrl": "./src",
-    "ignoreDeprecations": "5.0",
     "paths": {
       "@/components/*": [
         "components/*"
