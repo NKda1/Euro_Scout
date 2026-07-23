@@ -43,30 +43,9 @@ interface MessageReplyAllowance {
   replies_remaining: number;
 }
 
-interface MeetingRequestRow extends CallBookingRow {}
+type MeetingRequestRow = CallBookingRow;
 
 const DEFAULT_FREE_REPLIES_PER_CONVERSATION = 3;
-const callInputClass = "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/30 dark:text-white";
-
-function formatMeetingTime(value: string | null) {
-  if (!value) return "Time not set";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(value));
-}
-
-function toDatetimeLocal(value: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const offset = date.getTimezoneOffset() * 60 * 1000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
 
 export const metadata: Metadata = {
   title: "Conversation | EuroScout Pro",
