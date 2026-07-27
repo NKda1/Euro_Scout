@@ -148,17 +148,17 @@ export default function ProfileSummary({
       ];
 
   return (
-    <article className="overflow-hidden bg-white text-slate-950 dark:bg-[#090909] dark:text-white">
+    <article className="w-full overflow-hidden bg-white text-slate-950 dark:bg-[#090909] dark:text-white">
       <header className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#120807]">
-        <div className="mx-auto max-w-[110rem] px-4 py-6 sm:px-6 lg:px-8">
-          <Link href={backHref} className="mb-5 inline-flex h-10 items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white">
+        <div className="mx-auto max-w-[110rem] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+          <Link href={backHref} className="mb-5 inline-flex h-10 max-w-full items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white">
             ← {backLabel}
           </Link>
-          <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-start">
-            <div>
+          <div className="grid min-w-0 gap-7 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-start">
+            <div className="min-w-0">
               <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
                 <div
-                  className="flex h-32 w-32 shrink-0 items-center justify-center border-2 border-red-500 bg-slate-200 bg-cover bg-center text-5xl font-black text-slate-900 dark:bg-[#202020] dark:text-white"
+                  className="flex h-24 w-24 shrink-0 items-center justify-center border-2 border-red-500 bg-slate-200 bg-cover bg-center text-3xl font-black text-slate-900 dark:bg-[#202020] dark:text-white sm:h-32 sm:w-32 sm:text-5xl"
                   style={profile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.62)), url(${profile.avatar_url})` } : undefined}
                 >
                   {profile.avatar_url ? "" : initials(profile.display_name)}
@@ -180,17 +180,17 @@ export default function ProfileSummary({
                       </span>
                     ) : null}
                   </div>
-                  <h1 className="mt-4 text-4xl font-black leading-none sm:text-5xl">{profile.display_name}</h1>
-                  <p className="mt-3 text-lg font-bold text-slate-500 dark:text-white/45">
+                  <h1 className="mt-4 break-words text-3xl font-black leading-none sm:text-5xl">{profile.display_name}</h1>
+                  <p className="mt-3 break-words text-base font-bold text-slate-500 dark:text-white/45 sm:text-lg">
                     {location}
                     {currentTeam ? ` · ${currentTeam.name}` : ""}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-7 flex flex-wrap gap-3">
+              <div className="mt-7 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
                 {tags.map(([label, item]) => (
-                  <div key={label} className="min-h-9 border border-slate-200 bg-white px-4 py-2 text-sm dark:border-white/20 dark:bg-black/20">
+                  <div key={label} className="min-h-9 min-w-0 break-words border border-slate-200 bg-white px-4 py-2 text-sm dark:border-white/20 dark:bg-black/20">
                     <span className="mr-1.5 uppercase text-slate-500 dark:text-white/35">{label}</span>
                     <span className="font-bold capitalize text-slate-800 dark:text-white/75">{value(item)}</span>
                   </div>
@@ -206,7 +206,7 @@ export default function ProfileSummary({
                 weightKg={numberValue(roleProfile?.weight_kg)}
               />
             ) : (
-              <div className="grid grid-cols-2 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a]">
+              <div className="grid grid-cols-1 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a] sm:grid-cols-2">
                 {stats.map(([label, item], index) => (
                   <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
                     <p className="text-xs font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
@@ -219,18 +219,18 @@ export default function ProfileSummary({
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[110rem] gap-7 px-4 py-7 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="space-y-8 xl:border-r xl:border-slate-200 xl:pr-10 dark:xl:border-white/10">
+      <div className="mx-auto grid min-w-0 max-w-[110rem] gap-7 px-4 py-7 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="min-w-0 space-y-8 xl:border-r xl:border-slate-200 xl:pr-10 dark:xl:border-white/10">
           <section>
             <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Profile</p>
             <div className="mt-5 space-y-5">
               <div className="border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 dark:border-white/15 dark:from-[#1a1a1a] dark:to-[#111]">
-                <p className="text-base font-semibold leading-7 text-slate-600 dark:text-white/65">
+                <p className="break-words text-base font-semibold leading-7 text-slate-600 dark:text-white/65">
                   {profile.bio ?? "This profile is ready for more detail. Account controls can update this public profile at any time."}
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {/* Current Team Card */}
                 <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-indigo-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-indigo-500/40">
                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-indigo-500/5 opacity-0 transition group-hover:opacity-100 dark:to-indigo-500/10" />
@@ -331,7 +331,7 @@ export default function ProfileSummary({
           </section>
         </div>
 
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           <Panel eyebrow="Availability">
             <div className="flex items-center gap-3 text-lg font-black text-slate-950 dark:text-white">
               <span className="h-3 w-3 rounded-full bg-emerald-500" />
@@ -384,7 +384,7 @@ export default function ProfileSummary({
           </Panel>
 
           <Panel eyebrow="Share">
-            <p className="mb-4 text-sm font-semibold leading-6 text-slate-500 dark:text-white/45">
+            <p className="mb-4 break-words text-sm font-semibold leading-6 text-slate-500 dark:text-white/45">
               Copy this public profile link or send it through your device share menu.
             </p>
             <ShareProfileButton

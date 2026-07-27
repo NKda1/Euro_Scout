@@ -3,7 +3,7 @@
  *
  * Environment variable required:
  *   RESEND_API_KEY   – your Resend API key
- *   RESEND_FROM      – sender address, e.g. "EuroScout Pro <noreply@euroscout.pro>"
+ *   RESEND_FROM      – sender address, e.g. "EuroScout Pro <noreply@euroscoutpro.com>"
  *
  * All functions silently no-op when RESEND_API_KEY is not set.
  */
@@ -16,7 +16,7 @@ function getClient() {
   return new Resend(key);
 }
 
-const FROM = process.env.RESEND_FROM ?? "EuroScout Pro <noreply@euroscout.pro>";
+const FROM = process.env.RESEND_FROM ?? "EuroScout Pro <noreply@euroscoutpro.com>";
 
 export interface CallRequestEmailParams {
   to: string;

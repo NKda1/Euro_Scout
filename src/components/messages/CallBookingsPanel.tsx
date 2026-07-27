@@ -125,24 +125,39 @@ export default function CallBookingsPanel({
     };
   }, [supabase, conversationId, refreshMeeting]);
 
-  if (!meetings.length) return null;
+  const visibleMeetings = meetings.filter((meeting) =>
+    ["pending", "club_proposed", "accepted"].includes(meeting.status)
+  );
+
+  if (!visibleMeetings.length) return null;
 
   return (
-    <div
-      className="shrink-0 overflow-y-auto border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-black/20"
-      style={{ maxHeight: "240px" }}
-    >
-      <div className="p-3">
-        <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-red-500">
-          Call Bookings
-        </p>
-        <div className="space-y-1.5">
-          {meetings.map((meeting) => {
+    <div className="fixed bottom-20 left-4 z-40 w-[min(27rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-[#111] dark:shadow-black/40 sm:bottom-4">
+      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-red-500">
+            Call Box
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-500 dark:text-white/45">
+            Requested, pending and accepted calls
+          </p>
+        </div>
+        <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-black text-white">
+          {visibleMeetings.length}
+        </span>
+      </div>
+      <div className="max-h-[45vh] overflow-y-auto p-3">
+        <div className="space-y-2">
+          {visibleMeetings.map((meeting) => {
             const isPending = meeting.status === "pending";
             const isClubProposed = meeting.status === "club_proposed";
             const isAccepted = meeting.status === "accepted";
             const isOpen = isPending || isClubProposed || isAccepted;
             const isPlayerRequest = meeting.requested_by === meeting.player_profile_id;
+            const playerLabel =
+              meeting.player_profile_id === currentProfileId
+                ? "You"
+                : meeting.profiles?.display_name ?? "Player";
             const canClubRespond =
               !isAdminAudit &&
               (currentRole === "club" || currentRole === "admin") &&
@@ -193,7 +208,7 @@ export default function CallBookingsPanel({
                   )}
                   <p className="min-w-0 flex-1 truncate text-xs font-black text-slate-950 dark:text-white">
                     {meeting.teams?.name ?? "Club"} ×{" "}
-                    {meeting.profiles?.display_name ?? "Player"}
+                    {playerLabel}
                   </p>
                   {meeting.request_reason ? (
                     <span className="shrink-0 rounded border border-red-200 bg-red-50 px-1.5 py-px text-[10px] font-black uppercase text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">

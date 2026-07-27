@@ -25,3 +25,21 @@ pnpm-debug.log*
 # OS/editor
 .DS_Store
 .vscode/
+.vercel
+
+# Local-only project notes and database schema/migration exports
+*.md
+docs/
+src/db/*.sql
+
+# Local agent/plugin workspace files
+.claude/
+.agents/skills/stripe-*/
+.agents/skills/upgrade-stripe/
+
+#Local Images
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg

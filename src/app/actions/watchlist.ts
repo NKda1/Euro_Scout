@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { getAuthenticatedProfile } from "@/lib/auth";
 import { hasPremiumFeature } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -64,10 +65,15 @@ async function requireConnectedClub() {
   return { ...ctx, serviceClient, teamId: membership.team_id };
 }
 
+async function limitWatchlistMutation(profileId: string, redirectPath = "/watchlists") {
+  await enforceActionRateLimit(`watchlist:${profileId}`, 60, 60 * 60_000, redirectPath);
+}
+
 // ─── Create watchlist ─────────────────────────────────────────────────────────
 
 export async function createWatchlistAction(formData: FormData) {
   const { serviceClient, profile, teamId } = await requireConnectedClub();
+  await limitWatchlistMutation(profile.id);
   const name = text(formData, "name").slice(0, 100);
   const isShared = formData.get("is_shared") === "on";
   const submittedTeamId = text(formData, "team_id") || teamId;
@@ -92,6 +98,7 @@ export async function createWatchlistAction(formData: FormData) {
 
 export async function deleteWatchlistAction(formData: FormData) {
   const { serviceClient, profile, teamId } = await requireConnectedClub();
+  await limitWatchlistMutation(profile.id);
   const watchlistId = text(formData, "watchlist_id");
 
   let query = serviceClient.from("watchlists").delete().eq("id", watchlistId);
@@ -109,6 +116,7 @@ export async function addToWatchlistAction(formData: FormData) {
   const watchlistId = text(formData, "watchlist_id");
   const playerProfileId = text(formData, "player_profile_id");
   const returnPath = text(formData, "return_path") || "/players";
+  await limitWatchlistMutation(profile.id, returnPath);
 
   // Verify ownership
   let watchlistQuery = serviceClient
@@ -152,6 +160,7 @@ export async function addToWatchlistAction(formData: FormData) {
 
 export async function removeFromWatchlistAction(formData: FormData) {
   const { serviceClient, profile, teamId } = await requireConnectedClub();
+  await limitWatchlistMutation(profile.id);
   const watchlistItemId = text(formData, "watchlist_item_id");
   const watchlistId = text(formData, "watchlist_id");
 
@@ -178,6 +187,7 @@ export async function updateWatchlistItemNotesAction(formData: FormData) {
   const watchlistItemId = text(formData, "watchlist_item_id");
   const watchlistId = text(formData, "watchlist_id");
   const returnPath = text(formData, "return_path") || `/watchlists?watchlist=${watchlistId}`;
+  await limitWatchlistMutation(profile.id, returnPath);
   const notes = text(formData, "notes").slice(0, 2000) || null;
 
   if (profile.role !== "admin") {
@@ -204,6 +214,7 @@ export async function updateWatchlistItemRecruitmentStatusAction(formData: FormD
   const watchlistId = text(formData, "watchlist_id");
   const status = text(formData, "recruitment_status");
   const returnPath = text(formData, "return_path") || "/watchlists";
+  await limitWatchlistMutation(profile.id, returnPath);
   const allowedStatuses = new Set(["watchlisted", "in_negotiations", "signed", "archived"]);
 
   if (!allowedStatuses.has(status)) {

@@ -63,7 +63,7 @@ export default async function NotificationsPage() {
       label: "Open call threads",
       icon: PhoneCall
     },
-    ...(profile.role === "club"
+    ...(profile.role !== "player" && profile.role !== "admin"
       ? [
           {
             title: "Staff invites",
@@ -72,7 +72,11 @@ export default async function NotificationsPage() {
             href: "/dashboard",
             label: "Review invites",
             icon: UserPlus
-          },
+          }
+        ]
+      : []),
+    ...(profile.role === "club"
+      ? [
           {
             title: "Club interest",
             description: "Players who expressed interest in your club and recruitment activity around your team.",

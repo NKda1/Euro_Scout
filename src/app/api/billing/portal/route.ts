@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { portalReturnUrl, stripeSecretKey } from "@/lib/billing";
 import { getAuthenticatedProfile } from "@/lib/auth";
 import { isPremiumActive } from "@/lib/premium";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 function accountRedirect(request: NextRequest, params: { error?: string; notice?: string }) {
@@ -58,6 +59,11 @@ async function createStripePortalSession(params: { profileId: string; baseUrl: s
 }
 
 export async function GET(request: NextRequest) {
+  const limit = rateLimit(`billing-portal:${getClientIp(request)}`, 20, 15 * 60_000);
+  if (!limit.allowed) {
+    return accountRedirect(request, { error: "Too many billing portal attempts. Please wait before trying again." });
+  }
+
   const { profile } = await getAuthenticatedProfile();
 
   if (!profile) {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { signOutAction } from "@/app/actions/auth";
-import { acceptClubStaffInviteAction, declineClubStaffInviteAction } from "@/app/actions/club";
+import { acceptClubStaffInviteAction, declineClubStaffInviteAction, leaveClubOrganisationAction } from "@/app/actions/club";
 import { restoreAdminRoleAction } from "@/app/actions/profile";
 import ShareProfileButton from "@/components/profiles/ShareProfileButton";
 import { requireOnboardedProfile, roleLabel, isReservedAdminEmail, type Profile, type UserRole } from "@/lib/auth";
@@ -15,12 +15,14 @@ export const metadata: Metadata = {
 interface DashboardPageProps {
   searchParams: Promise<{
     error?: string;
+    notice?: string;
     onboarded?: string;
   }>;
 }
 
 interface ClubMembershipSummary {
   team_id: string;
+  club_role: string;
   teams: {
     id: string;
     name: string;
@@ -423,7 +425,7 @@ function buildDashboardModel(params: {
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const { profile, user } = await requireOnboardedProfile();
-  const { error, onboarded } = await searchParams;
+  const { error, notice, onboarded } = await searchParams;
   const adminRoleDrifted = isReservedAdminEmail(user.email) && profile.role !== "admin";
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: roleProfile } = profile.role === "player"
@@ -432,7 +434,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const { data: clubMembership } = profile.role === "club"
     ? await serviceClient
         .from("club_members")
-        .select("team_id, teams!team_id ( id, name, claim_status, logo_url, recruiting_active, open_roster_spots, roster_needs )")
+        .select("team_id, club_role, teams!team_id ( id, name, claim_status, logo_url, recruiting_active, open_roster_spots, roster_needs )")
         .eq("profile_id", profile.id)
         .limit(1)
         .maybeSingle<ClubMembershipSummary>()
@@ -470,7 +472,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     ? await serviceClient.from("teams").select("id", { count: "exact", head: true }).eq("claim_status", "pending")
     : { count: 0 };
   const normalizedUserEmail = user.email?.trim().toLowerCase() ?? "";
-  const { data: pendingStaffInvites } = profile.role === "club" && normalizedUserEmail
+  const { data: pendingStaffInvites } = profile.role !== "player" && profile.role !== "admin" && normalizedUserEmail
     ? await serviceClient
         .from("club_staff_invites")
         .select(
@@ -542,6 +544,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <section className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
         <div className="space-y-6">
           {error ? <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm font-bold text-red-700 dark:text-red-200">{error}</p> : null}
+          {notice ? <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm font-bold text-emerald-800 dark:text-emerald-200">{notice}</p> : null}
           {onboarded === "1" ? (
             <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm font-bold text-emerald-800 dark:text-emerald-200">
               Onboarding complete. Your next best step is ready below.
@@ -645,13 +648,30 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
 
         <aside className="space-y-6">
-          <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a]">
+          <section id="account-settings" className="rounded-lg border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a]">
             <p className="text-sm font-black uppercase text-red-500">Account</p>
             <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-5 dark:border-white/10 dark:bg-black/20">
               <SettingsRow label="Email" value={user.email ?? "Not available"} />
               <SettingsRow label="Role" value={roleLabel(profile.role)} />
               {profile.role === "club" ? <SettingsRow label="Club" value={clubMembership?.teams?.name ?? "Not connected"} /> : null}
             </div>
+            {profile.role === "club" && clubMembership?.team_id ? (
+              <div className="mt-5 border-t border-slate-200 pt-5 dark:border-white/10">
+                {clubMembership.club_role === "owner" ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                    Transfer ownership before leaving this organisation.
+                  </p>
+                ) : (
+                  <form action={leaveClubOrganisationAction}>
+                    <input type="hidden" name="team_id" value={clubMembership.team_id} />
+                    <input type="hidden" name="return_to" value="/dashboard" />
+                    <button className="h-10 w-full rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-black uppercase text-red-700 transition hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
+                      Leave organisation
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : null}
             <form action={signOutAction} className="mt-5">
               <button className="h-11 w-full rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
                 Sign out

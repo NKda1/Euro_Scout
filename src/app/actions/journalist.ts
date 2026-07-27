@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { requireOnboardedProfile } from "@/lib/auth";
-import { hasPremiumFeature } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
@@ -89,15 +89,13 @@ export async function publishJournalistArticleAction(formData: FormData) {
   if (profile.role !== "journalist" && profile.role !== "admin") {
     redirect("/account?error=Only journalist accounts can publish news links.");
   }
+  await enforceActionRateLimit(`journalist-publish:${profile.id}`, 12, 60 * 60_000, "/account");
 
   const title = text(formData, "title");
   const excerpt = text(formData, "excerpt");
   const articleUrl = requireUrl(text(formData, "article_url"), "Article link");
   const thumbnailFile = fileValue(formData, "thumbnail_file");
   const thumbnailLink = text(formData, "thumbnail_url");
-  if ((thumbnailFile || thumbnailLink) && !hasPremiumFeature(profile, "journalist_thumbnail_posts")) {
-    redirect("/account?error=Article thumbnails are a premium journalist feature. Publish without a thumbnail or upgrade to Premium.");
-  }
 
   const uploadedThumbnailUrl = await uploadArticleThumbnail({
     supabase,
@@ -154,6 +152,7 @@ export async function deleteJournalistArticleAction(formData: FormData) {
   if (profile.role !== "journalist" && profile.role !== "admin") {
     redirect("/account?error=Only journalist accounts can delete article links.");
   }
+  await enforceActionRateLimit(`journalist-delete:${profile.id}`, 30, 60 * 60_000, "/account");
 
   const serviceClient = createSupabaseServiceRoleClient();
   const query = serviceClient.from("journalist_articles").delete().eq("id", articleId);
@@ -210,6 +209,7 @@ function parseAdminArticlePayload(formData: FormData) {
 
 export async function adminCreateJournalistArticleAction(formData: FormData) {
   const profile = await requireAdmin();
+  await enforceActionRateLimit(`journalist-admin:${profile.id}`, 60, 60 * 60_000, "/admin/news");
   const payload = parseAdminArticlePayload(formData);
   const serviceClient = createSupabaseServiceRoleClient();
   const authorProfileId = text(formData, "journalist_profile_id") ?? profile.id;
@@ -232,7 +232,8 @@ export async function adminCreateJournalistArticleAction(formData: FormData) {
 }
 
 export async function adminUpdateJournalistArticleAction(formData: FormData) {
-  await requireAdmin();
+  const profile = await requireAdmin();
+  await enforceActionRateLimit(`journalist-admin:${profile.id}`, 60, 60 * 60_000, "/admin/news");
   const articleId = text(formData, "article_id");
 
   if (!articleId) {
@@ -266,7 +267,8 @@ export async function adminUpdateJournalistArticleAction(formData: FormData) {
 }
 
 export async function adminDeleteJournalistArticleAction(formData: FormData) {
-  await requireAdmin();
+  const profile = await requireAdmin();
+  await enforceActionRateLimit(`journalist-admin:${profile.id}`, 60, 60 * 60_000, "/admin/news");
   const articleId = text(formData, "article_id");
 
   if (!articleId) {

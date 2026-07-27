@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { getAuthenticatedProfile } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -21,6 +22,7 @@ export async function createPlayerProfileNoteAction(formData: FormData) {
   if (profile.role !== "club" && profile.role !== "admin") {
     redirect(`${returnPath}?error=Only club accounts can leave player notes.`);
   }
+  await enforceActionRateLimit(`player-note:${profile.id}`, 20, 60 * 60_000, returnPath);
 
   let teamId = text(formData, "team_id");
   if (profile.role !== "admin") {
@@ -71,6 +73,7 @@ export async function reviewPlayerProfileNoteAction(formData: FormData) {
   if (!note || (profile.role !== "admin" && note.player_profiles?.profile_id !== profile.id)) {
     redirect("/account?error=You cannot review that note.");
   }
+  await enforceActionRateLimit(`player-note-review:${profile.id}`, 40, 60 * 60_000, "/account");
 
   const now = new Date().toISOString();
   const status = action === "publish" ? "published" : action === "remove" ? "removed" : "rejected";

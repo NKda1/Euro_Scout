@@ -25,7 +25,7 @@ function metadata(object: Record<string, unknown>) {
 
 function planFromMetadata(object: Record<string, unknown>) {
   const plan = textValue(metadata(object).plan);
-  return plan === "player_premium" || plan === "club_premium" || plan === "journalist_premium" ? plan : null;
+  return plan === "player_premium" || plan === "club_premium" ? plan : null;
 }
 
 async function profileIdFromCustomer(customerId: string | null) {

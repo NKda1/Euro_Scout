@@ -67,6 +67,14 @@ async function emailAlreadyRegistered(email: string, next: string) {
   redirect(authPathWithParams(signUpPath, { error: "We could not verify that email. Please contact support." }));
 }
 
+type OAuthProvider = "google" | "apple";
+
+function getOAuthProvider(value: FormDataEntryValue | null): OAuthProvider | null {
+  const provider = String(value ?? "").trim().toLowerCase();
+  if (provider === "google" || provider === "apple") return provider;
+  return null;
+}
+
 export async function signUpAction(formData: FormData) {
   await checkAuthRateLimit("sign-up", "/auth/sign-up");
   const supabase = await createSupabaseServerClient();
@@ -112,7 +120,7 @@ export async function signUpAction(formData: FormData) {
     redirect(authPathWithParams(signUpPath, { error: error.message }));
   }
 
-  redirect(authPathWithParams("/auth/sign-in", { next, notice: "Check your email to confirm your account, then sign in." }));
+  redirect(authPathWithParams("/auth/sign-in", { next, notice: "Check your email to confirm your account. The link will bring you back to onboarding." }));
 }
 
 export async function signInAction(formData: FormData) {
@@ -144,7 +152,7 @@ export async function forgotPasswordAction(formData: FormData) {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${baseUrl}/auth/reset-password`
+    redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent("/auth/reset-password")}`
   });
 
   if (error) {
@@ -155,6 +163,7 @@ export async function forgotPasswordAction(formData: FormData) {
 }
 
 export async function resetPasswordAction(formData: FormData) {
+  await checkAuthRateLimit("reset-password", "/auth/reset-password");
   const supabase = await createSupabaseServerClient();
   const password = getRequired(formData, "password");
   const confirmPassword = String(formData.get("confirm_password") ?? "");
@@ -178,6 +187,34 @@ export async function resetPasswordAction(formData: FormData) {
   }
 
   redirect("/auth/sign-in?notice=Password updated. Sign in with your new password.");
+}
+
+export async function oauthSignInAction(formData: FormData) {
+  const mode = String(formData.get("mode") ?? "sign-in") === "sign-up" ? "sign-up" : "sign-in";
+  const authPath = mode === "sign-up" ? "/auth/sign-up" : "/auth/sign-in";
+  await checkAuthRateLimit(`oauth-${mode}`, authPath);
+
+  const provider = getOAuthProvider(formData.get("provider"));
+  const next = safeNextPath(formData.get("next"), "/welcome");
+
+  if (!provider) {
+    redirect(authPathWithParams(authPath, { next, error: "Unsupported sign-in provider." }));
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const baseUrl = await getRequestBaseUrl();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`
+    }
+  });
+
+  if (error || !data.url) {
+    redirect(authPathWithParams(authPath, { next, error: error?.message ?? "Could not start OAuth sign-in." }));
+  }
+
+  redirect(data.url);
 }
 
 export async function signOutAction() {

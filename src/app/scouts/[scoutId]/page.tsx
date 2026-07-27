@@ -444,7 +444,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
   const rosterNeeds = (team?.roster_needs ?? []).filter(Boolean);
   const formatPercent = (value: number | null | undefined) => value == null ? "—" : `${new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 }).format(value)}%`;
   return (
-    <main className="app-surface min-h-screen">
+    <main className="app-surface min-h-screen overflow-x-hidden">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={jsonLdScript({
@@ -461,18 +461,18 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
       />
       <article>
         <header className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#120807]">
-          <div className="mx-auto max-w-[92rem] px-4 py-6 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-[92rem] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
             <Link
               href="/scouts"
-              className="mb-5 inline-flex h-10 items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white"
+              className="mb-5 inline-flex h-10 max-w-full items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white"
             >
               ← Back to clubs
             </Link>
-            <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
-              <div>
+            <div className="grid min-w-0 gap-7 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+              <div className="min-w-0">
                 <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
                   <div
-                    className="flex h-32 w-32 shrink-0 items-center justify-center border-2 border-red-500 bg-slate-200 bg-cover bg-center text-5xl font-black text-slate-900 dark:bg-[#202020] dark:text-white"
+                    className="flex h-24 w-24 shrink-0 items-center justify-center border-2 border-red-500 bg-slate-200 bg-cover bg-center text-3xl font-black text-slate-900 dark:bg-[#202020] dark:text-white sm:h-32 sm:w-32 sm:text-5xl"
                     style={team?.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,.62)), url(${team.logo_url})` } : undefined}
                   >
                     {team?.logo_url ? "" : initials(teamName)}
@@ -490,19 +490,19 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                         {leagueLabel} {team?.tier ? `- Tier ${team.tier}` : ""}
                       </span>
                     </div>
-                    <h1 className="mt-4 text-4xl font-black leading-none text-slate-950 dark:text-white sm:text-5xl">{teamName}</h1>
-                    {location && <p className="mt-3 text-lg font-bold text-slate-500 dark:text-white/45">{location}</p>}
+                    <h1 className="mt-4 break-words text-3xl font-black leading-none text-slate-950 dark:text-white sm:text-5xl">{teamName}</h1>
+                    {location && <p className="mt-3 break-words text-base font-bold text-slate-500 dark:text-white/45 sm:text-lg">{location}</p>}
                   </div>
                 </div>
 
-                <div className="mt-7 flex flex-wrap gap-3">
+                <div className="mt-7 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
                   {[
                     ["Region", team?.country ?? "Europe"],
                     ["Type", campusPipeline?.label ?? league?.tier ?? "Club"],
                     ["Market", league?.marketTier ?? "—"],
                     ["Pipeline", pipelineNamesPublic ? "Public" : "Open"]
                   ].map(([label, value]) => (
-                    <div key={label} className="min-h-9 border border-slate-200 bg-white px-4 py-2 text-sm dark:border-white/20 dark:bg-black/20">
+                    <div key={label} className="min-h-9 min-w-0 break-words border border-slate-200 bg-white px-4 py-2 text-sm dark:border-white/20 dark:bg-black/20">
                       <span className="mr-1.5 uppercase text-slate-500 dark:text-white/35">{label}</span>
                       <span className="font-bold capitalize text-slate-800 dark:text-white/75">{value}</span>
                     </div>
@@ -513,7 +513,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a]">
+              <div className="grid grid-cols-1 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a] sm:grid-cols-2">
                 {([
                   ["League", leagueLabel],
                   ["Pass Play", formatPercent(team?.pass_run_percentage)],
@@ -530,8 +530,8 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
           </div>
         </header>
 
-        <div className="mx-auto grid max-w-[92rem] gap-7 px-4 py-7 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
-          <div className="space-y-8 lg:border-r lg:border-slate-200 lg:pr-10 dark:lg:border-white/10">
+        <div className="mx-auto grid min-w-0 max-w-[92rem] gap-7 px-4 py-7 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
+          <div className="min-w-0 space-y-8 lg:border-r lg:border-slate-200 lg:pr-10 dark:lg:border-white/10">
             {error ? <p className="border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">{error}</p> : null}
             {notice ? <p className="border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</p> : null}
 
@@ -539,10 +539,10 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
               <p className="text-sm font-black uppercase text-red-500">Club Profile</p>
               <div className="mt-5 space-y-5">
                 <div className="border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 dark:border-white/15 dark:from-[#1a1a1a] dark:to-[#111]">
-                  <p className="text-base font-semibold leading-7 text-slate-600 dark:text-white/65">{profileText}</p>
+                  <p className="break-words text-base font-semibold leading-7 text-slate-600 dark:text-white/65">{profileText}</p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {/* Stadium Card */}
                   <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-red-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-red-500/40">
                     <div className="absolute inset-0 bg-gradient-to-br from-red-500/0 to-red-500/5 opacity-0 transition group-hover:opacity-100 dark:to-red-500/10" />
@@ -646,7 +646,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
 
           </div>
 
-          <aside className="space-y-6">
+          <aside className="min-w-0 space-y-6">
             <section className="border border-red-200 bg-white p-7 dark:border-red-500/25 dark:bg-[#1a1a1a]">
               <p className="mb-5 text-sm font-black uppercase text-red-500">Contact Club</p>
                 {canContact && teamId ? (

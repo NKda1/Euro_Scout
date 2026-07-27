@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
@@ -17,6 +18,11 @@ function storagePathFromPublicUrl(url: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const limit = rateLimit(`player-photo-remove:${getClientIp(request)}`, 30, 60 * 60_000);
+  if (!limit.allowed) {
+    return accountRedirect(request, { error: "Too many photo changes. Try again shortly." });
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user }

@@ -2,9 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 
-function safeNextPath(value: string | null) {
+function safeNextPath(value: string | null, fallback = "/welcome") {
   const next = value?.trim();
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/dashboard";
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return fallback;
   return next;
 }
 
@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = safeNextPath(searchParams.get("next"));
+  const fallbackNext = type === "recovery" ? "/auth/reset-password" : "/welcome";
+  const next = safeNextPath(searchParams.get("next"), fallbackNext);
 
   const baseUrl = request.nextUrl.origin;
   const redirectTo = `${baseUrl}${next}`;

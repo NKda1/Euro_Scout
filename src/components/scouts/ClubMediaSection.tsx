@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Maximize2, X } from "lucide-react";
 import { deleteClubMediaAction, saveClubVideoAction, saveClubPhotoAction } from "@/app/actions/club";
 import { getEmbeddableVideoUrl, getPreviewEmbedUrl, getVideoProviderLabel, getVideoThumbnailUrl } from "@/lib/video";
 
@@ -30,6 +31,7 @@ function getVideoEmbedUrl(url: string, provider: string | null): string | null {
 
 export default function ClubMediaSection({ scoutId, teamId, media, isMember, returnTo }: ClubMediaSectionProps) {
   const [videoPreviewActive, setVideoPreviewActive] = useState(false);
+  const [videoFullscreenOpen, setVideoFullscreenOpen] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
   const video = media.find((m) => m.media_type === "video") ?? null;
   const photos = useMemo(
@@ -82,7 +84,7 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
                       src={previewEmbedUrl}
                       title={`${video.label ?? "Team video"} hover preview`}
                       className="pointer-events-none h-full w-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                       allowFullScreen
                     />
                     <a
@@ -111,7 +113,7 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
                     src={embedUrl}
                     title={video.label ?? "Team video"}
                     className="h-full w-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                     allowFullScreen
                   />
                 )}
@@ -128,9 +130,17 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
               </a>
             )}
 
-            {(video.label || video.provider) && (
+            {(video.label || video.provider || video.url) && (
               <div className="flex items-center gap-3 bg-[#1a1a1a] px-5 py-4">
-                {video.label && <p className="flex-1 text-base font-black text-white">{video.label}</p>}
+                <p className="flex-1 text-base font-black text-white">{video.label ?? "Club video"}</p>
+                <button
+                  type="button"
+                  onClick={() => setVideoFullscreenOpen(true)}
+                  className="inline-flex h-9 shrink-0 items-center gap-2 rounded border border-white/15 px-3 text-xs font-black uppercase tracking-wide text-white transition hover:border-red-400 hover:text-red-200"
+                >
+                  <Maximize2 className="h-4 w-4" aria-hidden />
+                  Full screen
+                </button>
                 {video.provider && (
                   <span className="shrink-0 rounded border border-white/15 px-3 py-1 text-xs font-bold uppercase text-white/35">
                     {getVideoProviderLabel(video.provider === "youtube" || video.provider === "vimeo" || video.provider === "hudl" ? video.provider : "external")}
@@ -268,6 +278,50 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
           })}
         </div>
       </div>
+
+      {video && videoFullscreenOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 px-4 py-6" role="dialog" aria-modal="true" aria-label="Full screen club video">
+          <div className="relative w-full max-w-6xl overflow-hidden border border-white/10 bg-[#111] shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setVideoFullscreenOpen(false)}
+              className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/75 text-white transition hover:bg-red-600"
+              aria-label="Close full screen club video"
+            >
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+            <div className="aspect-video bg-black">
+              {embedUrl ? (
+                <iframe
+                  src={embedUrl}
+                  title={video.label ?? "Club video"}
+                  className="h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allowFullScreen
+                />
+              ) : (
+                <div
+                  className="flex h-full items-center justify-center bg-cover bg-center p-8 text-center"
+                  style={videoThumbnailUrl ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.2), rgba(0,0,0,.9)), url(${videoThumbnailUrl})` } : undefined}
+                >
+                  <a href={video.url} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center justify-center bg-white px-6 text-xs font-black uppercase tracking-wide text-slate-950 transition hover:bg-red-50">
+                    Open video
+                  </a>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-3 border-t border-white/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-red-300">Full Screen Video</p>
+                <p className="mt-1 text-lg font-black text-white">{video.label ?? "Club video"}</p>
+              </div>
+              <a href={video.url} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center justify-center border border-white/20 bg-white px-5 text-xs font-black uppercase tracking-wide text-slate-950 transition hover:bg-red-50">
+                Open video
+              </a>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {activePhoto ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4" role="dialog" aria-modal="true">

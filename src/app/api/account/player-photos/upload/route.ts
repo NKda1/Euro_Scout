@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
@@ -22,6 +23,11 @@ function safeFileName(name: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const limit = rateLimit(`player-photo-upload:${getClientIp(request)}`, 12, 60 * 60_000);
+  if (!limit.allowed) {
+    return accountRedirect(request, { error: "Too many photo uploads. Try again shortly." });
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user }

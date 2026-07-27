@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { signInAction } from "@/app/actions/auth";
 import AuthShell from "@/components/auth/AuthShell";
+import OAuthButtons from "@/components/auth/OAuthButtons";
 import PasswordInput from "@/components/auth/PasswordInput";
 import { Notice } from "@/components/ui/StateDisplay";
 
@@ -22,7 +23,7 @@ interface SignInPageProps {
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const { error, notice, next, email } = await searchParams;
   const isExpiredLink = error ? /expired|invalid link|otp|token/i.test(error) : false;
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/welcome";
   const signUpParams = new URLSearchParams({ next: safeNext });
   if (email) signUpParams.set("email", email);
 
@@ -45,6 +46,12 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           </Notice>
         </div>
       ) : null}
+      <OAuthButtons next={safeNext} mode="sign-in" />
+      <div className="my-5 flex items-center gap-3 text-xs font-black uppercase text-slate-400">
+        <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+        <span>or use email</span>
+        <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+      </div>
       <form action={signInAction} className="space-y-4">
         <input type="hidden" name="next" value={safeNext} />
         <label className="block">

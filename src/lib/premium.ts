@@ -10,9 +10,7 @@ export type PremiumFeatureKey =
   | "expanded_watchlists"
   | "watchlist_export"
   | "club_direct_messaging_control"
-  | "club_call_negotiation_tools"
-  | "journalist_content_analytics"
-  | "journalist_thumbnail_posts";
+  | "club_call_negotiation_tools";
 
 export interface PremiumFeatureDefinition {
   key: PremiumFeatureKey;
@@ -78,20 +76,6 @@ export const PREMIUM_FEATURES: PremiumFeatureDefinition[] = [
     standard: "Players can request calls and receive accepted meeting updates.",
     premium: "Advanced call scheduling, counter-proposals and negotiation-room controls.",
     roles: ["club"]
-  },
-  {
-    key: "journalist_content_analytics",
-    label: "Article analytics",
-    standard: "Publish article links on the EuroScout news surface.",
-    premium: "Track article opens, recent engagement and source performance.",
-    roles: ["journalist"]
-  },
-  {
-    key: "journalist_thumbnail_posts",
-    label: "Article presentation",
-    standard: "Share article links with basic metadata.",
-    premium: "Add thumbnails and richer cards for published links.",
-    roles: ["journalist"]
   }
 ];
 

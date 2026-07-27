@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { getAuthenticatedProfile } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -38,6 +39,7 @@ export async function flagClubAccountAction(formData: FormData) {
   if (!profile?.onboarding_complete) {
     redirect("/onboarding");
   }
+  await enforceActionRateLimit(`club-flag:${profile.id}`, 5, 24 * 60 * 60_000, returnPath);
 
   if (!teamId) {
     redirect(withMessage(returnPath, "error", "Choose a club account to flag."));

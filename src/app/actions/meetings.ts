@@ -37,7 +37,7 @@ interface MeetingRequest {
 const OPEN_MEETING_STATUSES = ["pending", "club_proposed", "accepted"];
 const ROOM_OPEN_BUFFER_MINUTES = 5;
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://euroscout.pro";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://euroscoutpro.com";
 
 /** Get the email + profile_id for a given auth uid. */
 async function getProfileContact(serviceClient: ReturnType<typeof createSupabaseServiceRoleClient>, profileId: string) {
@@ -753,6 +753,7 @@ export async function acceptMeetingRequestAction(formData: FormData) {
     redirectWithError(returnPath, "That call request could not be found.");
   }
 
+  await enforceActionRateLimit(`call-response:${profile.id}`, 30, 60 * 60_000, returnPath);
   await requireMeetingManager(serviceClient, profile, meeting.team_id, returnPath);
 
   if (meeting.status !== "pending") {
@@ -835,6 +836,8 @@ export async function confirmMeetingTimeAction(formData: FormData) {
     redirectWithError(returnPath, "That call request could not be found.");
   }
 
+  await enforceActionRateLimit(`call-confirm:${profile.id}`, 30, 60 * 60_000, returnPath);
+
   if (meeting.player_profile_id !== profile.id) {
     redirectWithError(returnPath, "Only the player can confirm the final call time.");
   }
@@ -913,6 +916,8 @@ export async function declineMeetingRequestAction(formData: FormData) {
     redirectWithError(returnPath, "That call request could not be found.");
   }
 
+  await enforceActionRateLimit(`call-decline:${profile.id}`, 30, 60 * 60_000, returnPath);
+
   const canPlayerDecline = meeting.player_profile_id === profile.id && (meeting.status === "club_proposed" || meeting.requested_by !== profile.id);
   if (!canPlayerDecline) {
     await requireMeetingManager(serviceClient, profile, meeting.team_id, returnPath);
@@ -971,6 +976,8 @@ export async function cancelMeetingRequestAction(formData: FormData) {
     redirectWithError(returnPath, "That call request could not be found.");
   }
 
+  await enforceActionRateLimit(`call-cancel:${profile.id}`, 30, 60 * 60_000, returnPath);
+
   const canCancelAsPlayer = meeting.player_profile_id === profile.id;
   const canCancelAsClub = profile.role === "admin" || (profile.role === "club" && (await isClubMember(serviceClient, meeting.team_id, profile.id)));
 
@@ -1025,6 +1032,8 @@ export async function createMeetingJoinLinkAction(formData: FormData) {
   if (!isPlayer && !isClub) {
     redirectWithError(returnPath, "You are not a participant in that call.");
   }
+
+  await enforceActionRateLimit(`call-join-link:${profile.id}`, 20, 15 * 60_000, returnPath);
 
   if (meeting.status !== "accepted") {
     redirectWithError(returnPath, "This call is not confirmed yet.");

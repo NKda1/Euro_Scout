@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { getAuthenticatedProfile } from "@/lib/auth";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -10,6 +11,7 @@ function text(formData: FormData, key: string) {
 }
 
 type FilmProvider = "youtube" | "vimeo" | "hudl" | "external";
+const allowedFilmTypes = new Set(["highlights", "game_film", "combine"]);
 
 function normalizeFilmUrl(value: string) {
   const trimmed = value.trim();
@@ -45,6 +47,7 @@ export async function saveFilmLinkAction(formData: FormData) {
   if (!profile || profile.role !== "player") {
     redirect("/account?error=Only player accounts can manage film links.");
   }
+  await enforceActionRateLimit(`film-link:${profile.id}`, 30, 60 * 60_000, "/account");
 
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: playerProfile } = await serviceClient.from("player_profiles").select("id").eq("profile_id", profile.id).maybeSingle<{ id: string }>();
@@ -58,7 +61,8 @@ export async function saveFilmLinkAction(formData: FormData) {
   const url = normalizeFilmUrl(rawUrl);
   const rawThumbnailUrl = text(formData, "thumbnail_url");
   const thumbnailUrl = rawThumbnailUrl ? normalizeFilmUrl(rawThumbnailUrl) : null;
-  const filmType = text(formData, "film_type") || "highlights";
+  const requestedFilmType = text(formData, "film_type") || "highlights";
+  const filmType = allowedFilmTypes.has(requestedFilmType) ? requestedFilmType : "highlights";
   const isDefault = formData.get("is_default") === "on";
 
   if (!url) {
@@ -125,6 +129,7 @@ export async function deleteFilmLinkAction(formData: FormData) {
   if (!profile || profile.role !== "player" || !id) {
     redirect("/account");
   }
+  await enforceActionRateLimit(`film-link-delete:${profile.id}`, 30, 60 * 60_000, "/account");
 
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: playerProfile } = await serviceClient.from("player_profiles").select("id").eq("profile_id", profile.id).maybeSingle<{ id: string }>();
@@ -150,6 +155,9 @@ export async function trackFilmClickAction(formData: FormData) {
   const {
     data: { user }
   } = await authClient.auth.getUser();
+  if (user) {
+    await enforceActionRateLimit(`film-open:${user.id}`, 120, 60_000, fallbackUrl || "/players");
+  }
   const serviceClient = createSupabaseServiceRoleClient();
 
   const { data: film } = await serviceClient

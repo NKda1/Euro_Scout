@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { getAuthenticatedProfile } from "@/lib/auth";
 
 const PROFILE_MEDIA_BUCKET = "profile-media";
@@ -37,6 +38,7 @@ async function uploadProfileImage(folder: "avatar" | "photos", file: File) {
   const { supabase, profile } = await getAuthenticatedProfile();
 
   if (!profile) redirect("/auth/sign-in");
+  await enforceActionRateLimit(`profile-media:${profile.id}:${folder}`, 12, 60 * 60_000, "/account");
 
   validateImage(file);
 
@@ -129,6 +131,7 @@ export async function removePlayerPhotoAction(formData: FormData) {
   if (!profile || profile.role !== "player" || !url) {
     redirect("/account");
   }
+  await enforceActionRateLimit(`profile-media-remove:${profile.id}`, 30, 60 * 60_000, "/account");
 
   const { data: playerProfile } = await supabase
     .from("player_profiles")

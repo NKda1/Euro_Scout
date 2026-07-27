@@ -177,7 +177,22 @@ export default async function ConversationPage({ params, searchParams }: Convers
         ) : null}
       </div>
 
-      {/* Call bookings — real-time client component */}
+      <MessageThread
+        className="min-h-0 flex-1"
+        conversationId={conversation.id}
+        conversationTeamId={conversation.team_id}
+        initialMessages={messages ?? []}
+        profiles={profiles ?? []}
+        participantReadStates={participants ?? []}
+        currentProfileId={profile.id}
+        currentRole={profile.role}
+        isPremiumMessaging={isPremiumMessaging}
+        replyAllowanceLimit={replyAllowance?.reply_limit ?? DEFAULT_FREE_REPLIES_PER_CONVERSATION}
+        replyAllowanceRemaining={replyAllowance?.replies_remaining ?? DEFAULT_FREE_REPLIES_PER_CONVERSATION}
+        isAdminAudit={isAdminAudit}
+        flagged={flagged === "1"}
+      />
+
       <CallBookingsPanel
         conversationId={conversation.id}
         initialMeetings={(meetingRequests ?? []) as CallBookingRow[]}
@@ -185,21 +200,6 @@ export default async function ConversationPage({ params, searchParams }: Convers
         currentRole={profile.role}
         isAdminAudit={isAdminAudit}
       />
-          <MessageThread
-            className="flex-1 min-h-0"
-            conversationId={conversation.id}
-            conversationTeamId={conversation.team_id}
-            initialMessages={messages ?? []}
-            profiles={profiles ?? []}
-            participantReadStates={participants ?? []}
-            currentProfileId={profile.id}
-            currentRole={profile.role}
-            isPremiumMessaging={isPremiumMessaging}
-            replyAllowanceLimit={replyAllowance?.reply_limit ?? DEFAULT_FREE_REPLIES_PER_CONVERSATION}
-            replyAllowanceRemaining={replyAllowance?.replies_remaining ?? DEFAULT_FREE_REPLIES_PER_CONVERSATION}
-            isAdminAudit={isAdminAudit}
-            flagged={flagged === "1"}
-          />
     </div>
   );
 }

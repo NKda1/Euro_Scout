@@ -159,15 +159,28 @@ export default function RoleDemoReel({
 }) {
   const steps = useMemo(() => demoSteps[role], [role]);
   const [active, setActive] = useState(0);
-  const activeStep = steps[active];
+  const [autoPlay, setAutoPlay] = useState(true);
+  const activeStep = steps[active] ?? steps[0];
 
   useEffect(() => {
+    setActive(0);
+    setAutoPlay(true);
+  }, [role]);
+
+  useEffect(() => {
+    if (!autoPlay) return undefined;
+
     const timer = window.setInterval(() => {
       setActive((current) => (current + 1) % steps.length);
     }, 4200);
 
     return () => window.clearInterval(timer);
-  }, [steps.length]);
+  }, [autoPlay, steps.length]);
+
+  function selectStep(index: number) {
+    setActive(index);
+    setAutoPlay(false);
+  }
 
   return (
     <div className="grid min-h-[680px] overflow-hidden border border-slate-200 bg-white text-slate-950 dark:border-white/10 dark:bg-[#090909] dark:text-white xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -183,7 +196,7 @@ export default function RoleDemoReel({
             <button
               key={step.title}
               type="button"
-              onClick={() => setActive(index)}
+              onClick={() => selectStep(index)}
               className={`w-full border p-4 text-left transition ${
                 index === active
                   ? "border-red-500 bg-red-600 text-white"
@@ -240,7 +253,7 @@ export default function RoleDemoReel({
                 <button
                   key={step.title}
                   type="button"
-                  onClick={() => setActive(index)}
+                  onClick={() => selectStep(index)}
                   aria-label={`Show ${step.title}`}
                   className="h-2 overflow-hidden bg-white/15"
                 >

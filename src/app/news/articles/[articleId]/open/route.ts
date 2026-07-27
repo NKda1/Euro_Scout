@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 interface OpenArticleRouteProps {
@@ -7,7 +8,12 @@ interface OpenArticleRouteProps {
   }>;
 }
 
-export async function GET(_request: Request, { params }: OpenArticleRouteProps) {
+export async function GET(request: Request, { params }: OpenArticleRouteProps) {
+  const limit = rateLimit(`article-open:${getClientIp(request)}`, 120, 60_000);
+  if (!limit.allowed) {
+    redirect("/news?error=Too many article opens. Try again shortly.");
+  }
+
   const { articleId } = await params;
   const authClient = await createSupabaseServerClient();
   const serviceClient = createSupabaseServiceRoleClient();

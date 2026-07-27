@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signUpAction } from "@/app/actions/auth";
+import OAuthButtons from "@/components/auth/OAuthButtons";
 import PasswordInput from "@/components/auth/PasswordInput";
 
 const inputClass =
@@ -40,6 +41,12 @@ export default function SignUpForm({ error, defaultEmail, next }: SignUpFormProp
           {matchError ?? error}
         </p>
       )}
+      <OAuthButtons next={safeNext} mode="sign-up" />
+      <div className="my-5 flex items-center gap-3 text-xs font-black uppercase text-slate-400">
+        <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+        <span>or use email</span>
+        <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+      </div>
       <form action={signUpAction} onSubmit={handleSubmit} className="space-y-4">
         <input type="hidden" name="next" value={safeNext} />
         <label className="block">

@@ -1,6 +1,12 @@
+function normalizeBaseUrl(value: string) {
+  return value.replace(/\/+$/, "");
+}
+
 export function getBaseUrl() {
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL;
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
+
+  if (configuredUrl) {
+    return normalizeBaseUrl(configuredUrl);
   }
 
   if (process.env.VERCEL_URL) {

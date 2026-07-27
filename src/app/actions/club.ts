@@ -4,6 +4,8 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { getAuthenticatedProfile } from "@/lib/auth";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
+import { getBaseUrl } from "@/lib/api";
 import { PUBLIC_CACHE_TAGS } from "@/lib/cache-tags";
 import { regionForEuropeanCountry } from "@/lib/europe";
 import { hasPremiumFeature } from "@/lib/premium";
@@ -20,6 +22,16 @@ function revalidatePublicClubCaches() {
   revalidateTag(PUBLIC_CACHE_TAGS.teams);
   revalidateTag(PUBLIC_CACHE_TAGS.leagues);
   revalidateTag(PUBLIC_CACHE_TAGS.directory);
+}
+
+async function limitClubMutation(
+  profileId: string,
+  bucket: string,
+  redirectPath = "/account",
+  limit = 30,
+  windowMs = 60 * 60_000
+) {
+  await enforceActionRateLimit(`club:${bucket}:${profileId}`, limit, windowMs, redirectPath);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -201,6 +213,8 @@ export async function claimTeamAction(teamId: string) {
     redirect("/dashboard?error=Only club accounts can claim a team.");
   }
 
+  await limitClubMutation(profile.id, "claim", "/account", 5, 24 * 60 * 60_000);
+
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
   const serviceClient = createSupabaseServiceRoleClient();
@@ -268,6 +282,8 @@ export async function requestNewTeamFromAccountAction(formData: FormData) {
   if (profile.role !== "club") {
     redirect("/account?error=Only club accounts can request a team.");
   }
+
+  await limitClubMutation(profile.id, "create", "/account", 5, 24 * 60 * 60_000);
 
   const teamName = formText(formData, "team_name", 160);
   const country = formText(formData, "country", 80);
@@ -346,6 +362,7 @@ export async function updateClubProfileFromAccountAction(formData: FormData) {
   if (!teamId) redirect("/account?error=Missing club team.");
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "profile", "/account");
 
   const openRosterSpotsRaw = formText(formData, "open_roster_spots", 10);
   const openRosterSpots = openRosterSpotsRaw ? Math.max(0, Number(openRosterSpotsRaw.replace(",", "."))) : 0;
@@ -396,6 +413,7 @@ export async function inviteMemberAction(teamId: string, inviteeProfileId: strin
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "member", "/dashboard", 20);
 
   const { error } = await supabase.from("club_members").insert({
     team_id: teamId,
@@ -422,6 +440,7 @@ export async function removeMemberAction(teamId: string, memberProfileId: string
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "member", "/dashboard", 20);
 
   const { error } = await supabase
     .from("club_members")
@@ -449,6 +468,8 @@ export async function raiseDisputeAction(teamId: string, reason: string) {
   if (!trimmedReason) {
     redirect("/dashboard?error=A reason is required to raise a dispute.");
   }
+
+  await limitClubMutation(profile.id, "dispute", "/dashboard", 5, 24 * 60 * 60_000);
 
   const { error } = await supabase.from("club_disputes").insert({
     team_id: teamId,
@@ -482,6 +503,7 @@ export async function updateClubProfileAction(
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "profile", "/dashboard");
 
   const { error } = await supabase.from("teams").update(data).eq("id", teamId);
 
@@ -582,6 +604,7 @@ export async function uploadClubLogoAction(formData: FormData) {
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "logo", "/account", 10);
   const publicUrl = await uploadTeamImage(supabase, profile.id, teamId, logo, "club-logo", "/account");
   const serviceClient = createSupabaseServiceRoleClient();
   const { error } = await serviceClient
@@ -621,6 +644,7 @@ export async function inviteStaffFromAccountAction(formData: FormData) {
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "staff-invite", returnPath, 20);
 
   const serviceClient = createSupabaseServiceRoleClient();
   const normalizedEmail = email.slice(0, 240);
@@ -724,12 +748,28 @@ export async function inviteStaffFromAccountAction(formData: FormData) {
     redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
   }
 
+  const absoluteInviteUrl = new URL(inviteLink, getBaseUrl()).toString();
+  const { error: inviteEmailError } = await serviceClient.auth.admin.inviteUserByEmail(
+    normalizedEmail,
+    {
+      redirectTo: absoluteInviteUrl,
+      data: {
+        staff_invite_path: inviteLink,
+        invited_team_id: teamId,
+        invited_team_name: team.name,
+        invited_club_role: clubRole
+      }
+    }
+  );
+
   revalidatePath("/account");
   revalidatePath("/dashboard");
   revalidatePath(`/scouts/${teamId}`);
   redirect(
     returnPathWithParams(returnPath, {
-      notice: `Invite created for ${normalizedEmail}. Share the secure link so they can join ${team.name}.`,
+      notice: inviteEmailError
+        ? `Invite link created for ${normalizedEmail}. If the email does not arrive, share the secure link so they can join ${team.name}.`
+        : `Invite email sent to ${normalizedEmail}. They will land on ${team.name}'s staff onboarding flow.`,
       staff_invite: inviteLink
     })
   );
@@ -748,6 +788,7 @@ export async function refreshClubStaffInviteLinkAction(formData: FormData) {
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "staff-invite", returnPath, 20);
 
   const serviceClient = createSupabaseServiceRoleClient();
 
@@ -800,6 +841,7 @@ export async function acceptClubStaffInviteAction(formData: FormData) {
   const inviteId = formText(formData, "invite_id", 120);
   const returnPath = safeReturnPath(formText(formData, "return_to", 200), "/dashboard");
   const email = user.email?.trim().toLowerCase();
+  await limitClubMutation(profile.id, "staff-accept", returnPath, 20);
 
   if (!inviteId || !email) {
     redirect(`${returnPath}?error=Invite could not be verified.`);
@@ -885,6 +927,7 @@ export async function acceptClubStaffInviteByTokenAction(formData: FormData) {
   const defaultReturnPath = inviteToken ? staffInvitePath(inviteToken) : "/dashboard";
   const returnPath = safeReturnPath(formText(formData, "return_to", 500), defaultReturnPath);
   const email = user.email?.trim().toLowerCase();
+  await limitClubMutation(user.id, "staff-accept", returnPath, 20);
 
   if (!inviteToken || !email) {
     redirect(`${returnPath}?error=Invite could not be verified.`);
@@ -991,6 +1034,8 @@ export async function declineClubStaffInviteByTokenAction(formData: FormData) {
     redirect(`${returnPath}?error=Invite could not be verified.`);
   }
 
+  await limitClubMutation(user.id, "staff-decline", returnPath, 20);
+
   const serviceClient = createSupabaseServiceRoleClient();
   const { error } = await serviceClient
     .from("club_staff_invites")
@@ -1019,6 +1064,8 @@ export async function declineClubStaffInviteAction(formData: FormData) {
   if (!inviteId || !email) {
     redirect(`${returnPath}?error=Invite could not be verified.`);
   }
+
+  await limitClubMutation(profile.id, "staff-decline", returnPath, 20);
 
   const serviceClient = createSupabaseServiceRoleClient();
   const { error } = await serviceClient
@@ -1050,6 +1097,7 @@ export async function cancelClubStaffInviteAction(formData: FormData) {
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "staff-invite", returnPath, 20);
 
   const serviceClient = createSupabaseServiceRoleClient();
   const { error } = await serviceClient
@@ -1083,6 +1131,8 @@ export async function leaveClubOrganisationAction(formData: FormData) {
     redirect(`${returnPath}?error=Missing club organisation.`);
   }
 
+  await limitClubMutation(profile.id, "leave", returnPath, 10);
+
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: membership, error: membershipError } = await serviceClient
     .from("club_members")
@@ -1110,12 +1160,36 @@ export async function leaveClubOrganisationAction(formData: FormData) {
     redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
   }
 
+  const { error: profileUpdateError } = await serviceClient
+    .from("profiles")
+    .update({
+      role: "fan",
+      is_public: false,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", profile.id)
+    .neq("role", "admin");
+
+  if (profileUpdateError) {
+    redirect(`${returnPath}?error=${encodeURIComponent(profileUpdateError.message)}`);
+  }
+
+  const { error: userUpdateError } = await serviceClient
+    .from("users")
+    .update({ role: "fan" })
+    .eq("id", profile.id);
+
+  if (userUpdateError) {
+    redirect(`${returnPath}?error=${encodeURIComponent(userUpdateError.message)}`);
+  }
+
   revalidatePath("/account");
   revalidatePath("/dashboard");
   revalidatePath("/messages");
+  revalidatePath("/notifications");
   revalidatePath("/watchlists");
   revalidatePath(`/scouts/${teamId}`);
-  redirect(`${returnPath}?notice=${encodeURIComponent(`You left ${membership.teams?.name ?? "the organisation"}. You can request to join another club below.`)}`);
+  redirect(`${returnPath}?notice=${encodeURIComponent(`You left ${membership.teams?.name ?? "the organisation"}. Your account now has fan-only access until a new club invite is accepted.`)}`);
 }
 
 export async function requestClubJoinAction(formData: FormData) {
@@ -1138,6 +1212,8 @@ export async function requestClubJoinAction(formData: FormData) {
   if (!["coach", "recruiter", "analyst"].includes(requestedRole)) {
     redirect(`${returnPath}?error=Choose coach, recruiter or analyst.`);
   }
+
+  await limitClubMutation(profile.id, "join", returnPath, 10);
 
   const serviceClient = createSupabaseServiceRoleClient();
   await requireNoExistingClubMembership(serviceClient, profile.id, returnPath);
@@ -1194,6 +1270,8 @@ export async function cancelClubJoinRequestAction(formData: FormData) {
     redirect(`${returnPath}?error=Missing join request.`);
   }
 
+  await limitClubMutation(profile.id, "join", returnPath, 10);
+
   const serviceClient = createSupabaseServiceRoleClient();
   const { error } = await serviceClient
     .from("club_join_requests")
@@ -1224,6 +1302,7 @@ export async function approveClubJoinRequestAction(formData: FormData) {
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "join-review", returnPath, 40);
 
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: joinRequest, error: requestError } = await serviceClient
@@ -1310,6 +1389,7 @@ export async function declineClubJoinRequestAction(formData: FormData) {
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "join-review", returnPath, 40);
   const serviceClient = createSupabaseServiceRoleClient();
   const now = new Date().toISOString();
   const { error } = await serviceClient
@@ -1344,6 +1424,8 @@ export async function toggleClubDirectMessagingAction(formData: FormData) {
     redirect("/account?error=Direct messaging controls are a premium club feature. Standard clubs can keep messaging open and receive Express interest.");
   }
 
+  await limitClubMutation(profile.id, "message-toggle", "/account");
+
   const serviceClient = createSupabaseServiceRoleClient();
   const { error } = await serviceClient
     .from("teams")
@@ -1371,6 +1453,7 @@ export async function removeStaffFromAccountAction(formData: FormData) {
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "member", "/account", 20);
 
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: member } = await serviceClient
@@ -1415,6 +1498,7 @@ export async function transferOwnerFromAccountAction(formData: FormData) {
   }
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "member", "/account", 20);
   const serviceClient = createSupabaseServiceRoleClient();
 
   const { data: newOwner } = await serviceClient
@@ -1483,6 +1567,7 @@ export async function saveClubVideoAction(formData: FormData) {
   }
 
   await requireClubMember(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "media", redirectPath, 30);
   const provider = detectVideoProvider(url);
 
   // Upsert: one video per team — delete existing, then insert
@@ -1523,6 +1608,7 @@ export async function saveClubPhotoAction(formData: FormData) {
   }
 
   await requireClubMember(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "media", redirectPath, 30);
 
   if (!url && photo) {
     validateImage(photo, redirectPath);
@@ -1584,6 +1670,7 @@ export async function deleteClubMediaAction(formData: FormData) {
   }
 
   await requireClubMember(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "media", redirectPath, 30);
 
   const { error } = await supabase
     .from("club_media")
@@ -1607,6 +1694,7 @@ export async function togglePipelinePrivacyAction(teamId: string, isPublic: bool
   if (!profile) redirect("/auth/sign-in");
 
   await requireClubOwner(supabase, profile.id, teamId);
+  await limitClubMutation(profile.id, "profile", `/scouts/${teamId}`);
 
   const { error } = await supabase
     .from("teams")

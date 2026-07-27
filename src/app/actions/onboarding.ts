@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { getAuthenticatedUser, isUserRole, type Profile, type UserRole } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -14,6 +15,8 @@ function publicRole(value: FormDataEntryValue | null): DemoRole {
 export async function markWelcomeTourSeenAction(formData: FormData) {
   const role = publicRole(formData.get("role"));
   const { user } = await getAuthenticatedUser();
+  await enforceActionRateLimit(`welcome-tour:${user.id}`, 20, 60 * 60_000, "/welcome");
+
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: existingProfile } = await serviceClient
     .from("profiles")

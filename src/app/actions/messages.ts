@@ -724,6 +724,9 @@ export async function markConversationReadAction(conversationId: string) {
   const { profile } = await getAuthenticatedProfile();
   if (!profile) return;
 
+  const readLimit = await getActionRateLimit(`message-read:${profile.id}`, 120, 60_000);
+  if (!readLimit.allowed) return;
+
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: participant } = await serviceClient
     .from("conversation_participants")
@@ -750,6 +753,7 @@ export async function flagContactAction(formData: FormData) {
   if (profile.role !== "player") {
     redirect("/messages?error=Only players can flag contacts.");
   }
+  await enforceActionRateLimit(`message-flag:${profile.id}`, 10, 24 * 60 * 60_000, "/messages");
 
   const conversationId = text(formData, "conversation_id");
   const reason = text(formData, "reason").slice(0, 2000);
@@ -804,6 +808,7 @@ export async function contactClubAction(formData: FormData) {
   if (profile.role !== "player") {
     redirect("/messages?error=Only player accounts can contact club accounts.");
   }
+  await enforceActionRateLimit(`club-contact:${profile.id}`, 20, 60 * 60_000, "/scouts");
 
   const teamId = text(formData, "team_id");
   const scoutId = text(formData, "scout_id");
@@ -890,6 +895,7 @@ export async function expressInterestInClubAction(formData: FormData) {
   if (profile.role !== "player") {
     redirect("/messages?error=Only player accounts can express interest in clubs.");
   }
+  await enforceActionRateLimit(`club-interest:${profile.id}`, 30, 60 * 60_000, "/scouts");
 
   const teamId = text(formData, "team_id");
   const scoutId = text(formData, "scout_id") || teamId;

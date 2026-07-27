@@ -8,6 +8,7 @@ import { PUBLIC_CACHE_TAGS } from "@/lib/cache-tags";
 import { getCampusConference, getCampusTeam, isCampusPipeline, type CampusPipeline } from "@/lib/campus-to-pro";
 import { getClubCreationRegion } from "@/lib/club-regions";
 import { regionForEuropeanCountry } from "@/lib/europe";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 function text(formData: FormData, key: string) {
@@ -327,6 +328,7 @@ async function requireNoExistingClubMembership(
 
 export async function completeOnboardingAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUser();
+  await enforceActionRateLimit(`onboarding:${user.id}`, 20, 60 * 60_000, "/onboarding");
 
   // Never strip admin role — admins may preview any role in the wizard
   const { data: currentProfile } = await supabase
@@ -522,6 +524,7 @@ export async function completeOnboardingAction(formData: FormData) {
 
 export async function updateAccountAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUser();
+  await enforceActionRateLimit(`account-update:${user.id}`, 30, 60 * 60_000, "/account");
 
   // Never strip admin role via the account edit form
   const { data: currentProfile } = await supabase
@@ -572,6 +575,7 @@ export async function updateAccountAction(formData: FormData) {
 
 export async function restoreAdminRoleAction() {
   const { user } = await getAuthenticatedUser();
+  await enforceActionRateLimit(`restore-admin:${user.id}`, 5, 60 * 60_000, "/dashboard");
 
   if (!isReservedAdminEmail(user.email)) {
     redirect("/dashboard?error=Only the designated super admin account can restore the admin role.");

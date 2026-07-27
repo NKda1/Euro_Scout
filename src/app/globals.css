@@ -198,6 +198,10 @@
     animation: esCarouselFade 25s infinite ease-in-out;
     will-change: opacity, transform;
   }
+
+  .hero-copy-rotation {
+    animation: heroCopyRotation 650ms ease both;
+  }
 }
 
 .app-surface > section:first-child > .mx-auto,
@@ -317,12 +321,27 @@
   }
 }
 
+@keyframes heroCopyRotation {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-cinematic-frame {
     animation: none;
   }
 
   .es-carousel-frame {
+    animation: none;
+  }
+
+  .hero-copy-rotation {
     animation: none;
   }
 

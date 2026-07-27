@@ -3,6 +3,15 @@ import type { FilmLink } from "@/components/players/HudlFilmViewer";
 import { detectVideoProvider, getEmbeddableVideoUrl, getVideoProviderLabel, getVideoThumbnailUrl, normalizeVideoUrl } from "@/lib/video";
 
 const inputClass = "h-11 w-full rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/25 focus:border-red-500";
+const filmTypeLabels: Record<string, string> = {
+  highlights: "Highlights",
+  game_film: "Game Film",
+  combine: "Combine"
+};
+
+function normaliseFilmType(value: string) {
+  return filmTypeLabels[value] ? value : "highlights";
+}
 
 export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] }) {
   const defaultFilm = filmLinks.find((film) => film.is_default) ?? filmLinks[0] ?? null;
@@ -76,8 +85,6 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
           <option value="highlights">Highlights</option>
           <option value="game_film">Game Film</option>
           <option value="combine">Combine</option>
-          <option value="college_bucs">College/BUCS</option>
-          <option value="training">Training</option>
         </select>
         <input name="url" required placeholder="Hudl, YouTube or Vimeo URL" className={`${inputClass} md:col-span-2`} />
         <input name="thumbnail_url" type="url" placeholder="Thumbnail image URL (optional)" className={`${inputClass} md:col-span-2`} />
@@ -95,7 +102,7 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
               <div>
                 <p className="text-sm font-black text-white">{film.label ?? "Player film"}</p>
                 <p className="mt-1 text-xs font-semibold text-white/35">
-                  {film.film_type} {film.is_default ? "- Default" : ""} {film.thumbnail_url ? "- Thumbnail set" : ""}
+                  {filmTypeLabels[normaliseFilmType(film.film_type)]} {film.is_default ? "- Default" : ""} {film.thumbnail_url ? "- Thumbnail set" : ""}
                 </p>
               </div>
               <form action={deleteFilmLinkAction}>
@@ -108,12 +115,10 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
               <form action={saveFilmLinkAction} className="mt-3 grid gap-3 md:grid-cols-2">
                 <input type="hidden" name="film_id" value={film.id} />
                 <input name="label" defaultValue={film.label ?? ""} placeholder="Label" className={inputClass} />
-                <select name="film_type" defaultValue={film.film_type} className={inputClass}>
+                <select name="film_type" defaultValue={normaliseFilmType(film.film_type)} className={inputClass}>
                   <option value="highlights">Highlights</option>
                   <option value="game_film">Game Film</option>
                   <option value="combine">Combine</option>
-                  <option value="college_bucs">College/BUCS</option>
-                  <option value="training">Training</option>
                 </select>
                 <input name="url" required defaultValue={film.url} placeholder="Hudl, YouTube or Vimeo URL" className={`${inputClass} md:col-span-2`} />
                 <input name="thumbnail_url" type="url" defaultValue={film.thumbnail_url ?? ""} placeholder="Thumbnail image URL (optional)" className={`${inputClass} md:col-span-2`} />

@@ -9,7 +9,6 @@ import {
   declineClubJoinRequestAction,
   refreshClubStaffInviteLinkAction,
   inviteStaffFromAccountAction,
-  leaveClubOrganisationAction,
   removeStaffFromAccountAction,
   requestClubJoinAction,
   toggleClubDirectMessagingAction,
@@ -26,6 +25,7 @@ import {
   createMeetingJoinLinkAction,
   declineMeetingRequestAction
 } from "@/app/actions/meetings";
+import { signOutAction } from "@/app/actions/auth";
 import { reviewPlayerProfileNoteAction } from "@/app/actions/player-notes";
 import { updateAccountAction } from "@/app/actions/profile";
 import AccountManagement from "@/components/account/AccountManagement";
@@ -375,10 +375,6 @@ const fileClass =
   "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-950 file:mr-3 file:rounded-md file:border-0 file:bg-red-600 file:px-3 file:py-1.5 file:text-xs file:font-black file:text-white focus:border-red-500 focus:outline-none dark:border-white/10 dark:bg-black/35 dark:text-white";
 const secondaryActionCardClass =
   "border border-slate-200 bg-white text-slate-700 hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-black/20 dark:text-white/65 dark:hover:border-red-500/40 dark:hover:text-white";
-const meetingSecondaryButtonClass =
-  "inline-flex h-10 w-full items-center justify-center rounded-lg border border-slate-300 !bg-white px-4 text-xs font-black uppercase !text-slate-900 shadow-sm transition hover:border-red-400 hover:!text-red-700 dark:border-white/15 dark:!bg-white/10 dark:!text-white";
-const meetingDangerButtonClass =
-  "inline-flex h-10 w-full items-center justify-center rounded-lg border border-red-600 !bg-red-600 px-4 text-xs font-black uppercase !text-white shadow-sm transition hover:!bg-red-700 dark:border-red-500 dark:!bg-red-600 dark:!text-white";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -591,7 +587,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const isClubOwner = clubMembership?.club_role === "owner";
   const normalizedUserEmail = user.email?.trim().toLowerCase() ?? "";
   const inviteExpiryCutoff = new Date().toISOString();
-  const { data: pendingUserInvites } = profile.role === "club" && normalizedUserEmail
+  const { data: pendingUserInvites } = profile.role !== "player" && profile.role !== "admin" && normalizedUserEmail
     ? await serviceClient
         .from("club_staff_invites")
         .select(
@@ -848,6 +844,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 </span>
               ) : null}
             </Link>
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="inline-flex h-10 items-center border border-red-200 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:border-red-300 hover:bg-red-600 hover:text-white dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-100 dark:hover:border-red-500 dark:hover:bg-red-600"
+              >
+                Sign out
+              </button>
+            </form>
           </div>
         </div>
       </section>
@@ -912,6 +916,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           {profile.role === "player" ? (
             <AccountQuickNav items={[
               { id: "billing", label: "Billing" },
+              { id: "settings", label: "Settings" },
               { id: "profile", label: "Profile" },
               { id: "calls", label: "Video Calls", badge: pendingMeetingCount || null },
               { id: "notes", label: "Club Notes", badge: (playerNoteReviews ?? []).length || null },
@@ -921,6 +926,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : profile.role === "club" && team ? (
             <AccountQuickNav items={[
               { id: "billing", label: "Billing" },
+              { id: "settings", label: "Settings" },
               { id: "workbench", label: "Quick Actions" },
               { id: "interest", label: "Interest", badge: newInterestCount || null },
               { id: "calls", label: "Video Calls", badge: pendingMeetingCount || null },
@@ -939,6 +945,63 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 accountTier={accountTierLabel(profile)}
                 premiumExpiryText={isPremiumAccount ? premiumExpiryLabel(profile) : undefined}
               />
+            </Panel>
+          ) : null}
+
+          {(profile.role === "player" || profile.role === "club") && billingPlan ? (
+            <Panel id="settings" eyebrow="Account Settings" title="Membership & account controls">
+              <div className={`grid gap-4 ${profile.role === "club" && team ? "lg:grid-cols-2" : ""}`}>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-black/20">
+                  <p className={labelClass}>Membership</p>
+                  <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-2xl font-black text-slate-950 dark:text-white">{accountTierLabel(profile)}</p>
+                      <p className="mt-1 text-sm font-semibold leading-6 text-slate-600 dark:text-white/50">
+                        {isPremiumAccount ? premiumExpiryLabel(profile) : "Standard access is active. Upgrade when you are ready for premium recruiting tools."}
+                      </p>
+                    </div>
+                    <Link
+                      href={isPremiumAccount ? "/api/billing/portal" : `/api/billing/checkout?plan=${billingPlan}`}
+                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700"
+                    >
+                      {isPremiumAccount ? "Manage membership" : "Upgrade to premium"}
+                    </Link>
+                  </div>
+                </div>
+
+                {profile.role === "club" && team ? (
+                  <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-black/20">
+                    <p className={labelClass}>Club Messaging</p>
+                    <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-lg font-black text-slate-950 dark:text-white">
+                          {team.direct_messaging_enabled === false ? "Direct messages are off" : "Direct messages are on"}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600 dark:text-white/50">
+                          Premium clubs can turn inbox access off while keeping Express interest available for players.
+                        </p>
+                      </div>
+                      {isClubOwner && isPremiumAccount ? (
+                        <form action={toggleClubDirectMessagingAction} className="shrink-0">
+                          <input type="hidden" name="team_id" value={team.id} />
+                          <input type="hidden" name="direct_messaging_enabled" value={team.direct_messaging_enabled === false ? "true" : "false"} />
+                          <button className={`h-11 rounded-lg px-5 text-sm font-black text-white transition ${team.direct_messaging_enabled === false ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}>
+                            {team.direct_messaging_enabled === false ? "Turn messaging on" : "Turn messaging off"}
+                          </button>
+                        </form>
+                      ) : isClubOwner ? (
+                        <Link href={`/api/billing/checkout?plan=${billingPlan}`} className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-5 text-sm font-black text-amber-900 transition hover:border-red-300 hover:text-red-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                          Upgrade to control messaging
+                        </Link>
+                      ) : (
+                        <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/40">
+                          Only the club owner can change messaging.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </Panel>
           ) : null}
 
@@ -1489,8 +1552,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 {[
                   ["Links", String(journalistArticles?.length ?? 0), "Submitted"],
                   ["Published", String(journalistPublishedCount), "Live on news"],
-                  ["Article opens", isPremiumAccount ? String(journalistOpenCount ?? 0) : "Pro", isPremiumAccount ? "All time" : "Premium analytics"],
-                  ["Last 7 days", isPremiumAccount ? String(journalistWeekOpenCount ?? 0) : "Pro", isPremiumAccount ? "Recent opens" : "Premium analytics"]
+                  ["Article opens", String(journalistOpenCount ?? 0), "All time"],
+                  ["Last 7 days", String(journalistWeekOpenCount ?? 0), "Recent opens"]
                 ].map(([label, value, helper]) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/25">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-white/35">{label}</p>
@@ -1498,8 +1561,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                     <p className="mt-1 text-xs font-bold text-slate-500 dark:text-white/40">{helper}</p>
                   </div>
                 ))}
-                <Link href={isPremiumAccount ? "/analytics" : billingPlan ? `/api/billing/checkout?plan=${billingPlan}` : "/account"} className="inline-flex h-11 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 md:col-span-4 md:w-fit">
-                  {isPremiumAccount ? "Open article analytics" : "Upgrade for article analytics"}
+                <Link href="/analytics" className="inline-flex h-11 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700 md:col-span-4 md:w-fit">
+                  Open article analytics
                 </Link>
               </div>
               <form action={publishJournalistArticleAction} encType="multipart/form-data" className="grid gap-4">
@@ -1509,15 +1572,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <Field label="Article link">
                   <input name="article_url" required type="url" placeholder="https://your-publication.com/article" className={inputClass} />
                 </Field>
-                {isPremiumAccount ? (
-                  <Field label="Upload thumbnail">
-                    <input name="thumbnail_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" className={fileClass} />
-                  </Field>
-                ) : (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                    Article thumbnails are included with Premium. Standard journalist accounts can still publish clean text links.
-                  </div>
-                )}
+                <Field label="Upload thumbnail">
+                  <input name="thumbnail_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" className={fileClass} />
+                </Field>
                 <Field label="Short preview">
                   <textarea
                     name="excerpt"
@@ -1654,7 +1711,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       {[team.city, team.country].filter(Boolean).join(", ") || "Connected club"} · {clubMembership?.club_role ?? "staff"}
                     </p>
                     <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-white/45">
-                      Coaches and staff can leave an organisation and then request access to a new club. Owners must transfer ownership before leaving.
+                      Coaches and staff can manage organisation access from Settings. Leaving switches the account to fan-only access until a new club invite is accepted.
                     </p>
                   </div>
                   {isClubOwner ? (
@@ -1662,13 +1719,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       Transfer ownership before leaving this club.
                     </p>
                   ) : (
-                    <form action={leaveClubOrganisationAction} className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-500/30 dark:bg-red-500/10 sm:min-w-72">
-                      <input type="hidden" name="team_id" value={team.id} />
-                      <input type="hidden" name="return_to" value="/account" />
-                      <button className="h-11 w-full rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
-                        Leave organisation
-                      </button>
-                    </form>
+                    <Link href="/dashboard#account-settings" className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-black/20 dark:text-white/70 dark:hover:border-red-500/40 dark:hover:text-red-100">
+                      Open settings
+                    </Link>
                   )}
                 </div>
               ) : (

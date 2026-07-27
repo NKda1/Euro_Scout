@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 function readFilmId(body: unknown) {
@@ -14,6 +15,11 @@ function readEventType(body: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  const limit = rateLimit(`film-click:${getClientIp(request)}`, 120, 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many film tracking events." }, { status: 429 });
+  }
+
   let body: unknown;
 
   try {

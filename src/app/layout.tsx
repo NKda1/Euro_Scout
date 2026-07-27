@@ -9,7 +9,7 @@ import NavHistoryButtons from "@/components/layout/NavHistoryButtons";
 import PushNotificationPrompt from "@/components/layout/PushNotificationPrompt";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://euroscout.pro"),
+  metadataBase: new URL("https://euroscoutpro.com"),
   title: {
     default: "EuroScout Pro",
     template: "%s"

@@ -69,7 +69,7 @@ export async function getNotificationSummary(profile: Profile, email?: string | 
   let articleEngagement = 0;
   const recentCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  if (profile.role === "club" && email) {
+  if (profile.role !== "player" && profile.role !== "admin" && email) {
     const { count } = await serviceClient
       .from("club_staff_invites")
       .select("id", { count: "exact", head: true })

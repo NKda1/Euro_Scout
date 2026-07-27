@@ -3,7 +3,7 @@ import { sendCallReminderEmail } from "@/lib/email";
 import { sendPushToProfiles } from "@/lib/push";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://euroscout.pro";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://euroscoutpro.com";
 // Remind when call is 10–25 minutes away (cron runs every 15 min)
 const REMIND_AFTER_MINUTES = 10;
 const REMIND_BEFORE_MINUTES = 25;

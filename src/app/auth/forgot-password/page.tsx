@@ -7,10 +7,19 @@ export const metadata: Metadata = {
   description: "Reset your EuroScout Pro password."
 };
 
-export default function ForgotPasswordPage() {
+interface ForgotPasswordPageProps {
+  searchParams: Promise<{
+    notice?: string;
+    error?: string;
+  }>;
+}
+
+export default async function ForgotPasswordPage({ searchParams }: ForgotPasswordPageProps) {
+  const { notice, error } = await searchParams;
+
   return (
     <AuthShell eyebrow="Password Reset" title="Forgot your password?">
-      <ForgotPasswordForm />
+      <ForgotPasswordForm notice={notice} error={error} />
     </AuthShell>
   );
 }

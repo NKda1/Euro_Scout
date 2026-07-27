@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createStripeCheckoutSession, stripeConfigured } from "@/lib/billing";
 import { BILLING_PLANS, SHARED_PREMIUM_PRICE_ENV, planForRole, type BillingPlanKey } from "@/lib/billing-plans";
 import { isPremiumActive } from "@/lib/premium";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/auth";
 
@@ -16,6 +17,11 @@ function accountRedirect(request: NextRequest, params: Record<string, string>) {
 }
 
 export async function GET(request: NextRequest) {
+  const limit = rateLimit(`billing-checkout:${getClientIp(request)}`, 10, 15 * 60_000);
+  if (!limit.allowed) {
+    return accountRedirect(request, { error: "Too many checkout attempts. Please wait before trying again." });
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user }

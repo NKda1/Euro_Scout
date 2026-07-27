@@ -1,8 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
+  const limit = rateLimit(`push-subscribe:${getClientIp(request)}`, 30, 60 * 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many push subscription updates." }, { status: 429 });
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 

@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
+import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { isReservedAdminEmail, requireAdminProfile } from "@/lib/auth";
 import { PUBLIC_CACHE_TAGS } from "@/lib/cache-tags";
 import { isCampusPipeline } from "@/lib/campus-to-pro";
@@ -16,6 +17,10 @@ function revalidatePublicDirectoryCaches() {
   revalidateTag(PUBLIC_CACHE_TAGS.teams);
   revalidateTag(PUBLIC_CACHE_TAGS.leagues);
   revalidateTag(PUBLIC_CACHE_TAGS.directory);
+}
+
+async function limitAdminMutation(profileId: string, bucket: string, redirectPath = "/admin") {
+  await enforceActionRateLimit(`admin:${bucket}:${profileId}`, 120, 60 * 60_000, redirectPath);
 }
 
 function text(formData: FormData, key: string) {
@@ -221,7 +226,8 @@ async function releaseClubToSeedRecord(serviceClient: ReturnType<typeof createSu
 }
 
 export async function adminCreateClubAction(formData: FormData) {
-  await requireAdminProfile();
+  const { profile } = await requireAdminProfile();
+  await limitAdminMutation(profile.id, "clubs", "/admin/clubs");
   const serviceClient = createSupabaseServiceRoleClient();
   const payload = adminClubPayload(formData);
   const baseSlug = slugify(payload.name);
@@ -251,7 +257,8 @@ export async function adminCreateClubAction(formData: FormData) {
 }
 
 export async function adminUpdateClubAction(formData: FormData) {
-  await requireAdminProfile();
+  const { profile } = await requireAdminProfile();
+  await limitAdminMutation(profile.id, "clubs", "/admin/clubs");
   const teamId = text(formData, "team_id");
   if (!teamId) redirect("/admin/clubs?error=Choose a club to update.");
 
@@ -274,7 +281,8 @@ export async function adminUpdateClubAction(formData: FormData) {
 }
 
 export async function adminDeleteClubAction(formData: FormData) {
-  await requireAdminProfile();
+  const { profile } = await requireAdminProfile();
+  await limitAdminMutation(profile.id, "clubs", "/admin/clubs");
   const teamId = text(formData, "team_id");
   const confirmation = text(formData, "confirmation");
 
@@ -296,7 +304,8 @@ export async function adminDeleteClubAction(formData: FormData) {
 }
 
 export async function adminReleaseClubToSeedAction(formData: FormData) {
-  await requireAdminProfile();
+  const { profile } = await requireAdminProfile();
+  await limitAdminMutation(profile.id, "clubs", "/admin/clubs");
   const teamId = text(formData, "team_id");
   const confirmation = text(formData, "confirmation");
 
@@ -368,7 +377,8 @@ async function getCampusClubForAdminAction(teamId: string) {
 }
 
 export async function verifyClubClaimAction(formData: FormData) {
-  await requireAdminProfile();
+  const { profile } = await requireAdminProfile();
+  await limitAdminMutation(profile.id, "club-verification", "/admin/club-verification");
   const teamId = text(formData, "team_id");
   const { serviceClient, team } = await getPendingClubForAdminAction(teamId);
   const now = new Date().toISOString();
@@ -396,7 +406,8 @@ export async function verifyClubClaimAction(formData: FormData) {
 }
 
 export async function declineAndDeleteClubClaimAction(formData: FormData) {
-  await requireAdminProfile();
+  const { profile } = await requireAdminProfile();
+  await limitAdminMutation(profile.id, "club-verification", "/admin/club-verification");
   const teamId = text(formData, "team_id");
   const confirmation = text(formData, "confirmation");
 
@@ -450,7 +461,8 @@ export async function declineAndDeleteClubClaimAction(formData: FormData) {
 }
 
 export async function deleteCampusClubAction(formData: FormData) {
-  await requireAdminProfile();
+  const { profile } = await requireAdminProfile();
+  await limitAdminMutation(profile.id, "campus-clubs", "/admin/club-verification");
   const teamId = text(formData, "team_id");
   const confirmation = text(formData, "confirmation");
 
@@ -506,7 +518,8 @@ export async function deleteCampusClubAction(formData: FormData) {
 }
 
 export async function deleteAdminAccountAction(formData: FormData) {
-  const { user: adminUser } = await requireAdminProfile();
+  const { user: adminUser, profile: adminProfile } = await requireAdminProfile();
+  await limitAdminMutation(adminProfile.id, "users", "/admin/users");
   const targetId = text(formData, "profile_id");
   const confirmation = text(formData, "confirmation");
   const deleteClubs = formData.get("delete_clubs") === "on";
@@ -648,7 +661,8 @@ export async function deleteAdminAccountAction(formData: FormData) {
 }
 
 export async function adminUpdateAccountTierAction(formData: FormData) {
-  await requireAdminProfile();
+  const { profile } = await requireAdminProfile();
+  await limitAdminMutation(profile.id, "account-tier", "/admin/users");
   const profileId = text(formData, "profile_id");
   const accountTier = text(formData, "account_tier");
   const premiumExpiresAt = text(formData, "premium_expires_at");
