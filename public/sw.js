@@ -23,8 +23,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body,
-    icon: icon || "/images/icon-192.png",
-    badge: badge || "/images/badge-72.png",
+    icon: icon || "/icon-192.png",
+    badge: badge || "/badge-72.png",
     tag: tag || "euroscout-notification",
     data: { url },
     requireInteraction: false,
