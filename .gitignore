@@ -37,9 +37,9 @@ src/db/*.sql
 .agents/skills/stripe-*/
 .agents/skills/upgrade-stripe/
 
-#Local Images
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.svg
+# Local-only image dumps
+# Keep deployable app assets in public/ tracked so Vercel can serve logos,
+# favicons, carousel images, league badges and Open Graph media.
+local-images/
+private-images/
+screenshots/
