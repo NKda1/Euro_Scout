@@ -217,6 +217,28 @@ export async function oauthSignInAction(formData: FormData) {
   redirect(data.url);
 }
 
+export async function resendConfirmationAction(formData: FormData) {
+  await checkAuthRateLimit("resend-confirmation", "/auth/resend-confirmation");
+  const supabase = await createSupabaseServerClient();
+  const baseUrl = await getRequestBaseUrl();
+  const email = getRequired(formData, "email");
+
+  if (email.length > MAX_EMAIL_LENGTH) {
+    redirect("/auth/resend-confirmation?notice=If that email is registered and unconfirmed, a new link is on its way.");
+  }
+
+  await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent("/welcome")}`
+    }
+  });
+
+  // Always show the same notice to avoid email enumeration
+  redirect("/auth/resend-confirmation?notice=If that email is registered and unconfirmed, a new link is on its way.");
+}
+
 export async function signOutAction() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();

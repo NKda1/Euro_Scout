@@ -23,6 +23,7 @@ interface SignInPageProps {
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const { error, notice, next, email } = await searchParams;
   const isExpiredLink = error ? /expired|invalid link|otp|token/i.test(error) : false;
+  const isUnconfirmed = error ? /not confirmed|email not confirmed/i.test(error) : false;
   const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/welcome";
   const signUpParams = new URLSearchParams({ next: safeNext });
   if (email) signUpParams.set("email", email);
@@ -38,11 +39,15 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         <div className="mb-4">
           <Notice
             tone="danger"
-            title={isExpiredLink ? "That sign-in link has expired." : "We could not sign you in."}
-            actionHref={isExpiredLink ? "/auth/forgot-password" : undefined}
-            actionLabel={isExpiredLink ? "Request a new link" : undefined}
+            title={isExpiredLink ? "That sign-in link has expired." : isUnconfirmed ? "Your email isn't confirmed yet." : "We could not sign you in."}
+            actionHref={isExpiredLink ? "/auth/forgot-password" : isUnconfirmed ? "/auth/resend-confirmation" : undefined}
+            actionLabel={isExpiredLink ? "Request a new link" : isUnconfirmed ? "Resend confirmation email" : undefined}
           >
-            {isExpiredLink ? "For security, EuroScout links can only be used once and may expire. Request a fresh link and try again." : error}
+            {isExpiredLink
+              ? "For security, EuroScout links can only be used once and may expire. Request a fresh link and try again."
+              : isUnconfirmed
+              ? "Check your inbox for the confirmation link we sent when you signed up. Didn't get it?"
+              : error}
           </Notice>
         </div>
       ) : null}

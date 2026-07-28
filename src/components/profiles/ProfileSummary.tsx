@@ -279,29 +279,32 @@ export default function ProfileSummary({
           {isPlayer && sortedCareerEntries.length ? (
             <section>
               <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Career Timeline</p>
-              <div className="mt-5 overflow-x-auto border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#111]">
-                <div className="flex min-w-max items-start gap-4">
+              <div className="mt-5 border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#111]">
+                <div className="relative">
                   {sortedCareerEntries.map((entry, index) => (
-                    <div key={entry.id} className="flex items-start gap-4">
-                      <div className="w-56">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-red-500 bg-red-600 text-xs font-black text-white">
-                            {index + 1}
-                          </span>
+                    <div key={entry.id} className="relative flex gap-4 pb-6 last:pb-0">
+                      {index < sortedCareerEntries.length - 1 && (
+                        <div className="absolute left-[17px] top-9 h-full w-px bg-red-500/30" />
+                      )}
+                      <span className="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center border border-red-500 bg-red-600 text-xs font-black text-white">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 pt-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs font-black text-slate-500 dark:text-white/35">
-                            {entry.start_year ?? "----"} - {entry.is_current ? "Present" : entry.end_year ?? "----"}
+                            {entry.start_year ?? "----"} – {entry.is_current ? "Present" : (entry.end_year ?? "----")}
                           </span>
+                          {entry.is_current && (
+                            <span className="border border-green-400 bg-green-100 px-2 py-0.5 text-[10px] font-black uppercase text-green-900 dark:border-green-500/40 dark:bg-green-500/15 dark:text-green-100">
+                              Current
+                            </span>
+                          )}
                         </div>
-                        <div className="mt-4 border-l-2 border-red-500/50 pl-4">
-                          <p className="text-base font-black text-slate-950 dark:text-white">{entry.team_name}</p>
-                          <p className="mt-1 text-xs font-bold uppercase text-slate-500 dark:text-white/35">
-                            {[entry.position, entry.league_name, entry.country].filter(Boolean).join(" / ") || "Career entry"}
-                          </p>
-                        </div>
+                        <p className="mt-1 text-base font-black text-slate-950 dark:text-white">{entry.team_name}</p>
+                        <p className="mt-0.5 text-xs font-bold uppercase text-slate-500 dark:text-white/35">
+                          {[entry.position, entry.league_name, entry.country].filter(Boolean).join(" · ") || "Career entry"}
+                        </p>
                       </div>
-                      {index < sortedCareerEntries.length - 1 ? (
-                        <div className="mt-4 h-px w-16 bg-red-500/50" />
-                      ) : null}
                     </div>
                   ))}
                 </div>

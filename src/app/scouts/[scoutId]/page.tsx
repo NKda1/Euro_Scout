@@ -26,13 +26,14 @@ interface ClubProfilePageProps {
   }>;
 }
 
+function isValidUUID(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
 export async function generateMetadata({ params }: ClubProfilePageProps): Promise<Metadata> {
   const { scoutId } = await params;
   const supabase = createSupabaseServiceRoleClient();
-  const { data: member } = await supabase
-    .from("club_members")
-    .select(
-      `
+  const metaSelect = `
         profile_id,
         teams!team_id (
           id, name, city, country, logo_url, claim_status, league_id
@@ -40,9 +41,15 @@ export async function generateMetadata({ params }: ClubProfilePageProps): Promis
         profiles!profile_id (
           display_name, bio, headline, avatar_url, is_public
         )
-      `
-    )
-    .or(`team_id.eq.${scoutId},profile_id.eq.${scoutId}`)
+      `;
+  // profile_id is UUID — only include it in the filter when scoutId is a valid UUID
+  const filter = isValidUUID(scoutId)
+    ? `team_id.eq.${scoutId},profile_id.eq.${scoutId}`
+    : `team_id.eq.${scoutId}`;
+  const { data: member } = await supabase
+    .from("club_members")
+    .select(metaSelect)
+    .or(filter)
     .eq("club_role", "owner")
     .maybeSingle<{
       profile_id: string;
@@ -205,7 +212,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     .eq("club_role", "owner")
     .maybeSingle<ClubMemberRow>();
 
-  const { data: memberByProfile } = !memberByTeam
+  const { data: memberByProfile } = !memberByTeam && isValidUUID(scoutId)
     ? await supabase
         .from("club_members")
         .select(memberSelect)
@@ -216,7 +223,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
 
   const member = memberByTeam ?? memberByProfile;
 
-  const { data: profileFallback } = !member
+  const { data: profileFallback } = !member && isValidUUID(scoutId)
     ? await supabase
         .from("profiles")
         .select("*")

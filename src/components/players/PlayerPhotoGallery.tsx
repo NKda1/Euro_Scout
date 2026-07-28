@@ -43,8 +43,8 @@ export default function PlayerPhotoGallery({ photoUrls, canRemove = false }: Pla
 
   return (
     <>
-      {/* Photo grid */}
-      <div className="mt-5 grid snap-x grid-flow-col auto-cols-[minmax(13rem,1fr)] gap-2 overflow-x-auto pb-2 sm:grid-flow-row sm:grid-cols-4 sm:overflow-visible sm:pb-0">
+      {/* Photo grid — always 2×2, expands to 4 columns on sm+ */}
+      <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {Array.from({ length: MAX_PLAYER_PHOTOS }).map((_, slot) => {
           const photo = photos[slot];
           return (
