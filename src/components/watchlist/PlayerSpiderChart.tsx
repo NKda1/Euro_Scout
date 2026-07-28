@@ -93,7 +93,7 @@ export default function PlayerSpiderChart({ players }: PlayerSpiderChartProps) {
             wrapperStyle={{ fontSize: 13, fontWeight: 700, paddingTop: 12 }}
           />
           <Tooltip
-            formatter={(value: number, name: string) => [`${value}/100`, name]}
+            formatter={(value, name) => [`${value}/100`, name]}
             contentStyle={{
               background: "var(--tooltip-bg, #1e293b)",
               border: "1px solid rgba(255,255,255,0.1)",
