@@ -1,7 +1,10 @@
-import { getBaseUrl } from "@/lib/api";
+const CANONICAL_SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  process.env.NEXT_PUBLIC_APP_URL ??
+  "https://euroscoutpro.com";
 
 export function absoluteUrl(path: string) {
-  const base = getBaseUrl().replace(/\/$/, "");
+  const base = CANONICAL_SITE_URL.replace(/\/$/, "");
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
