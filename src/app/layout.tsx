@@ -7,6 +7,8 @@ import Footer from "@/components/layout/Footer";
 import PageTransition from "@/components/layout/PageTransition";
 import NavHistoryButtons from "@/components/layout/NavHistoryButtons";
 import PushNotificationPrompt from "@/components/layout/PushNotificationPrompt";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://euroscoutpro.com"),
@@ -53,6 +55,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <PageTransition>{children}</PageTransition>
         <PushNotificationPrompt />
         <Footer />
+        <SpeedInsights />
       </body>
     </html>
   );
