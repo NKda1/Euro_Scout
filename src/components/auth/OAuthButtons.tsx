@@ -3,8 +3,7 @@
 import { oauthSignInAction } from "@/app/actions/auth";
 
 const providers = [
-  { id: "google", label: "Google", mark: "G" },
-  { id: "apple", label: "Apple", mark: "A" }
+  { id: "google", label: "Google", mark: "G" }
 ] as const;
 
 interface OAuthButtonsProps {
@@ -17,7 +16,7 @@ export default function OAuthButtons({ next = "/welcome", mode = "sign-in" }: OA
   const prefix = mode === "sign-up" ? "Sign up" : "Continue";
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3">
       {providers.map((provider) => (
         <form key={provider.id} action={oauthSignInAction}>
           <input type="hidden" name="provider" value={provider.id} />
