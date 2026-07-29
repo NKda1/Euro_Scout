@@ -53,8 +53,9 @@ export async function GET(request: NextRequest) {
   }
 
   if (!stripeConfigured(plan)) {
+    const missingKey = !process.env.STRIPE_SECRET_KEY ? "STRIPE_SECRET_KEY" : (BILLING_PLANS[plan].priceEnv);
     return accountRedirect(request, {
-      notice: `Stripe checkout stub is ready for ${BILLING_PLANS[plan].label}. Add STRIPE_SECRET_KEY and ${SHARED_PREMIUM_PRICE_ENV} to enable live checkout.`
+      notice: `Stripe checkout is not yet live. Add ${missingKey} to your environment variables to enable ${BILLING_PLANS[plan].label} checkout.`
     });
   }
 
