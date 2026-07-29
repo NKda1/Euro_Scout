@@ -1,5 +1,6 @@
 import { deleteFilmLinkAction, saveFilmLinkAction } from "@/app/actions/film";
 import type { FilmLink } from "@/components/players/HudlFilmViewer";
+import VideoLinkComposer from "@/components/account/VideoLinkComposer";
 import { detectVideoProvider, getEmbeddableVideoUrl, getVideoProviderLabel, getVideoThumbnailUrl, normalizeVideoUrl } from "@/lib/video";
 
 const inputClass = "h-11 w-full rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/25 focus:border-red-500";
@@ -22,8 +23,8 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
   const defaultThumbnailUrl = defaultFilm ? defaultFilm.thumbnail_url ?? getVideoThumbnailUrl(defaultFilm.url) : null;
 
   return (
-    <section className="rounded-lg border border-white/10 bg-[#1a1a1a] p-6">
-      <p className="text-sm font-black uppercase text-red-500">Film Links</p>
+    <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">
+      <p className="text-sm font-black text-slate-950 dark:text-white">Film reel</p>
 
       <div className="mt-5 overflow-hidden rounded-lg border border-white/15 bg-black/30">
         <div className="aspect-video">
@@ -79,20 +80,20 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
         </div>
       </div>
 
-      <form action={saveFilmLinkAction} className="mt-5 grid gap-4 md:grid-cols-2">
-        <input name="label" placeholder="Label, e.g. 2026 highlights" className={inputClass} />
+      <form action={saveFilmLinkAction} className="mt-4 grid gap-3">
+        <VideoLinkComposer showThumbnailField />
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <select name="film_type" defaultValue="highlights" className={inputClass}>
           <option value="highlights">Highlights</option>
           <option value="game_film">Game Film</option>
           <option value="combine">Combine</option>
         </select>
-        <input name="url" required placeholder="Hudl, YouTube or Vimeo URL" className={`${inputClass} md:col-span-2`} />
-        <input name="thumbnail_url" type="url" placeholder="Thumbnail image URL (optional)" className={`${inputClass} md:col-span-2`} />
         <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
           <input name="is_default" type="checkbox" className="h-4 w-4 rounded border-white/20 text-red-600" />
           Set as default film
         </label>
         <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">Add film</button>
+        </div>
       </form>
 
       <div className="mt-5 space-y-3">

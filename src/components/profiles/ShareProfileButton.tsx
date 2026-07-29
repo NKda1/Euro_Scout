@@ -10,6 +10,7 @@ interface ShareProfileButtonProps {
   text?: string;
   variant?: "solid" | "outline";
   className?: string;
+  compactOnMobile?: boolean;
 }
 
 function absoluteShareUrl(path: string) {
@@ -24,7 +25,8 @@ export default function ShareProfileButton({
   title = "EuroScout Pro profile",
   text = "View this EuroScout Pro profile.",
   variant = "outline",
-  className = ""
+  className = "",
+  compactOnMobile = false
 }: ShareProfileButtonProps) {
   const [copied, setCopied] = useState(false);
   const [canNativeShare, setCanNativeShare] = useState(false);
@@ -66,9 +68,10 @@ export default function ShareProfileButton({
       onClick={handleShare}
       className={`inline-flex h-11 items-center justify-center gap-2 px-4 text-sm font-black transition ${buttonClass} ${className}`}
       aria-live="polite"
+      aria-label={copied ? "Profile link copied" : label}
     >
-      <Icon aria-hidden className="h-4 w-4" />
-      {copied ? "Link copied" : label}
+      <Icon aria-hidden className="h-4 w-4 shrink-0" />
+      <span className={compactOnMobile ? "hidden sm:inline" : ""}>{copied ? "Link copied" : label}</span>
     </button>
   );
 }

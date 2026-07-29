@@ -78,7 +78,6 @@ function getOAuthProvider(value: FormDataEntryValue | null): OAuthProvider | nul
 export async function signUpAction(formData: FormData) {
   await checkAuthRateLimit("sign-up", "/auth/sign-up");
   const supabase = await createSupabaseServerClient();
-  const baseUrl = await getRequestBaseUrl();
   const email = getRequired(formData, "email");
   const password = getRequired(formData, "password");
   const confirmPassword = String(formData.get("confirm_password") ?? "");
@@ -105,22 +104,26 @@ export async function signUpAction(formData: FormData) {
     redirect(authPathWithParams("/auth/sign-in", { next, error: "That email already has an account. Sign in or reset your password instead." }));
   }
 
-  const { error } = await supabase.auth.signUp({
+  // Use admin API to create the user with email pre-confirmed, then sign in immediately.
+  // This bypasses Supabase's confirmation email delivery entirely.
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { data: adminUser, error: createError } = await serviceClient.auth.admin.createUser({
     email,
     password,
-    options: {
-      data: {
-        display_name: displayName
-      },
-      emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`
-    }
+    email_confirm: true,
+    user_metadata: { display_name: displayName }
   });
 
-  if (error) {
-    redirect(authPathWithParams(signUpPath, { error: error.message }));
+  if (createError || !adminUser?.user) {
+    redirect(authPathWithParams(signUpPath, { error: createError?.message ?? "Could not create account. Please try again." }));
   }
 
-  redirect(authPathWithParams("/auth/sign-in", { next, notice: "Check your email to confirm your account. The link will bring you back to onboarding." }));
+  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+  if (signInError) {
+    redirect(authPathWithParams("/auth/sign-in", { next, notice: "Account created. Sign in to continue." }));
+  }
+
+  redirect(next);
 }
 
 export async function signInAction(formData: FormData) {

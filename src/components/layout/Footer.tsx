@@ -19,8 +19,8 @@ const legalLinks = [
 export default function Footer() {
   return (
     <footer className="site-footer border-t border-slate-200 bg-white dark:border-white/10 dark:bg-[#090909]">
-      <div className="mx-auto max-w-[92rem] px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto max-w-[92rem] px-4 py-8 sm:py-12 sm:px-6 lg:px-8">
+        <div className="grid gap-6 sm:gap-10 sm:grid-cols-2 lg:grid-cols-4">
 
           {/* Brand */}
           <div className="lg:col-span-1">
@@ -92,7 +92,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 flex flex-col items-start justify-between gap-4 border-t border-slate-200 pt-6 dark:border-white/10 sm:flex-row sm:items-center">
+        <div className="mt-6 sm:mt-10 flex flex-col items-start justify-between gap-4 border-t border-slate-200 pt-6 dark:border-white/10 sm:flex-row sm:items-center">
           <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
             © {new Date().getFullYear()} EuroScout Pro · All rights reserved
           </p>

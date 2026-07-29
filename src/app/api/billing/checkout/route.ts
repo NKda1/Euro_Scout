@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createStripeCheckoutSession, stripeConfigured } from "@/lib/billing";
-import { BILLING_PLANS, SHARED_PREMIUM_PRICE_ENV, planForRole, type BillingPlanKey } from "@/lib/billing-plans";
+import { BILLING_PLANS, planForRole, type BillingPlanKey } from "@/lib/billing-plans";
 import { isPremiumActive } from "@/lib/premium";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
