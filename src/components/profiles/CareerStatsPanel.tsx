@@ -1,5 +1,5 @@
-import { Activity, Hash, Shield, Target, Trophy, Zap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { Activity, Hash, Shield, Target, Trophy, Zap } from "lucide-react";
 
 type CareerStats = Record<string, unknown>;
 
@@ -41,23 +41,41 @@ export default function CareerStatsPanel({ stats }: CareerStatsPanelProps) {
   return (
     <section>
       <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Career Stats</p>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {rows.map(([key, value]) => {
-          const safeValue = value ?? 0;
-          const Icon = iconForKey(key);
-          return (
-            <div key={key} className="flex items-center gap-3 border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center border border-red-200 bg-red-50 text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-                <Icon aria-hidden className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-white/35">{labelForKey(key)}</p>
-                <p className="mt-1 text-xl font-black text-slate-950 dark:text-white">{safeValue}</p>
-              </div>
-            </div>
-          );
-        })}
+      <div className="mt-5 overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
+              <th className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-[0.16em] text-slate-400 dark:text-white/30">
+                Stat
+              </th>
+              <th className="px-4 py-3 text-right text-[11px] font-black uppercase tracking-[0.16em] text-slate-400 dark:text-white/30">
+                Value
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-white/[0.06]">
+            {rows.map(([key, value]) => {
+              const Icon = iconForKey(key);
+              return (
+                <tr key={key} className="transition hover:bg-slate-50 dark:hover:bg-white/[0.02]">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-red-200 bg-red-50 text-red-500 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300">
+                        <Icon aria-hidden className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="text-sm font-semibold text-slate-600 dark:text-white/55">{labelForKey(key)}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right text-base font-black text-slate-950 dark:text-white">
+                    {value}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </section>
   );
 }
+

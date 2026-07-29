@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { requireOnboardedProfile } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import PlayerSpiderChart from "@/components/watchlist/PlayerSpiderChart";
 
 export const metadata: Metadata = {
   title: "Player Comparison | EuroScout Pro",
@@ -121,6 +122,24 @@ export default async function WatchlistComparePage({ params }: ComparePageProps)
             Club-only side-by-side comparison for watchlisted players.
           </p>
         </div>
+
+        {compareItems.length >= 2 && (
+          <div className="mt-8 border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#111]">
+            <p className="eyebrow-red mb-4">Radar Comparison</p>
+            <PlayerSpiderChart
+              players={compareItems.slice(0, 4).map((item) => ({
+                name: item.player_profiles!.profiles!.display_name,
+                height_cm: item.player_profiles!.height_cm,
+                weight_kg: item.player_profiles!.weight_kg,
+                forty_yard_dash: item.player_profiles!.forty_yard_dash,
+                shuttle_seconds: item.player_profiles!.shuttle_seconds,
+                vertical_jump_cm: item.player_profiles!.vertical_jump_cm,
+                broad_jump_cm: item.player_profiles!.broad_jump_cm,
+                bench_reps: item.player_profiles!.bench_reps,
+              }))}
+            />
+          </div>
+        )}
 
         {compareItems.length ? (
           <div className="mt-6 overflow-x-auto">
