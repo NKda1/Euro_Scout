@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 interface PlayerPhotoGalleryProps {
@@ -15,19 +15,19 @@ export default function PlayerPhotoGallery({ photoUrls, canRemove = false }: Pla
   const photos = photoUrls.slice(0, MAX_PLAYER_PHOTOS);
   const activePhoto = activeIndex === null ? null : photos[activeIndex] ?? null;
 
-  function showPreviousPhoto() {
+  const showPreviousPhoto = useCallback(() => {
     setActiveIndex((current) => {
       if (current === null || photos.length === 0) return current;
       return current === 0 ? photos.length - 1 : current - 1;
     });
-  }
+  }, [photos.length]);
 
-  function showNextPhoto() {
+  const showNextPhoto = useCallback(() => {
     setActiveIndex((current) => {
       if (current === null || photos.length === 0) return current;
       return current === photos.length - 1 ? 0 : current + 1;
     });
-  }
+  }, [photos.length]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function PlayerPhotoGallery({ photoUrls, canRemove = false }: Pla
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeIndex]);
+  }, [activeIndex, showNextPhoto, showPreviousPhoto]);
 
   return (
     <>

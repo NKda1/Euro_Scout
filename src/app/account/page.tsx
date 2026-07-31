@@ -25,16 +25,19 @@ import {
   createMeetingJoinLinkAction,
   declineMeetingRequestAction
 } from "@/app/actions/meetings";
-import { signOutAction } from "@/app/actions/auth";
 import { reviewPlayerProfileNoteAction } from "@/app/actions/player-notes";
 import { updateAccountAction } from "@/app/actions/profile";
+import AccountActionBar from "@/components/account/AccountActionBar";
 import AccountManagement from "@/components/account/AccountManagement";
 import AccountQuickNav from "@/components/account/AccountQuickNav";
 import AccountSection from "@/components/account/AccountSection";
+import AccountSettingsPanel from "@/components/account/AccountSettingsPanel";
+import AccountWorkspaceOverview from "@/components/account/AccountWorkspaceOverview";
 import CareerStatsBuilder from "@/components/account/CareerStatsBuilder";
 import CareerTimelineBuilder from "@/components/account/CareerTimelineBuilder";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
 import MetricNumberControl from "@/components/account/MetricNumberControl";
+import MediaFileInput from "@/components/account/MediaFileInput";
 import PlayerPhotoManager from "@/components/account/PlayerPhotoManager";
 import RosterNeedsBuilder from "@/components/account/RosterNeedsBuilder";
 import StaffInviteLinkNotice from "@/components/account/StaffInviteLinkNotice";
@@ -373,9 +376,6 @@ const textareaClass =
 const labelClass = "mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35";
 const fileClass =
   "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-950 file:mr-3 file:rounded-md file:border-0 file:bg-red-600 file:px-3 file:py-1.5 file:text-xs file:font-black file:text-white focus:border-red-500 focus:outline-none dark:border-white/10 dark:bg-black/35 dark:text-white";
-const secondaryActionCardClass =
-  "border border-slate-200 bg-white text-slate-700 hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-black/20 dark:text-white/65 dark:hover:border-red-500/40 dark:hover:text-white";
-
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
@@ -715,12 +715,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const nonOwnerStaff = staff.filter((staffMember) => staffMember.club_role !== "owner");
   const pendingStaffInvites = pendingTeamInvites ?? [];
   const availableStaffSlots = Math.max(0, 3 - nonOwnerStaff.length - pendingStaffInvites.length);
-  const { count: clubWatchlistCount } = team
-    ? await serviceClient
-        .from("watchlists")
-        .select("id", { count: "exact", head: true })
-        .eq("team_id", team.id)
-    : { count: 0 };
   const { data: clubInterestNotifications } = team
     ? await serviceClient
         .from("club_interest_notifications")
@@ -796,14 +790,27 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const isPremiumAccount = isPremiumActive(profile);
   const billingPlan = planForRole(profile.role);
   const premiumFeatures = rolePremiumFeatures(profile.role);
+  const completionSignals = [
+    Boolean(profile.display_name),
+    Boolean(profile.location),
+    Boolean(profile.bio),
+    Boolean(profile.avatar_url || (profile.role === "club" && team?.logo_url)),
+    profile.is_public,
+    profile.role === "player"
+      ? Boolean(textValue(roleProfile, "position"))
+      : profile.role === "club"
+        ? Boolean(team)
+        : true
+  ];
+  const accountCompletion = Math.round((completionSignals.filter(Boolean).length / completionSignals.length) * 100);
 
   return (
     <main className="theme-private min-h-screen bg-white text-slate-950 dark:bg-[#090909] dark:text-white">
       <section className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#111]">
-        <div className="mx-auto grid max-w-[110rem] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
             <div
-              className="flex h-20 w-20 shrink-0 items-center justify-center border border-red-500 bg-slate-100 bg-cover bg-center text-2xl font-black text-slate-950 dark:bg-[#202020] dark:text-white"
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-red-500 bg-slate-100 bg-cover bg-center text-xl font-black text-slate-950 dark:bg-[#202020] dark:text-white"
               style={(profile.role === "club" && team?.logo_url ? team.logo_url : profile.avatar_url) ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,.55)), url(${profile.role === "club" && team?.logo_url ? team.logo_url : profile.avatar_url})` } : undefined}
             >
               {(profile.role === "club" && team?.logo_url) || profile.avatar_url ? "" : initials(profile.display_name)}
@@ -825,39 +832,18 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   </span>
                 ) : null}
               </div>
-              <h1 className="mt-2 truncate text-3xl font-black leading-none">{profile.display_name}</h1>
+              <h1 className="mt-1.5 truncate text-2xl font-black leading-none">{profile.display_name}</h1>
               <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-white/45">{profile.headline ?? (team ? team.name : "Account control surface")}</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 lg:justify-end">
-            <Link href={publicHref} className="inline-flex h-10 items-center border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/65 dark:hover:border-red-500/40 dark:hover:text-white">
-              Public preview
-            </Link>
-            <Link href="/dashboard" className="inline-flex h-10 items-center border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/50 dark:hover:border-red-500/40 dark:hover:text-white">
-              Settings
-            </Link>
-            <Link href="/messages" className="relative inline-flex h-10 items-center bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
-              Messages
-              {unreadMessageCount ? (
-                <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-black text-red-600">
-                  {unreadMessageCount}
-                </span>
-              ) : null}
-            </Link>
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center border border-red-200 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:border-red-300 hover:bg-red-600 hover:text-white dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-100 dark:hover:border-red-500 dark:hover:bg-red-600"
-              >
-                Sign out
-              </button>
-            </form>
+          <div className="lg:justify-self-end">
+            <AccountActionBar publicHref={publicHref} displayName={profile.display_name} showSettingsLink={false} />
           </div>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-[110rem] gap-5 px-4 py-5 sm:px-6 lg:px-8">
-        <div className="order-2 overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
+      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
           {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">{error}</p> : null}
           {notice ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</p> : null}
           {staffInvitePath ? (
@@ -915,30 +901,46 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           {profile.role === "player" ? (
             <AccountQuickNav items={[
-              { id: "billing", label: "Billing" },
-              { id: "settings", label: "Settings" },
+              { id: "overview", label: "Overview" },
               { id: "profile", label: "Profile" },
-              { id: "calls", label: "Video Calls", badge: pendingMeetingCount || null },
-              { id: "notes", label: "Club Notes", badge: (playerNoteReviews ?? []).length || null },
-              { id: "media", label: "Media" },
-              { id: "views", label: "Profile Views" },
-            ]} />
-          ) : profile.role === "club" && team ? (
-            <AccountQuickNav items={[
-              { id: "billing", label: "Billing" },
+              { id: "recruitment", label: "Recruitment", badge: pendingMeetingCount || null },
+              { id: "communication", label: "Communication", badge: unreadMessageCount || null },
+              { id: "membership", label: "Membership" },
               { id: "settings", label: "Settings" },
-              { id: "workbench", label: "Quick Actions" },
-              { id: "interest", label: "Interest", badge: newInterestCount || null },
-              { id: "calls", label: "Video Calls", badge: pendingMeetingCount || null },
-              { id: "club-profile", label: "Club Profile" },
-              { id: "staff", label: "Staff" },
-              { id: "messaging", label: "Messaging" },
-              { id: "club-media", label: "Media" },
             ]} />
-          ) : null}
+          ) : profile.role === "club" ? (
+            <AccountQuickNav items={[
+              { id: "overview", label: "Overview" },
+              { id: "profile", label: "Profile" },
+              { id: "organisation", label: "Organisation" },
+              { id: "recruitment", label: "Recruitment", badge: newInterestCount + pendingMeetingCount || null },
+              { id: "communication", label: "Communication", badge: unreadMessageCount || null },
+              { id: "membership", label: "Membership" },
+              { id: "settings", label: "Settings" },
+            ]} />
+          ) : (
+            <AccountQuickNav items={[
+              { id: "overview", label: "Overview" },
+              { id: "profile", label: "Profile" },
+              { id: "communication", label: "Communication", badge: unreadMessageCount || null },
+              { id: "membership", label: "Membership" },
+              { id: "settings", label: "Settings" },
+            ]} />
+          )}
+
+          <AccountWorkspaceOverview
+            completion={accountCompletion}
+            unreadMessages={unreadMessageCount}
+            pendingCalls={pendingMeetingCount}
+            planLabel={accountTierLabel(profile)}
+            isPublic={profile.is_public}
+            publicHref={publicHref}
+            role={profile.role}
+            organisationName={team?.name}
+          />
 
           {(profile.role === "player" || profile.role === "club") && billingPlan ? (
-            <Panel id="billing" eyebrow="Account Management" title="Subscription & Billing">
+            <Panel id="membership" eyebrow="Membership" title="Subscription & billing">
               <AccountManagement
                 isPremium={isPremiumAccount}
                 billingPlan={billingPlan}
@@ -948,65 +950,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </Panel>
           ) : null}
 
-          {(profile.role === "player" || profile.role === "club") && billingPlan ? (
-            <Panel id="settings" eyebrow="Account Settings" title="Membership & account controls">
-              <div className={`grid gap-4 ${profile.role === "club" && team ? "lg:grid-cols-2" : ""}`}>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-black/20">
-                  <p className={labelClass}>Membership</p>
-                  <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-2xl font-black text-slate-950 dark:text-white">{accountTierLabel(profile)}</p>
-                      <p className="mt-1 text-sm font-semibold leading-6 text-slate-600 dark:text-white/50">
-                        {isPremiumAccount ? premiumExpiryLabel(profile) : "Standard access is active. Upgrade when you are ready for premium recruiting tools."}
-                      </p>
-                    </div>
-                    <Link
-                      href={isPremiumAccount ? "/api/billing/portal" : `/api/billing/checkout?plan=${billingPlan}`}
-                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700"
-                    >
-                      {isPremiumAccount ? "Manage membership" : "Upgrade to premium"}
-                    </Link>
-                  </div>
-                </div>
-
-                {profile.role === "club" && team ? (
-                  <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-black/20">
-                    <p className={labelClass}>Club Messaging</p>
-                    <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-lg font-black text-slate-950 dark:text-white">
-                          {team.direct_messaging_enabled === false ? "Direct messages are off" : "Direct messages are on"}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-600 dark:text-white/50">
-                          Premium clubs can turn inbox access off while keeping Express interest available for players.
-                        </p>
-                      </div>
-                      {isClubOwner && isPremiumAccount ? (
-                        <form action={toggleClubDirectMessagingAction} className="shrink-0">
-                          <input type="hidden" name="team_id" value={team.id} />
-                          <input type="hidden" name="direct_messaging_enabled" value={team.direct_messaging_enabled === false ? "true" : "false"} />
-                          <button className={`h-11 rounded-lg px-5 text-sm font-black text-white transition ${team.direct_messaging_enabled === false ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}>
-                            {team.direct_messaging_enabled === false ? "Turn messaging on" : "Turn messaging off"}
-                          </button>
-                        </form>
-                      ) : isClubOwner ? (
-                        <Link href={`/api/billing/checkout?plan=${billingPlan}`} className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-5 text-sm font-black text-amber-900 transition hover:border-red-300 hover:text-red-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                          Upgrade to control messaging
-                        </Link>
-                      ) : (
-                        <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/40">
-                          Only the club owner can change messaging.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </Panel>
-          ) : null}
-
           {profile.role !== "admin" && (profile.role !== "player" && profile.role !== "club") ? (
-            <Panel id="billing" eyebrow="Membership" title={`${accountTierLabel(profile)} account`}>
+            <Panel id="membership" eyebrow="Membership" title={`${accountTierLabel(profile)} account`}>
               <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
                 <div className={`rounded-lg border p-5 ${isPremiumAccount ? "border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10" : "border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-black/20"}`}>
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500 dark:text-white/35">Current tier</p>
@@ -1045,25 +990,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "club" && team ? (
-            <Panel id="workbench" eyebrow="Club Workbench" title="Recruiting command center">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ["Watchlists", "/watchlists", `${clubWatchlistCount ?? 0} shortlist${clubWatchlistCount === 1 ? "" : "s"}`, "bg-red-600 text-white hover:bg-red-700"],
-                  ["Player directory", "/players", "Scout players", secondaryActionCardClass],
-                  ["Club inbox", "/messages", unreadMessageCount ? `${unreadMessageCount} unread` : "Messages", secondaryActionCardClass],
-                  ["Public preview", publicHref, "View as public", secondaryActionCardClass]
-                ].map(([label, href, detail, classes]) => (
-                  <Link key={label} href={href} className={`px-4 py-3 transition ${classes}`}>
-                    <span className="block text-sm font-black">{label}</span>
-                    <span className="mt-1 block text-xs font-bold opacity-70">{detail}</span>
-                  </Link>
-                ))}
-              </div>
-            </Panel>
-          ) : null}
-
-          {profile.role === "club" && team ? (
-            <Panel id="interest" eyebrow="Interest Notifications" title={newInterestCount ? `${newInterestCount} new player interest${newInterestCount === 1 ? "" : "s"}` : "Player interest"}>
+            <Panel id="recruitment" eyebrow="Recruitment" title={newInterestCount ? `${newInterestCount} new player interest${newInterestCount === 1 ? "" : "s"}` : "Player interest"}>
               {(clubInterestNotifications ?? []).length ? (
                 <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-black/20">
                   {(clubInterestNotifications ?? []).map((interest) => {
@@ -1109,7 +1036,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           {(profile.role === "player" || (profile.role === "club" && team)) ? (
             <Panel
-              id="calls"
+              id={profile.role === "player" ? "recruitment" : "calls"}
               eyebrow="Video Calls"
               title={profile.role === "club" ? (pendingMeetingCount ? `${pendingMeetingCount} pending call request${pendingMeetingCount === 1 ? "" : "s"}` : "Club call requests") : "Your club call requests"}
             >
@@ -1308,23 +1235,31 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </Panel>
           ) : null}
 
-          {profile.role === "player" ? (
-            <Panel id="workbench" eyebrow="Player Workbench" title="Profile command center">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ["Public preview", publicHref, "View as public", "bg-red-600 text-white hover:bg-red-700"],
-                  ["Messages", "/messages", unreadMessageCount ? `${unreadMessageCount} unread` : "Inbox", secondaryActionCardClass],
-                  ["Player directory", "/players", "Browse market", secondaryActionCardClass],
-                  ["Settings", "/dashboard", "Account details", secondaryActionCardClass]
-                ].map(([label, href, detail, classes]) => (
-                  <Link key={label} href={href} className={`px-4 py-3 transition ${classes}`}>
-                    <span className="block text-sm font-black">{label}</span>
-                    <span className="mt-1 block text-xs font-bold opacity-70">{detail}</span>
-                  </Link>
-                ))}
-              </div>
-            </Panel>
-          ) : null}
+          <Panel id="communication" defaultOpen={false} eyebrow="Communication" title="Inbox, calls & notifications">
+            <div className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 dark:divide-white/10 dark:border-white/10">
+              <Link href="/messages" className="flex items-center justify-between gap-4 bg-white px-4 py-3 transition hover:bg-slate-50 dark:bg-black/20 dark:hover:bg-white/[0.04]">
+                <span>
+                  <span className="block text-sm font-black text-slate-950 dark:text-white">Inbox</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-white/40">Recruitment conversations and direct messages</span>
+                </span>
+                <span className="shrink-0 rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">{unreadMessageCount} unread</span>
+              </Link>
+              <Link href="/notifications" className="flex items-center justify-between gap-4 bg-white px-4 py-3 transition hover:bg-slate-50 dark:bg-black/20 dark:hover:bg-white/[0.04]">
+                <span>
+                  <span className="block text-sm font-black text-slate-950 dark:text-white">Notifications</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-white/40">Interest, activity and account updates</span>
+                </span>
+                <span aria-hidden className="text-slate-300 dark:text-white/20">→</span>
+              </Link>
+              <a href="mailto:info@euroscoutpro.com?subject=EuroScout%20notification%20preferences" className="flex items-center justify-between gap-4 bg-white px-4 py-3 transition hover:bg-slate-50 dark:bg-black/20 dark:hover:bg-white/[0.04]">
+                <span>
+                  <span className="block text-sm font-black text-slate-950 dark:text-white">Email preferences</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-white/40">Request a change to transactional notifications</span>
+                </span>
+                <span aria-hidden className="text-slate-300 dark:text-white/20">→</span>
+              </a>
+            </div>
+          </Panel>
 
           {profile.role === "player" ? (
             <Panel id="views" defaultOpen={false} eyebrow="Profile Views" title="Who has viewed your account">
@@ -1398,23 +1333,12 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           <Panel id="profile" eyebrow="Profile Controls" title="Edit your profile">
-            <div className="mb-6 grid gap-4 md:grid-cols-[112px_minmax(0,1fr)] md:items-center">
-              <div
-                className="flex aspect-square items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-4xl font-black"
-                style={profile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.58)), url(${profile.avatar_url})` } : undefined}
-              >
-                {profile.avatar_url ? "" : initials(profile.display_name)}
-              </div>
-              <div>
-                <p className={labelClass}>Profile photo</p>
-                <form action={uploadAvatarAction} className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <input name="avatar" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required className={fileClass} />
-                  <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
-                    Upload
-                  </button>
-                </form>
-              </div>
-            </div>
+            <form action={uploadAvatarAction} className="mb-5 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <MediaFileInput name="avatar" label="Profile photo" currentUrl={profile.avatar_url} />
+              <button className="h-10 rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
+                Save photo
+              </button>
+            </form>
             <form action={updateAccountAction} className="grid gap-4 md:grid-cols-2">
               <input type="hidden" name="role" value={profile.role} />
               <Field label="Display name">
@@ -1520,7 +1444,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       <CareerStatsBuilder
                         name="career_stats_json"
                         position={textValue(roleProfile, "position")}
-                        defaultValue={(roleProfile?.career_stats as Record<string, number | string> | null) ?? null}
+                        defaultValue={(roleProfile?.career_stats as Record<string, unknown> | null) ?? null}
                       />
                     </Field>
                   </div>
@@ -1823,24 +1747,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           {profile.role === "club" && team ? (
             <Panel id="club-profile" eyebrow="Club Profile" title="Edit public club metrics">
-              <div className="mb-6 grid gap-5 md:grid-cols-[140px_minmax(0,1fr)] md:items-center">
-                <div
-                  className="flex aspect-square items-center justify-center rounded-lg border-2 border-red-500 bg-[#202020] bg-cover bg-center text-4xl font-black"
-                  style={team.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.58)), url(${team.logo_url})` } : undefined}
-                >
-                  {team.logo_url ? "" : initials(team.name)}
-                </div>
+              <div className="mb-5">
                 {isClubOwner ? (
-                  <div>
-                    <p className={labelClass}>Club logo</p>
-                    <form action={uploadClubLogoAction} className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                      <input type="hidden" name="team_id" value={team.id} />
-                      <input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required className={fileClass} />
-                      <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
-                        Upload logo
-                      </button>
-                    </form>
-                  </div>
+                  <form action={uploadClubLogoAction} className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <input type="hidden" name="team_id" value={team.id} />
+                    <MediaFileInput name="logo" label="Club logo" currentUrl={team.logo_url} />
+                    <button className="h-10 rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
+                      Save logo
+                    </button>
+                  </form>
                 ) : (
                   <p className="text-sm font-semibold text-slate-500 dark:text-white/45">Only the club owner can update the club logo.</p>
                 )}
@@ -2071,43 +1986,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               )}
             </Panel>
           ) : null}
+
+          <Panel id="settings" defaultOpen={false} eyebrow="Settings" title="Security, privacy & account">
+            <AccountSettingsPanel
+              email={user.email ?? "No email available"}
+              provider={typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : null}
+            />
+          </Panel>
         </div>
 
-        {profile.role === "club" ? (
-        <aside className="order-1 overflow-hidden border border-white/10 bg-[#111]">
-            <Panel eyebrow="Club Access" title={team ? "Connected club" : "Claim or create"}>
-              {team ? (
-                <div>
-                  <h3 className="text-2xl font-black text-white">{team.name}</h3>
-                  <p className="mt-1 text-sm font-semibold text-white/45">{[team.city, team.country].filter(Boolean).join(", ")}</p>
-                  <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10">
-                    {[
-                      ["Role", clubMembership?.club_role ?? "staff"],
-                      ["Status", team.claim_status ?? "pending"],
-                      ["Recruiting", team.recruiting_active ? "Active" : "Inactive"],
-                      ["Open spots", String(team.open_roster_spots ?? 0)]
-                    ].map(([label, value]) => (
-                      <div key={label} className="bg-[#111] p-4">
-                        <p className="text-xs font-bold uppercase text-white/35">{label}</p>
-                        <p className="mt-1 text-lg font-black capitalize text-white">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <Link href={`/scouts/${team.id}`} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
-                    View club profile
-                  </Link>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-                  <p className="text-sm font-black text-white">No connected club</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-white/40">
-                    Club creation and claiming are only available during onboarding.
-                  </p>
-                </div>
-              )}
-            </Panel>
-        </aside>
-        ) : null}
       </section>
     </main>
   );

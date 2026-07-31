@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { Maximize2, X } from "lucide-react";
 import { deleteClubMediaAction, saveClubVideoAction, saveClubPhotoAction } from "@/app/actions/club";
+import MediaFileInput from "@/components/account/MediaFileInput";
+import VideoLinkComposer from "@/components/account/VideoLinkComposer";
 import { getEmbeddableVideoUrl, getPreviewEmbedUrl, getVideoProviderLabel, getVideoThumbnailUrl } from "@/lib/video";
 
 export interface ClubMediaRow {
@@ -166,30 +168,14 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
             )}
           </div>
         ) : isMember ? (
-          <form
-            action={saveClubVideoAction}
-            className="space-y-3 rounded-lg border border-dashed border-white/20 bg-[#1a1a1a] p-5"
-          >
+          <form action={saveClubVideoAction} className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">
             <input type="hidden" name="team_id" value={teamId} />
             <input type="hidden" name="scout_id" value={scoutId} />
             {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
-            <p className="text-xs font-black uppercase text-white/35">Add team video</p>
-            <input
-              type="url"
-              name="url"
-              required
-              placeholder="YouTube or Vimeo URL"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white placeholder-white/25 focus:border-red-500 focus:outline-none"
-            />
-            <input
-              type="text"
-              name="label"
-              placeholder="Label (optional, e.g. 2025 Season Highlights)"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white placeholder-white/25 focus:border-red-500 focus:outline-none"
-            />
+            <VideoLinkComposer compact />
             <button
               type="submit"
-              className="rounded-lg bg-red-600 px-4 py-2 text-xs font-black uppercase text-white transition hover:bg-red-700"
+              className="h-10 w-fit rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700 md:ml-auto"
             >
               Save video
             </button>
@@ -202,7 +188,7 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
       </div>
 
       <div>
-        <div className="grid max-w-full grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid max-w-full grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: MAX_CLUB_PHOTOS }).map((_, slot) => {
             const photo = photos[slot];
 
@@ -240,26 +226,15 @@ export default function ClubMediaSection({ scoutId, teamId, media, isMember, ret
 
             if (isMember) {
               return (
-                <form
-                  key={`slot-${slot}`}
-                  action={saveClubPhotoAction}
-                  className="flex aspect-[4/3] min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 bg-[#1a1a1a] p-3"
-                >
+                <form key={`slot-${slot}`} action={saveClubPhotoAction} className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-black/20">
                   <input type="hidden" name="team_id" value={teamId} />
                   <input type="hidden" name="scout_id" value={scoutId} />
                   <input type="hidden" name="display_order" value={slot} />
                   {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
-                  <p className="text-[10px] font-black uppercase text-white/35">Photo {slot + 1}</p>
-                  <input
-                    type="file"
-                    name="photo"
-                    required
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    className="max-w-full rounded border border-white/10 bg-black/30 px-2 py-1 text-[10px] text-white file:mr-2 file:rounded file:border-0 file:bg-red-600 file:px-2 file:py-1 file:text-[10px] file:font-black file:text-white focus:border-red-500 focus:outline-none"
-                  />
+                  <MediaFileInput name="photo" label={`Photo ${slot + 1}`} shape="landscape" helper="Public gallery slot" />
                   <button
                     type="submit"
-                    className="rounded bg-red-600 px-3 py-1 text-[10px] font-black uppercase text-white transition hover:bg-red-700"
+                    className="mt-2 h-8 w-full rounded bg-red-600 px-3 text-[10px] font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Add
                   </button>

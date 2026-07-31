@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
 
   const baseUrl = request.nextUrl.origin;
   const redirectTo = `${baseUrl}${next}`;
-  const errorRedirect = (msg: string) =>
-    NextResponse.redirect(`${baseUrl}/auth/sign-in?error=${encodeURIComponent(msg)}`);
+  const errorRedirect = () =>
+    NextResponse.redirect(`${baseUrl}/auth/sign-in?error=${encodeURIComponent("This sign-in link is invalid or has expired. Please request a new one.")}`);
 
   // Build the redirect response first so we can attach session cookies to it
   const response = NextResponse.redirect(redirectTo);
@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !key) return errorRedirect("Server configuration error.");
+  if (!url || !key) {
+    console.error("[auth.callback.configuration_missing]", { hasUrl: Boolean(url), hasKey: Boolean(key) });
+    return errorRedirect();
+  }
 
   // Create a client that writes cookies directly onto `response`
   const supabase = createServerClient(url, key, {
@@ -47,12 +50,19 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) return errorRedirect(error.message);
+    if (error) {
+      console.error("[auth.callback.code_exchange_failed]", { code: error.code, status: error.status });
+      return errorRedirect();
+    }
   } else if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({ token_hash, type });
-    if (error) return errorRedirect(error.message);
+    if (error) {
+      console.error("[auth.callback.otp_verification_failed]", { code: error.code, status: error.status, type });
+      return errorRedirect();
+    }
   } else {
-    return errorRedirect("Invalid or expired link.");
+    console.error("[auth.callback.parameters_missing]", { hasCode: Boolean(code), hasTokenHash: Boolean(token_hash), type });
+    return errorRedirect();
   }
 
   return response;

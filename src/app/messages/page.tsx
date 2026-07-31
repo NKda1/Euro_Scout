@@ -28,4 +28,3 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
     </div>
   );
 }
-import { countUnreadMessages, getDisplayProfile, profileInitials, type MessageRow } from "@/lib/messaging";

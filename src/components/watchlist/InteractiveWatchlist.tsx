@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { removeFromWatchlistAction, updateWatchlistItemNotesAction, updateWatchlistItemRecruitmentStatusAction } from "@/app/actions/watchlist";
+import PlayerSpiderChart, { type SpiderPlayer } from "@/components/watchlist/PlayerSpiderChart";
 
 interface WatchlistItemRow {
   id: string;
@@ -87,6 +88,7 @@ interface InteractiveWatchlistProps {
 export default function InteractiveWatchlist({ items, watchlistId }: InteractiveWatchlistProps) {
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [showComparison, setShowComparison] = useState(false);
+  const [showSpiderChart, setShowSpiderChart] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -122,6 +124,7 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
   const clearComparison = () => {
     setSelectedPlayers(new Set());
     setShowComparison(false);
+    setShowSpiderChart(false);
   };
 
   const compareItems = items.filter((item) => selectedPlayers.has(item.id) && item.player_profiles?.profiles);
@@ -320,12 +323,20 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                   Side-by-side comparison of {compareItems.length} selected player{compareItems.length !== 1 ? "s" : ""}.
                 </p>
               </div>
-              <button
-                onClick={clearComparison}
-                className="text-xs font-black uppercase tracking-wide text-slate-400 transition hover:text-red-600 dark:hover:text-red-300"
-              >
-                Close comparison
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowSpiderChart((prev) => !prev)}
+                  className="text-xs font-black uppercase tracking-wide text-red-600 transition hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
+                >
+                  {showSpiderChart ? "Hide graphic report" : "View graphic report"}
+                </button>
+                <button
+                  onClick={clearComparison}
+                  className="text-xs font-black uppercase tracking-wide text-slate-400 transition hover:text-red-600 dark:hover:text-red-300"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
           <div className="overflow-x-auto p-5">
@@ -395,6 +406,25 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
               })}
             </div>
           </div>
+
+          {showSpiderChart && (() => {
+            const spiderPlayers: SpiderPlayer[] = compareItems.map((item) => ({
+              name: item.player_profiles!.profiles!.display_name,
+              height_cm: item.player_profiles!.height_cm,
+              weight_kg: item.player_profiles!.weight_kg,
+              forty_yard_dash: item.player_profiles!.forty_yard_dash,
+              shuttle_seconds: item.player_profiles!.shuttle_seconds,
+              vertical_jump_cm: item.player_profiles!.vertical_jump_cm,
+              broad_jump_cm: item.player_profiles!.broad_jump_cm,
+              bench_reps: item.player_profiles!.bench_reps,
+            }));
+            return (
+              <div className="animate-in fade-in slide-in-from-bottom-4 border-t border-slate-200 p-5 duration-300 dark:border-white/10">
+                <p className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Graphic report</p>
+                <PlayerSpiderChart players={spiderPlayers} />
+              </div>
+            );
+          })()}
         </section>
       )}
     </>

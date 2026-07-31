@@ -1,7 +1,6 @@
 import type { UserRole } from "@/lib/auth";
 
 export type BillingPlanKey = "player_premium" | "club_premium";
-export const SHARED_PREMIUM_PRICE_ENV = "STRIPE_PREMIUM_PRICE_ID";
 
 export const BILLING_PLANS: Record<BillingPlanKey, { label: string; role: Exclude<UserRole, "admin" | "fan" | "journalist">; priceEnv: string }> = {
   player_premium: {

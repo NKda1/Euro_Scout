@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getBaseUrl } from "@/lib/api";
-import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // ─── Input constraints ────────────────────────────────────────────────────────
@@ -46,27 +46,6 @@ async function getRequestBaseUrl() {
   return headerStore.get("origin") ?? getBaseUrl();
 }
 
-async function emailAlreadyRegistered(email: string, next: string) {
-  const serviceClient = createSupabaseServiceRoleClient();
-  const normalizedEmail = email.trim().toLowerCase();
-  const perPage = 1000;
-  const signUpPath = authPathWithParams("/auth/sign-up", { next });
-
-  for (let page = 1; page <= 10; page += 1) {
-    const { data, error } = await serviceClient.auth.admin.listUsers({ page, perPage });
-
-    if (error) {
-      redirect(authPathWithParams(signUpPath, { error: "We could not verify that email. Please try again." }));
-    }
-
-    const users = data.users ?? [];
-    if (users.some((user) => user.email?.toLowerCase() === normalizedEmail)) return true;
-    if (users.length < perPage) return false;
-  }
-
-  redirect(authPathWithParams(signUpPath, { error: "We could not verify that email. Please contact support." }));
-}
-
 type OAuthProvider = "google" | "apple";
 
 function getOAuthProvider(value: FormDataEntryValue | null): OAuthProvider | null {
@@ -78,7 +57,6 @@ function getOAuthProvider(value: FormDataEntryValue | null): OAuthProvider | nul
 export async function signUpAction(formData: FormData) {
   await checkAuthRateLimit("sign-up", "/auth/sign-up");
   const supabase = await createSupabaseServerClient();
-  const baseUrl = await getRequestBaseUrl();
   const email = getRequired(formData, "email");
   const password = getRequired(formData, "password");
   const confirmPassword = String(formData.get("confirm_password") ?? "");
@@ -101,26 +79,29 @@ export async function signUpAction(formData: FormData) {
   if (password.length < 6) {
     redirect(authPathWithParams(signUpPath, { error: "Password must be at least 6 characters." }));
   }
-  if (await emailAlreadyRegistered(email, next)) {
-    redirect(authPathWithParams("/auth/sign-in", { next, error: "That email already has an account. Sign in or reset your password instead." }));
-  }
 
-  const { error } = await supabase.auth.signUp({
+  const baseUrl = await getRequestBaseUrl();
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: {
-        display_name: displayName
-      },
+      data: { display_name: displayName },
       emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`
     }
   });
 
   if (error) {
-    redirect(authPathWithParams(signUpPath, { error: error.message }));
+    console.error("[auth.signup.failed]", { code: error.code, status: error.status });
+    redirect(authPathWithParams(signUpPath, { error: "Could not create the account. Please try again or sign in if you already registered." }));
   }
 
-  redirect(authPathWithParams("/auth/sign-in", { next, notice: "Check your email to confirm your account. The link will bring you back to onboarding." }));
+  // Projects with email confirmation disabled return a session immediately.
+  if (data.session) redirect(next);
+
+  redirect(authPathWithParams("/auth/sign-in", {
+    next,
+    notice: "Check your email to confirm your account, then sign in to continue."
+  }));
 }
 
 export async function signInAction(formData: FormData) {
@@ -227,13 +208,17 @@ export async function resendConfirmationAction(formData: FormData) {
     redirect("/auth/resend-confirmation?notice=If that email is registered and unconfirmed, a new link is on its way.");
   }
 
-  await supabase.auth.resend({
+  const { error } = await supabase.auth.resend({
     type: "signup",
     email,
     options: {
       emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent("/welcome")}`
     }
   });
+
+  if (error) {
+    console.error("[auth.confirmation_resend.failed]", { code: error.code, status: error.status });
+  }
 
   // Always show the same notice to avoid email enumeration
   redirect("/auth/resend-confirmation?notice=If that email is registered and unconfirmed, a new link is on its way.");

@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getBaseUrl } from "@/lib/api";
-import { BILLING_PLANS, SHARED_PREMIUM_PRICE_ENV, type BillingPlanKey } from "@/lib/billing-plans";
+import { BILLING_PLANS, type BillingPlanKey } from "@/lib/billing-plans";
 
 export function stripeSecretKey() {
   const key = process.env.STRIPE_SECRET_KEY?.trim() ?? "";
@@ -8,7 +8,7 @@ export function stripeSecretKey() {
 }
 
 export function stripePlanPriceId(plan: BillingPlanKey) {
-  return process.env[SHARED_PREMIUM_PRICE_ENV] || process.env[BILLING_PLANS[plan].priceEnv] || "";
+  return process.env[BILLING_PLANS[plan].priceEnv]?.trim() ?? "";
 }
 
 export function stripeConfigured(plan: BillingPlanKey) {

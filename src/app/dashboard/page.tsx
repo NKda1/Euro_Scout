@@ -1,9 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { signOutAction } from "@/app/actions/auth";
-import { acceptClubStaffInviteAction, declineClubStaffInviteAction, leaveClubOrganisationAction } from "@/app/actions/club";
+import { acceptClubStaffInviteAction, declineClubStaffInviteAction } from "@/app/actions/club";
 import { restoreAdminRoleAction } from "@/app/actions/profile";
-import ShareProfileButton from "@/components/profiles/ShareProfileButton";
+import AccountActionBar from "@/components/account/AccountActionBar";
 import { requireOnboardedProfile, roleLabel, isReservedAdminEmail, type Profile, type UserRole } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
@@ -82,15 +81,6 @@ function formatShortDate(value: string) {
     day: "2-digit",
     month: "short"
   }).format(new Date(value));
-}
-
-function SettingsRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between border-b border-slate-200 py-4 last:border-b-0 dark:border-white/10">
-      <span className="text-sm font-bold text-slate-500 dark:text-white/40">{label}</span>
-      <span className="text-right text-sm font-black text-slate-950 dark:text-white">{value}</span>
-    </div>
-  );
 }
 
 function OverviewMetric({ label, value, helper }: { label: string; value: string; helper?: string }) {
@@ -535,13 +525,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </p>
             </div>
           </div>
-          <Link href={publicProfileHref} className="inline-flex h-11 items-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
-            Public preview
-          </Link>
+          <AccountActionBar publicHref={publicProfileHref} displayName={profile.display_name} />
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="space-y-6">
           {error ? <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm font-bold text-red-700 dark:text-red-200">{error}</p> : null}
           {notice ? <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm font-bold text-emerald-800 dark:text-emerald-200">{notice}</p> : null}
@@ -646,53 +634,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
           </section>
         </div>
-
-        <aside className="space-y-6">
-          <section id="account-settings" className="rounded-lg border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a]">
-            <p className="text-sm font-black uppercase text-red-500">Account</p>
-            <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-5 dark:border-white/10 dark:bg-black/20">
-              <SettingsRow label="Email" value={user.email ?? "Not available"} />
-              <SettingsRow label="Role" value={roleLabel(profile.role)} />
-              {profile.role === "club" ? <SettingsRow label="Club" value={clubMembership?.teams?.name ?? "Not connected"} /> : null}
-            </div>
-            {profile.role === "club" && clubMembership?.team_id ? (
-              <div className="mt-5 border-t border-slate-200 pt-5 dark:border-white/10">
-                {clubMembership.club_role === "owner" ? (
-                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                    Transfer ownership before leaving this organisation.
-                  </p>
-                ) : (
-                  <form action={leaveClubOrganisationAction}>
-                    <input type="hidden" name="team_id" value={clubMembership.team_id} />
-                    <input type="hidden" name="return_to" value="/dashboard" />
-                    <button className="h-10 w-full rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-black uppercase text-red-700 transition hover:bg-red-600 hover:text-white dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
-                      Leave organisation
-                    </button>
-                  </form>
-                )}
-              </div>
-            ) : null}
-            <form action={signOutAction} className="mt-5">
-              <button className="h-11 w-full rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
-                Sign out
-              </button>
-            </form>
-          </section>
-
-          <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#1a1a1a]">
-            <p className="text-sm font-black uppercase text-red-500">Share Profile</p>
-            <p className="mt-3 text-sm font-semibold leading-6 text-slate-500 dark:text-white/45">
-              Send your public EuroScout profile to clubs, players, readers or staff contacts.
-            </p>
-            <ShareProfileButton
-              path={publicProfileHref}
-              title={`${profile.display_name} | EuroScout Pro`}
-              text={`View ${profile.display_name} on EuroScout Pro.`}
-              variant="solid"
-              className="mt-5 w-full"
-            />
-          </section>
-        </aside>
       </section>
     </main>
   );

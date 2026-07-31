@@ -31,16 +31,16 @@ function norm(value: number | null, min: number, max: number, lowerIsBetter = fa
 
 function buildChartData(players: SpiderPlayer[]) {
   const axes = [
-    { key: "speed",    label: "Speed",     getValue: (p: SpiderPlayer) => norm(p.forty_yard_dash,   4.2,  5.8, true)  },
-    { key: "agility",  label: "Agility",   getValue: (p: SpiderPlayer) => norm(p.shuttle_seconds,   3.7,  5.2, true)  },
-    { key: "vertical", label: "Vertical",  getValue: (p: SpiderPlayer) => norm(p.vertical_jump_cm,  50,   120, false) },
-    { key: "broad",    label: "Broad Jump",getValue: (p: SpiderPlayer) => norm(p.broad_jump_cm,     180,  300, false) },
-    { key: "strength", label: "Strength",  getValue: (p: SpiderPlayer) => norm(p.bench_reps,        0,    40,  false) },
-    { key: "height",   label: "Height",    getValue: (p: SpiderPlayer) => norm(p.height_cm,         160,  215, false) },
-    { key: "weight",   label: "Weight",    getValue: (p: SpiderPlayer) => norm(p.weight_kg,         70,   145, false) },
+    { label: "Speed",      getValue: (p: SpiderPlayer) => norm(p.forty_yard_dash,  4.2, 5.8, true) },
+    { label: "Agility",    getValue: (p: SpiderPlayer) => norm(p.shuttle_seconds,  3.7, 5.2, true) },
+    { label: "Vertical",   getValue: (p: SpiderPlayer) => norm(p.vertical_jump_cm, 50, 120) },
+    { label: "Broad Jump", getValue: (p: SpiderPlayer) => norm(p.broad_jump_cm,    180, 300) },
+    { label: "Strength",   getValue: (p: SpiderPlayer) => norm(p.bench_reps,       0, 40) },
+    { label: "Height",     getValue: (p: SpiderPlayer) => norm(p.height_cm,        160, 215) },
+    { label: "Weight",     getValue: (p: SpiderPlayer) => norm(p.weight_kg,        70, 145) },
   ];
 
-  return axes.map(({ key, label, getValue }) => {
+  return axes.map(({ label, getValue }) => {
     const entry: Record<string, string | number> = { subject: label };
     players.forEach((p, i) => {
       entry[`p${i}`] = getValue(p);

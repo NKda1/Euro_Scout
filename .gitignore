@@ -30,6 +30,9 @@ pnpm-debug.log*
 # Local-only project notes and database schema/migration exports
 *.md
 docs/
+!docs/
+!docs/email-infrastructure.md
+!docs/production-stabilisation.md
 src/db/*.sql
 
 # Local agent/plugin workspace files

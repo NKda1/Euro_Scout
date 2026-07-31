@@ -41,6 +41,36 @@ function parseCareerStats(formData: FormData) {
 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (Array.isArray(parsed.seasons)) {
+      const seasons = parsed.seasons
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
+        .map((entry, index) => {
+          const rawStats = entry.stats && typeof entry.stats === "object" && !Array.isArray(entry.stats)
+            ? entry.stats as Record<string, unknown>
+            : {};
+          const stats = Object.fromEntries(
+            Object.entries(rawStats)
+              .map(([key, value]) => [key, Number(value)])
+              .filter(([key, value]) => /^[a-z0-9_]+$/i.test(String(key)) && Number.isFinite(value as number) && Number(value) >= 0)
+              .slice(0, 20)
+          );
+          const parsedGames = Number(entry.games);
+          return {
+            id: String(entry.id ?? `season-${index + 1}`).slice(0, 80),
+            club: String(entry.club ?? "").trim().slice(0, 100),
+            season: String(entry.season ?? "").trim().slice(0, 20),
+            games: entry.games === "" || entry.games == null || !Number.isFinite(parsedGames)
+              ? null
+              : Math.max(0, Math.min(99, parsedGames)),
+            positionGroup: String(entry.positionGroup ?? "WR").replace(/[^A-Z]/g, "").slice(0, 4) || "WR",
+            stats
+          };
+        })
+        .filter((entry) => entry.club || entry.season || entry.games != null || Object.keys(entry.stats).length)
+        .slice(0, 20);
+      return { version: 2, seasons };
+    }
+
     return Object.fromEntries(
       Object.entries(parsed)
         .map(([key, value]) => [key, Number(value)])
