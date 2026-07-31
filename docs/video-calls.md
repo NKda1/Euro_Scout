@@ -11,4 +11,4 @@ The application exposes `POST /api/webhooks/daily`. After deploying that route:
 
 Daily does not provide a dedicated project CLI. Use its REST API for room, token, and webhook automation. Never place `DAILY_API_KEY` or `DAILY_WEBHOOK_SECRET` in a `NEXT_PUBLIC_` variable.
 
-Vercel cron invokes room preparation every five minutes and call reminders every fifteen minutes. The join action also creates a room on demand, so an authorised participant still has a safe fallback if a cron invocation is delayed.
+Rooms are created on demand by the authenticated join action. The cron endpoints remain available for a future external scheduler, but are deliberately not registered in `vercel.json` because Hobby deployments only support daily schedules and meeting preparation requires minute-level timing.
