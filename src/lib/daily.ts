@@ -4,6 +4,8 @@ const DAILY_API_BASE = "https://api.daily.co/v1";
 const ROOM_START_BUFFER_MINUTES = 5;
 const ROOM_END_BUFFER_MINUTES = 30;
 const DEFAULT_CALL_DURATION_MINUTES = 30;
+const DAILY_REQUEST_TIMEOUT_MS = 10_000;
+const DAILY_MAX_ATTEMPTS = 3;
 
 interface DailyRoomResponse {
   id: string;
@@ -62,22 +64,35 @@ async function dailyPost<T>(path: string, body: Record<string, unknown>) {
     throw new Error("Daily is not configured. Add DAILY_API_KEY to enable video calls.");
   }
 
-  const response = await fetch(`${DAILY_API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body),
-    cache: "no-store"
-  });
+  let lastError = "Daily request failed.";
+  for (let attempt = 1; attempt <= DAILY_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(`${DAILY_API_BASE}${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+        signal: AbortSignal.timeout(DAILY_REQUEST_TIMEOUT_MS)
+      });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || `Daily request failed with status ${response.status}.`);
+      if (response.ok) return (await response.json()) as T;
+
+      const errorText = (await response.text()).slice(0, 500);
+      lastError = errorText || `Daily request failed with status ${response.status}.`;
+      const retryable = response.status === 429 || response.status >= 500;
+      if (!retryable || attempt === DAILY_MAX_ATTEMPTS) break;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "Daily network request failed.";
+      if (attempt === DAILY_MAX_ATTEMPTS) break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** (attempt - 1)));
   }
 
-  return (await response.json()) as T;
+  console.error("Daily API request failed", { path, attempts: DAILY_MAX_ATTEMPTS, error: lastError });
+  throw new Error(`Video provider request failed. ${lastError}`);
 }
 
 export async function createDailyRoom({ meetingId, scheduledAt, durationMinutes = DEFAULT_CALL_DURATION_MINUTES }: CreateDailyRoomInput) {

@@ -33,6 +33,7 @@ docs/
 !docs/
 !docs/email-infrastructure.md
 !docs/production-stabilisation.md
+!docs/video-calls.md
 src/db/*.sql
 
 # Local agent/plugin workspace files

@@ -33,6 +33,7 @@ import AccountQuickNav from "@/components/account/AccountQuickNav";
 import AccountSection from "@/components/account/AccountSection";
 import AccountSettingsPanel from "@/components/account/AccountSettingsPanel";
 import AccountWorkspaceOverview from "@/components/account/AccountWorkspaceOverview";
+import MeetingCountdown from "@/components/meetings/MeetingCountdown";
 import CareerStatsBuilder from "@/components/account/CareerStatsBuilder";
 import CareerTimelineBuilder from "@/components/account/CareerTimelineBuilder";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
@@ -357,6 +358,18 @@ function formatMeetingTime(value: string | null) {
   }).format(new Date(value));
 }
 
+function meetingGroup(meeting: Pick<MeetingRequestRow, "status" | "scheduled_at" | "proposed_start_at">) {
+  if (meeting.status === "completed") return { label: "Completed", priority: 4 };
+  if (["cancelled", "declined", "expired"].includes(meeting.status)) return { label: "Cancelled", priority: 5 };
+  const value = meeting.scheduled_at ?? meeting.proposed_start_at;
+  if (!value) return { label: "Upcoming", priority: 2 };
+  const date = new Date(value);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return { label: "Today", priority: 0 };
+  if (date.getTime() > now.getTime()) return { label: "Upcoming", priority: 1 };
+  return { label: "Past", priority: 3 };
+}
+
 function toDatetimeLocal(value: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -374,8 +387,6 @@ const inputClass =
 const textareaClass =
   "min-h-28 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-red-500 dark:border-white/10 dark:bg-black/35 dark:text-white dark:placeholder:text-white/25";
 const labelClass = "mb-2 block text-xs font-black uppercase text-slate-500 dark:text-white/35";
-const fileClass =
-  "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-950 file:mr-3 file:rounded-md file:border-0 file:bg-red-600 file:px-3 file:py-1.5 file:text-xs file:font-black file:text-white focus:border-red-500 focus:outline-none dark:border-white/10 dark:bg-black/35 dark:text-white";
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
@@ -783,7 +794,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           .limit(10)
           .returns<MeetingRequestRow[]>()
       : { data: [] as MeetingRequestRow[] };
-  const meetingRows = meetingRequests ?? [];
+  const meetingRows = [...(meetingRequests ?? [])].sort((a, b) => {
+    const aGroup = meetingGroup(a);
+    const groupDifference = aGroup.priority - meetingGroup(b).priority;
+    if (groupDifference) return groupDifference;
+    const aTime = Date.parse(a.scheduled_at ?? a.proposed_start_at ?? a.created_at);
+    const bTime = Date.parse(b.scheduled_at ?? b.proposed_start_at ?? b.created_at);
+    return aGroup.priority <= 2 ? aTime - bTime : bTime - aTime;
+  });
   const pendingMeetingCount = meetingRows.filter((meeting) => meeting.status === "pending" || meeting.status === "club_proposed").length;
   const journalistPublishedCount = (journalistArticles ?? []).filter((article) => article.status === "published").length;
   const activeJoinRequest = ownJoinRequests?.[0] ?? null;
@@ -918,6 +936,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               { id: "membership", label: "Membership" },
               { id: "settings", label: "Settings" },
             ]} />
+          ) : profile.role === "journalist" ? (
+            <AccountQuickNav items={[
+              { id: "overview", label: "Overview" },
+              { id: "profile", label: "Profile" },
+              { id: "journalist", label: "Publishing" },
+              { id: "communication", label: "Communication", badge: unreadMessageCount || null },
+              { id: "membership", label: "Membership" },
+              { id: "settings", label: "Settings" },
+            ]} />
           ) : (
             <AccountQuickNav items={[
               { id: "overview", label: "Overview" },
@@ -1042,7 +1069,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             >
               {meetingRows.length ? (
                 <div className="space-y-3">
-                  {meetingRows.map((meeting) => {
+                  {meetingRows.map((meeting, index) => {
                     const isPending = meeting.status === "pending";
                     const isClubProposed = meeting.status === "club_proposed";
                     const isAccepted = meeting.status === "accepted";
@@ -1058,6 +1085,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       : [meeting.teams?.city, meeting.teams?.country].filter(Boolean).join(", ") || "Club account";
                     const avatarUrl = profile.role === "club" ? meeting.profiles?.avatar_url : meeting.teams?.logo_url;
                     const confirmedTime = meeting.scheduled_at ?? meeting.proposed_start_at;
+                    const groupLabel = meetingGroup(meeting).label;
+                    const showGroupHeading = index === 0 || meetingGroup(meetingRows[index - 1]).label !== groupLabel;
                     const statusLabel = isClubProposed ? "awaiting player" : meeting.status.replace("_", " ");
                     const statusClass = isAccepted
                       ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-300"
@@ -1070,7 +1099,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                         : "border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/35";
 
                     return (
-                      <div key={meeting.id} className="rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-black/20">
+                      <div key={meeting.id}>
+                        {showGroupHeading ? (
+                          <h3 className="mb-2 mt-4 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 first:mt-0 dark:text-white/35">{groupLabel}</h3>
+                        ) : null}
+                      <div className="rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-black/20">
                         {/* Compact header row */}
                         <div className="flex items-center gap-3 px-3 py-2.5">
                           <div
@@ -1113,6 +1146,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                               Confirmed <span className="font-bold">{formatMeetingTime(meeting.scheduled_at)}</span>
                             </span>
                           ) : null}
+                          <span className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-white/30">
+                            {meetingGroup(meeting).label}
+                          </span>
+                          <MeetingCountdown scheduledAt={meeting.scheduled_at} status={meeting.status} />
                         </div>
 
                         {/* Notes (condensed) */}
@@ -1221,6 +1258,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                             ) : null}
                           </div>
                         ) : null}
+                      </div>
                       </div>
                     );
                   })}
@@ -1472,16 +1510,16 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   Journalist publishing needs the `src/db/012_journalist_articles.sql` Supabase migration.
                 </div>
               ) : null}
-              <div className="mb-5 grid gap-3 md:grid-cols-4">
+              <div className="mb-5 grid grid-cols-2 gap-2 lg:grid-cols-4">
                 {[
                   ["Links", String(journalistArticles?.length ?? 0), "Submitted"],
                   ["Published", String(journalistPublishedCount), "Live on news"],
                   ["Article opens", String(journalistOpenCount ?? 0), "All time"],
                   ["Last 7 days", String(journalistWeekOpenCount ?? 0), "Recent opens"]
                 ].map(([label, value, helper]) => (
-                  <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/25">
+                  <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-black/25">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-white/35">{label}</p>
-                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{value}</p>
+                    <p className="mt-1 text-xl font-black text-slate-950 dark:text-white">{value}</p>
                     <p className="mt-1 text-xs font-bold text-slate-500 dark:text-white/40">{helper}</p>
                   </div>
                 ))}
@@ -1489,17 +1527,17 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   Open article analytics
                 </Link>
               </div>
-              <form action={publishJournalistArticleAction} encType="multipart/form-data" className="grid gap-4">
+              <form action={publishJournalistArticleAction} encType="multipart/form-data" className="grid gap-4 md:grid-cols-2">
                 <Field label="Article title">
                   <input name="title" required minLength={4} maxLength={180} placeholder="e.g. Vienna Vikings reload ahead of CEFL matchup" className={inputClass} />
                 </Field>
                 <Field label="Article link">
                   <input name="article_url" required type="url" placeholder="https://your-publication.com/article" className={inputClass} />
                 </Field>
-                <Field label="Upload thumbnail">
-                  <input name="thumbnail_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" className={fileClass} />
-                </Field>
-                <Field label="Short preview">
+                <div className="md:col-span-2">
+                  <MediaFileInput name="thumbnail_file" label="Article thumbnail" required={false} shape="landscape" helper="PNG, JPG, WebP or GIF" />
+                </div>
+                <div className="md:col-span-2"><Field label="Short preview">
                   <textarea
                     name="excerpt"
                     required
@@ -1508,20 +1546,20 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                     placeholder="Write the short bio/preview that should appear on EuroScout before readers open the article."
                     className={textareaClass}
                   />
-                </Field>
-                <div>
+                </Field></div>
+                <div className="md:col-span-2">
                   <span className={labelClass}>Leagues covered</span>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {leagues.map((league) => (
-                      <label key={league.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-xs font-bold text-white/60">
-                        <input name="league_ids" value={league.id} type="checkbox" className="h-4 w-4 rounded border-white/20 text-red-600" />
+                      <label key={league.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-black/25 dark:text-white/60">
+                        <input name="league_ids" value={league.id} type="checkbox" className="h-4 w-4 rounded border-slate-300 text-red-600 dark:border-white/20" />
                         <span>{league.shortName}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-                <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
-                  <input name="save_as_draft" type="checkbox" className="h-4 w-4 rounded border-white/20 text-red-600" />
+                <label className="flex h-11 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-black/35 dark:text-white/70">
+                  <input name="save_as_draft" type="checkbox" className="h-4 w-4 rounded border-slate-300 text-red-600 dark:border-white/20" />
                   Save as draft instead of publishing
                 </label>
                 <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 md:w-fit">
@@ -1529,15 +1567,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 </button>
               </form>
 
-              <div className="mt-6 border-t border-white/10 pt-5">
+              <div className="mt-6 border-t border-slate-200 pt-5 dark:border-white/10">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-black uppercase tracking-[0.14em] text-white/60">Your links</h3>
-                  <Link href="/news" className="text-xs font-black uppercase text-red-300 transition hover:text-red-200">
+                  <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-600 dark:text-white/60">Your links</h3>
+                  <Link href="/news" className="text-xs font-black uppercase text-red-600 transition hover:text-red-500 dark:text-red-300 dark:hover:text-red-200">
                     View news page
                   </Link>
                 </div>
                 {(journalistArticles ?? []).length ? (
-                  <div className="divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10 bg-black/20">
+                  <div className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-black/20">
                     {(journalistArticles ?? []).map((article) => (
                       <div key={article.id} className="grid gap-4 p-4 md:grid-cols-[72px_minmax(0,1fr)_auto] md:items-center">
                         <div
@@ -1555,10 +1593,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                               {formatNotificationTime(article.published_at ?? article.created_at)}
                             </span>
                           </div>
-                          <a href={`/news/articles/${article.id}/open`} target="_blank" rel="noopener noreferrer" className="mt-2 block truncate text-sm font-black text-white transition hover:text-red-300">
+                          <a href={`/news/articles/${article.id}/open`} target="_blank" rel="noopener noreferrer" className="mt-2 block truncate text-sm font-black text-slate-950 transition hover:text-red-600 dark:text-white dark:hover:text-red-300">
                             {article.title}
                           </a>
-                          <p className="mt-1 line-clamp-1 text-xs font-semibold text-white/40">
+                          <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-500 dark:text-white/40">
                             {article.excerpt ?? "No preview added."}
                           </p>
                         </div>
@@ -1572,8 +1610,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-                    <p className="text-sm font-semibold text-white/40">No journalist links submitted yet.</p>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">
+                    <p className="text-sm font-semibold text-slate-500 dark:text-white/40">No journalist links submitted yet.</p>
                   </div>
                 )}
               </div>

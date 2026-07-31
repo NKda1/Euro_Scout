@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { removeFromWatchlistAction, updateWatchlistItemNotesAction, updateWatchlistItemRecruitmentStatusAction } from "@/app/actions/watchlist";
 import PlayerSpiderChart, { type SpiderPlayer } from "@/components/watchlist/PlayerSpiderChart";
+import { normaliseSeasonStats } from "@/lib/player-stats";
 
 interface WatchlistItemRow {
   id: string;
@@ -89,11 +90,6 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [showComparison, setShowComparison] = useState(false);
   const [showSpiderChart, setShowSpiderChart] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const togglePlayerSelection = (itemId: string) => {
     const newSet = new Set(selectedPlayers);
@@ -132,7 +128,7 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
   return (
     <>
       <section className="border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
-        <div className="border-b border-slate-200 p-5 dark:border-white/10">
+        <div className="border-b border-slate-200 p-3 sm:p-4 dark:border-white/10">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Player board</p>
@@ -162,12 +158,11 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
             return (
               <article 
                 key={item.id} 
-                className={`p-5 transition-all duration-200 ${
+                className={`p-3 transition-colors sm:p-4 ${
                   isSelected 
                     ? "bg-red-50 dark:bg-red-500/10" 
                     : "hover:bg-slate-50 dark:hover:bg-white/[0.02]"
-                } ${mounted ? "animate-in fade-in slide-in-from-bottom-2" : ""}`}
-                style={{ animationDelay: `${items.indexOf(item) * 50}ms`, animationFillMode: "backwards" }}
+                }`}
               >
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
                   <div className="flex min-w-0 gap-4">
@@ -215,8 +210,8 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <form action={updateWatchlistItemRecruitmentStatusAction} className="grid grid-cols-[minmax(0,1fr)_80px] gap-2">
+                  <div className="space-y-2">
+                    <form action={updateWatchlistItemRecruitmentStatusAction} className="grid grid-cols-[minmax(0,1fr)_72px] gap-2">
                       <input type="hidden" name="watchlist_item_id" value={item.id} />
                       <input type="hidden" name="watchlist_id" value={watchlistId} />
                       <input type="hidden" name="return_path" value={`/watchlists?watchlist=${watchlistId}`} />
@@ -237,7 +232,11 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                   </div>
                 </div>
 
-                <form action={updateWatchlistItemNotesAction} className="mt-4">
+                <details className="mt-3 border-t border-slate-100 pt-3 dark:border-white/[0.06]">
+                  <summary className="cursor-pointer text-xs font-black uppercase tracking-wide text-slate-500 marker:text-red-500 dark:text-white/40">
+                    {item.notes ? "Edit recruitment notes" : "Add recruitment notes"}
+                  </summary>
+                <form action={updateWatchlistItemNotesAction} className="mt-3">
                   <input type="hidden" name="watchlist_item_id" value={item.id} />
                   <input type="hidden" name="watchlist_id" value={watchlistId} />
                   <input type="hidden" name="return_path" value={`/watchlists?watchlist=${watchlistId}`} />
@@ -256,6 +255,7 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                     </button>
                   </div>
                 </form>
+                </details>
               </article>
             );
           })}
@@ -264,10 +264,10 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
 
       {/* Floating comparison action bar */}
       {selectedPlayers.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className="flex items-center gap-3 border border-red-500 bg-red-600 px-6 py-4 shadow-2xl">
+        <div className="fixed inset-x-3 bottom-20 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300 sm:inset-x-auto sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2">
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-red-500 bg-red-600 p-2.5 shadow-2xl sm:px-4 sm:py-3">
             <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
+              <div className="hidden -space-x-2 sm:flex">
                 {Array.from(selectedPlayers).slice(0, 4).map((itemId) => {
                   const item = items.find((i) => i.id === itemId);
                   const avatar = item?.player_profiles?.profiles?.avatar_url;
@@ -295,13 +295,13 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
             <button
               onClick={startComparison}
               disabled={selectedPlayers.size < 2}
-              className="ml-4 h-11 bg-white px-6 text-sm font-black uppercase text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white"
+              className="h-10 shrink-0 rounded-md bg-white px-3 text-xs font-black uppercase text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white sm:ml-3 sm:px-5"
             >
               Compare players
             </button>
             <button
               onClick={clearComparison}
-              className="ml-2 h-11 border border-white/30 px-4 text-sm font-black uppercase text-white transition hover:bg-white/10"
+              className="hidden h-10 rounded-md border border-white/30 px-3 text-xs font-black uppercase text-white transition hover:bg-white/10 sm:block"
             >
               Clear
             </button>
@@ -339,12 +339,13 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
               </div>
             </div>
           </div>
-          <div className="overflow-x-auto p-5">
-            <div className="grid min-w-[900px] gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(compareItems.length, 4)}, minmax(220px, 1fr))` }}>
+          <div className="p-3 sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {compareItems.map((item, index) => {
                 const player = item.player_profiles!;
                 const publicProfile = player.profiles!;
-                const careerStats = Object.entries(player.career_stats ?? {}).filter(([, value]) => Number(value) > 0);
+                const latestSeason = normaliseSeasonStats(player.career_stats, player.position).at(-1);
+                const careerStats = Object.entries(latestSeason?.stats ?? {}).filter(([, value]) => Number(value) > 0);
                 return (
                   <article 
                     key={item.id} 
@@ -370,7 +371,7 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                     </div>
                     <div className="space-y-4 p-4">
                       <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-red-600 dark:text-red-400">Measureables</p>
+                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-red-600 dark:text-red-400">Measurements</p>
                         <div className="mt-2 grid grid-cols-2 gap-px overflow-hidden border border-slate-200 bg-slate-200 text-sm dark:border-white/10 dark:bg-white/10">
                           {[
                             ["Height", metric(player.height_cm, "cm")],

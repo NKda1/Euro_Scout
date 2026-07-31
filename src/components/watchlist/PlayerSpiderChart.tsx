@@ -68,12 +68,13 @@ export default function PlayerSpiderChart({ players }: PlayerSpiderChartProps) {
 
   return (
     <div className="w-full">
-      <ResponsiveContainer width="100%" height={400}>
-        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
+      <div className="h-[290px] w-full sm:h-[380px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart cx="50%" cy="48%" outerRadius="62%" data={data}>
           <PolarGrid stroke="rgba(100,116,139,0.25)" />
           <PolarAngleAxis
             dataKey="subject"
-            tick={{ fontSize: 12, fontWeight: 700, fill: "currentColor" }}
+            tick={{ fontSize: 10, fontWeight: 700, fill: "currentColor" }}
           />
           {players.map((player, i) => (
             <Radar
@@ -90,7 +91,7 @@ export default function PlayerSpiderChart({ players }: PlayerSpiderChartProps) {
           <Legend
             iconType="circle"
             iconSize={10}
-            wrapperStyle={{ fontSize: 13, fontWeight: 700, paddingTop: 12 }}
+            wrapperStyle={{ fontSize: 11, fontWeight: 700, paddingTop: 8 }}
           />
           <Tooltip
             formatter={(value, name) => [`${value}/100`, name]}
@@ -106,6 +107,7 @@ export default function PlayerSpiderChart({ players }: PlayerSpiderChartProps) {
           />
         </RadarChart>
       </ResponsiveContainer>
+      </div>
       <p className="mt-2 text-center text-xs font-semibold text-slate-400 dark:text-slate-500">
         All axes normalised to 0–100. Speed &amp; Agility: lower raw = higher score.
       </p>

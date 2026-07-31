@@ -9,6 +9,7 @@ import CareerStatsPanel from "@/components/profiles/CareerStatsPanel";
 import CombineMetricsPanel from "@/components/profiles/CombineMetricsPanel";
 import PlayerMeasureGrid from "@/components/profiles/PlayerMeasureGrid";
 import ShareProfileButton from "@/components/profiles/ShareProfileButton";
+import CompactFactGrid from "@/components/ui/CompactFactGrid";
 import TrustSignals, { lastActiveLabel } from "@/components/ui/TrustSignals";
 import { roleLabel, type Profile } from "@/lib/auth";
 import { campusPipelines, getCampusTeam } from "@/lib/campus-to-pro";
@@ -88,9 +89,9 @@ function numberValue(item: unknown) {
 
 function Panel({ eyebrow, children }: { eyebrow: string; children: React.ReactNode }) {
   return (
-    <section className="border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#111]">
+    <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
       <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">{eyebrow}</p>
-      <div className="mt-5">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
@@ -122,18 +123,10 @@ export default function ProfileSummary({
   const isPlayer = profile.role === "player";
   const primaryTag = isPlayer ? stringValue(roleProfile?.position) || "Player" : roleLabel(profile.role);
   const secondaryTag = isPlayer ? formatPipeline(roleProfile?.pipeline_type) : profile.role === "fan" ? "Supporter" : roleLabel(profile.role);
-  const availability = isPlayer && roleProfile?.available_for_transfer ? "Available" : "Open";
   const location = profile.location ?? currentTeam?.country ?? "Europe";
   const completion = Math.min(100, 35 + (profile.bio ? 20 : 0) + filmLinks.length * 10 + photoUrls.length * 5);
   const sortedCareerEntries = [...careerEntries].sort((a, b) => (a.start_year ?? 0) - (b.start_year ?? 0));
   const resolvedSharePath = sharePath ?? (isPlayer ? `/players/${profile.id}` : `/profiles/${profile.id}`);
-
-  const stats: SummaryField[] = [
-        ["Role", roleLabel(profile.role)],
-        ["Location", location],
-        ["Status", availability],
-        ["Visibility", profile.is_public ? "Public" : "Private"]
-      ];
 
   const tags: SummaryField[] = isPlayer
     ? [
@@ -143,22 +136,24 @@ export default function ProfileSummary({
         ["Transfer", roleProfile?.available_for_transfer ? "Available" : "Not listed"]
       ]
     : [
-        ["Location", profile.location],
-        ["Bio", profile.bio]
+        ["Role", roleLabel(profile.role)],
+        ["Location", location],
+        ["Visibility", profile.is_public ? "Public" : "Private"],
+        ["Account", "Active"]
       ];
 
   return (
     <article className="w-full overflow-hidden bg-white text-slate-950 dark:bg-[#090909] dark:text-white">
       <header className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#120807]">
         <div className="mx-auto max-w-[110rem] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
-          <Link href={backHref} className="mb-5 inline-flex h-10 max-w-full items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white">
+          <Link href={backHref} className="mb-4 inline-flex h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white">
             ← {backLabel}
           </Link>
-          <div className="grid min-w-0 gap-7 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-start">
+          <div className={`grid min-w-0 gap-5 xl:items-start ${isPlayer ? "xl:grid-cols-[minmax(0,1fr)_400px]" : ""}`}>
             <div className="min-w-0">
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-4 sm:gap-5">
                 <div
-                  className="flex h-24 w-24 shrink-0 items-center justify-center border-2 border-red-500 bg-slate-200 bg-cover bg-center text-3xl font-black text-slate-900 dark:bg-[#202020] dark:text-white sm:h-32 sm:w-32 sm:text-5xl"
+                  className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border-2 border-red-500 bg-slate-200 bg-cover bg-center text-2xl font-black text-slate-900 dark:bg-[#202020] dark:text-white sm:h-28 sm:w-28 sm:text-4xl"
                   style={profile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.62)), url(${profile.avatar_url})` } : undefined}
                 >
                   {profile.avatar_url ? "" : initials(profile.display_name)}
@@ -180,22 +175,19 @@ export default function ProfileSummary({
                       </span>
                     ) : null}
                   </div>
-                  <h1 className="mt-4 break-words text-3xl font-black leading-none sm:text-5xl">{profile.display_name}</h1>
-                  <p className="mt-3 break-words text-base font-bold text-slate-500 dark:text-white/45 sm:text-lg">
+                  <h1 className="mt-3 break-words text-2xl font-black leading-none sm:text-4xl">{profile.display_name}</h1>
+                  <p className="mt-2 break-words text-sm font-bold text-slate-500 dark:text-white/45 sm:text-base">
                     {location}
                     {currentTeam ? ` · ${currentTeam.name}` : ""}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-7 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
-                {tags.map(([label, item]) => (
-                  <div key={label} className="min-h-9 min-w-0 break-words border border-slate-200 bg-white px-4 py-2 text-sm dark:border-white/20 dark:bg-black/20">
-                    <span className="mr-1.5 uppercase text-slate-500 dark:text-white/35">{label}</span>
-                    <span className="font-bold capitalize text-slate-800 dark:text-white/75">{value(item)}</span>
-                  </div>
-                ))}
-              </div>
+              <CompactFactGrid
+                className="mt-5"
+                columns={isPlayer ? 4 : 2}
+                facts={tags.map(([label, item]) => ({ label, value: value(item) }))}
+              />
             </div>
 
             {isPlayer ? (
@@ -205,32 +197,29 @@ export default function ProfileSummary({
                 heightCm={numberValue(roleProfile?.height_cm)}
                 weightKg={numberValue(roleProfile?.weight_kg)}
               />
-            ) : (
-              <div className="grid grid-cols-1 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a] sm:grid-cols-2">
-                {stats.map(([label, item], index) => (
-                  <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
-                    <p className="text-xs font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
-                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{value(item)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid min-w-0 max-w-[110rem] gap-7 px-4 py-7 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="min-w-0 space-y-8 xl:border-r xl:border-slate-200 xl:pr-10 dark:xl:border-white/10">
+      <div className="mx-auto grid min-w-0 max-w-[110rem] gap-5 px-3 py-5 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-6 xl:border-r xl:border-slate-200 xl:pr-7 dark:xl:border-white/10">
           <section>
             <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Profile</p>
-            <div className="mt-5 space-y-5">
-              <div className="border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 dark:border-white/15 dark:from-[#1a1a1a] dark:to-[#111]">
+            <div className="mt-3 space-y-3">
+              <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 dark:border-white/15 dark:from-[#1a1a1a] dark:to-[#111]">
                 <p className="break-words text-base font-semibold leading-7 text-slate-600 dark:text-white/65">
                   {profile.bio ?? "This profile is ready for more detail. Account controls can update this public profile at any time."}
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {isPlayer ? <CompactFactGrid columns={3} facts={[
+                { label: "Current team", value: currentTeam?.name ?? "Not listed" },
+                { label: "Current league", value: currentLeagueName ?? "Not listed" },
+                { label: "Profile status", value: profile.bio ? "Complete" : "Needs bio" }
+              ]} /> : null}
+              {/* Legacy feature cards are retained for non-player roles only. */}
+              {false ? <div className="hidden">
                 {/* Current Team Card */}
                 <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-indigo-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-indigo-500/40">
                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-indigo-500/5 opacity-0 transition group-hover:opacity-100 dark:to-indigo-500/10" />
@@ -272,7 +261,7 @@ export default function ProfileSummary({
                     <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{profile.bio ? "Complete" : "Not listed"}</p>
                   </div>
                 </div>
-              </div>
+              </div> : null}
             </div>
           </section>
 
@@ -333,13 +322,15 @@ export default function ProfileSummary({
 
           {isPlayer ? <HudlFilmViewer filmLinks={filmLinks} /> : null}
 
-          <section>
-            <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Photos</p>
-            <PlayerPhotoGallery photoUrls={photoUrls} />
-          </section>
+          {isPlayer || photoUrls.length ? (
+            <section>
+              <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Photos</p>
+              <PlayerPhotoGallery photoUrls={photoUrls} />
+            </section>
+          ) : null}
         </div>
 
-        <aside className="min-w-0 space-y-6">
+        <aside className="min-w-0 space-y-4">
           <Panel eyebrow="Availability">
             <div className="flex items-center gap-3 text-lg font-black text-slate-950 dark:text-white">
               <span className="h-3 w-3 rounded-full bg-emerald-500" />
@@ -409,14 +400,14 @@ export default function ProfileSummary({
                 <form action={startConversationAction}>
                   <input type="hidden" name="target_profile_id" value={profile.id} />
                   <input type="hidden" name="subject" value={`EuroScout intro with ${profile.display_name}`} />
-                  <button className="h-14 w-full bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700">Send message</button>
+                  <button className="h-11 w-full rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700">Send message</button>
                 </form>
               ) : showEditLink ? (
-                <Link href="/account" className="inline-flex h-14 w-full items-center justify-center bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700">
+                <Link href="/account" className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700">
                   Edit account
                 </Link>
               ) : (
-                <Link href="/auth/sign-in" className="inline-flex h-14 w-full items-center justify-center bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700">
+                <Link href="/auth/sign-in" className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700">
                   Sign in to message
                 </Link>
               )}

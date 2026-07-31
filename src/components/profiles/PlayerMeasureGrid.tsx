@@ -33,8 +33,8 @@ export default function PlayerMeasureGrid({ position, age, heightCm, weightKg }:
   ];
 
   return (
-    <div className="border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a]">
-      <div className="flex items-center justify-between border-b border-slate-200 p-3 dark:border-white/10">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a]">
+      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-white/10">
         <span className="text-xs font-black uppercase text-slate-500 dark:text-white/35">Measurements</span>
         <div className="grid grid-cols-2 border border-slate-200 bg-slate-50 p-0.5 dark:border-white/10 dark:bg-black/35">
           {(["metric", "imperial"] as const).map((system) => (
@@ -42,7 +42,7 @@ export default function PlayerMeasureGrid({ position, age, heightCm, weightKg }:
               key={system}
               type="button"
               onClick={() => setUnitSystem(system)}
-              className={`px-3 py-1.5 text-[10px] font-black uppercase transition ${
+              className={`min-h-8 px-2.5 py-1 text-[10px] font-black uppercase transition ${
                 unitSystem === system ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950" : "text-slate-500 dark:text-white/45"
               }`}
             >
@@ -53,9 +53,9 @@ export default function PlayerMeasureGrid({ position, age, heightCm, weightKg }:
       </div>
       <div className="grid grid-cols-2 overflow-hidden">
         {measurements.map(([label, item], index) => (
-          <div key={label} className={`p-5 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
-            <p className="text-xs font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
-            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{item}</p>
+          <div key={label} className={`px-3 py-2.5 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-white/35">{label}</p>
+            <p className="mt-1 text-lg font-black leading-6 text-slate-950 dark:text-white">{item}</p>
           </div>
         ))}
       </div>

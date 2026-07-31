@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, CircleUserRound, LayoutDashboard, MessageSquare, Settings, Target, WalletCards } from "lucide-react";
+import { Building2, CircleUserRound, LayoutDashboard, MessageSquare, Newspaper, Settings, Target, WalletCards } from "lucide-react";
 
 interface NavItem {
   id: string;
@@ -16,6 +16,7 @@ const iconByLabel = {
   Organisation: Building2,
   Recruitment: Target,
   Communication: MessageSquare,
+  Publishing: Newspaper,
   Membership: WalletCards,
   Settings
 };

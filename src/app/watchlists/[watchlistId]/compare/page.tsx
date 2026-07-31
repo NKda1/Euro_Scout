@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireOnboardedProfile } from "@/lib/auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import PlayerSpiderChart from "@/components/watchlist/PlayerSpiderChart";
+import { normaliseSeasonStats } from "@/lib/player-stats";
 
 export const metadata: Metadata = {
   title: "Player Comparison | EuroScout Pro",
@@ -111,20 +112,20 @@ export default async function WatchlistComparePage({ params }: ComparePageProps)
 
   return (
     <main className="app-surface min-h-screen">
-      <section className="mx-auto max-w-[92rem] px-4 py-8 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[92rem] px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
         <Link href={`/watchlists/${watchlistId}`} className="text-sm font-black text-red-600 hover:text-red-700">
           ← Back to watchlist
         </Link>
         <div className="mt-5 border-b border-slate-200 pb-5 dark:border-white/10">
           <p className="eyebrow-red">Comparison Tool</p>
-          <h1 className="mt-2 text-4xl font-black text-slate-950 dark:text-white">{watchlist.name}</h1>
+          <h1 className="mt-2 text-3xl font-black text-slate-950 dark:text-white sm:text-4xl">{watchlist.name}</h1>
           <p className="mt-2 text-sm font-bold text-slate-500 dark:text-white/45">
             Club-only side-by-side comparison for watchlisted players.
           </p>
         </div>
 
         {compareItems.length >= 2 && (
-          <div className="mt-8 border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#111]">
+          <div className="mt-5 rounded-lg border border-slate-200 bg-white p-3 sm:mt-8 sm:p-5 dark:border-white/10 dark:bg-[#111]">
             <p className="eyebrow-red mb-4">Radar Comparison</p>
             <PlayerSpiderChart
               players={compareItems.slice(0, 4).map((item) => ({
@@ -142,22 +143,23 @@ export default async function WatchlistComparePage({ params }: ComparePageProps)
         )}
 
         {compareItems.length ? (
-          <div className="mt-6 overflow-x-auto">
-            <div className="grid min-w-[980px] gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(compareItems.length, 4)}, minmax(240px, 1fr))` }}>
+          <div className="mt-5">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {compareItems.slice(0, 4).map((item) => {
                 const player = item.player_profiles!;
                 const publicProfile = player.profiles!;
-                const careerStats = Object.entries(player.career_stats ?? {}).filter(([, value]) => Number(value) > 0);
+                const latestSeason = normaliseSeasonStats(player.career_stats, player.position).at(-1);
+                const careerStats = Object.entries(latestSeason?.stats ?? {}).filter(([, value]) => Number(value) > 0);
                 return (
                   <article key={item.id} className="border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
                     <div className="border-b border-slate-200 p-4 dark:border-white/10">
                       <div
-                        className="flex h-24 w-24 items-center justify-center border border-red-500 bg-slate-100 bg-cover bg-center text-2xl font-black text-slate-900 dark:bg-[#202020] dark:text-white"
+                        className="flex h-16 w-16 items-center justify-center rounded-lg border border-red-500 bg-slate-100 bg-cover bg-center text-xl font-black text-slate-900 dark:bg-[#202020] dark:text-white"
                         style={publicProfile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.58)), url(${publicProfile.avatar_url})` } : undefined}
                       >
                         {publicProfile.avatar_url ? "" : initials(publicProfile.display_name)}
                       </div>
-                      <h2 className="mt-4 text-2xl font-black text-slate-950 dark:text-white">{publicProfile.display_name}</h2>
+                      <h2 className="mt-3 text-xl font-black text-slate-950 dark:text-white">{publicProfile.display_name}</h2>
                       <p className="mt-1 text-sm font-bold text-slate-500 dark:text-white/45">{[player.position, player.nationality].filter(Boolean).join(" · ") || "Player"}</p>
                       <span className="mt-3 inline-flex border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-black uppercase text-amber-950 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-100">
                         Added to watchlist
@@ -166,7 +168,7 @@ export default async function WatchlistComparePage({ params }: ComparePageProps)
 
                     <div className="space-y-5 p-4">
                       <section>
-                        <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Measureables</p>
+                        <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Measurements</p>
                         <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden border border-slate-200 bg-slate-200 text-sm dark:border-white/10 dark:bg-white/10">
                           {[
                             ["Height", formatMetric(player.height_cm, "cm")],

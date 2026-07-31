@@ -14,6 +14,7 @@ import ClubStatsVisualPanel from "@/components/scouts/ClubStatsVisualPanel";
 import ShareProfileButton from "@/components/profiles/ShareProfileButton";
 import FlagClubButton from "@/components/scouts/FlagClubButton";
 import TrustSignals, { lastActiveLabel } from "@/components/ui/TrustSignals";
+import CompactFactGrid from "@/components/ui/CompactFactGrid";
 import { absoluteUrl, jsonLdScript, truncateMeta } from "@/lib/seo";
 
 interface ClubProfilePageProps {
@@ -471,15 +472,15 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
           <div className="mx-auto max-w-[92rem] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
             <Link
               href="/scouts"
-              className="mb-5 inline-flex h-10 max-w-full items-center border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white"
+              className="mb-4 inline-flex h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/40 dark:hover:border-red-500/50 dark:hover:text-white"
             >
               ← Back to clubs
             </Link>
-            <div className="grid min-w-0 gap-7 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+            <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_390px] lg:items-start">
               <div className="min-w-0">
-                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-4 sm:gap-5">
                   <div
-                    className="flex h-24 w-24 shrink-0 items-center justify-center border-2 border-red-500 bg-slate-200 bg-cover bg-center text-3xl font-black text-slate-900 dark:bg-[#202020] dark:text-white sm:h-32 sm:w-32 sm:text-5xl"
+                    className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border-2 border-red-500 bg-slate-200 bg-cover bg-center text-2xl font-black text-slate-900 dark:bg-[#202020] dark:text-white sm:h-28 sm:w-28 sm:text-4xl"
                     style={team?.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,.62)), url(${team.logo_url})` } : undefined}
                   >
                     {team?.logo_url ? "" : initials(teamName)}
@@ -497,39 +498,29 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                         {leagueLabel} {team?.tier ? `- Tier ${team.tier}` : ""}
                       </span>
                     </div>
-                    <h1 className="mt-4 break-words text-3xl font-black leading-none text-slate-950 dark:text-white sm:text-5xl">{teamName}</h1>
-                    {location && <p className="mt-3 break-words text-base font-bold text-slate-500 dark:text-white/45 sm:text-lg">{location}</p>}
+                    <h1 className="mt-3 break-words text-2xl font-black leading-none text-slate-950 dark:text-white sm:text-4xl">{teamName}</h1>
+                    {location && <p className="mt-2 break-words text-sm font-bold text-slate-500 dark:text-white/45 sm:text-base">{location}</p>}
                   </div>
                 </div>
 
-                <div className="mt-7 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
-                  {[
-                    ["Region", team?.country ?? "Europe"],
-                    ["Type", campusPipeline?.label ?? league?.tier ?? "Club"],
-                    ["Market", league?.marketTier ?? "—"],
-                    ["Pipeline", pipelineNamesPublic ? "Public" : "Open"]
-                  ].map(([label, value]) => (
-                    <div key={label} className="min-h-9 min-w-0 break-words border border-slate-200 bg-white px-4 py-2 text-sm dark:border-white/20 dark:bg-black/20">
-                      <span className="mr-1.5 uppercase text-slate-500 dark:text-white/35">{label}</span>
-                      <span className="font-bold capitalize text-slate-800 dark:text-white/75">{value}</span>
-                    </div>
-                  ))}
-                  <span className="min-h-9 px-2 py-2 text-sm font-black uppercase text-red-600 dark:text-red-400">
-                    {resolvedProfile.is_public ? "Public Profile" : "Private Profile"}
-                  </span>
-                </div>
+                <CompactFactGrid className="mt-5" columns={4} facts={[
+                  { label: "Region", value: team?.country ?? "Europe" },
+                  { label: "Type", value: campusPipeline?.label ?? league?.tier ?? "Club" },
+                  { label: "Market", value: league?.marketTier ?? "—" },
+                  { label: "Pipeline", value: pipelineNamesPublic ? "Public" : "Open" }
+                ]} />
               </div>
 
-              <div className="grid grid-cols-1 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a] sm:grid-cols-2">
+              <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a]">
                 {([
                   ["League", leagueLabel],
                   ["Pass Play", formatPercent(team?.pass_run_percentage)],
                   ["Open Spots", String(openSpots || "—")],
                   ["Staff", String(staff.length || "—")]
                 ] as [string, string][]).map(([label, value], index) => (
-                  <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
-                    <p className="text-xs font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
-                    <p className={`mt-2 text-2xl font-black ${label === "Open Spots" ? "text-green-600 dark:text-green-400" : "text-slate-950 dark:text-white"}`}>{value}</p>
+                  <div key={label} className={`px-3 py-2.5 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
+                    <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
+                    <p className={`mt-1 text-lg font-black ${label === "Open Spots" ? "text-green-600 dark:text-green-400" : "text-slate-950 dark:text-white"}`}>{value}</p>
                   </div>
                 ))}
               </div>
@@ -537,59 +528,22 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
           </div>
         </header>
 
-        <div className="mx-auto grid min-w-0 max-w-[92rem] gap-7 px-4 py-7 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
-          <div className="min-w-0 space-y-8 lg:border-r lg:border-slate-200 lg:pr-10 dark:lg:border-white/10">
+        <div className="mx-auto grid min-w-0 max-w-[92rem] gap-5 px-3 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:px-8">
+          <div className="min-w-0 space-y-6 lg:border-r lg:border-slate-200 lg:pr-7 dark:lg:border-white/10">
             {error ? <p className="border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">{error}</p> : null}
             {notice ? <p className="border border-emerald-300 bg-emerald-50 p-4 text-sm font-bold text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</p> : null}
 
             <section>
               <p className="text-sm font-black uppercase text-red-500">Club Profile</p>
-              <div className="mt-5 space-y-5">
-                <div className="border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 dark:border-white/15 dark:from-[#1a1a1a] dark:to-[#111]">
+              <div className="mt-3 space-y-3">
+                <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 dark:border-white/15 dark:from-[#1a1a1a] dark:to-[#111]">
                   <p className="break-words text-base font-semibold leading-7 text-slate-600 dark:text-white/65">{profileText}</p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {/* Stadium Card */}
-                  <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-red-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-red-500/40">
-                    <div className="absolute inset-0 bg-gradient-to-br from-red-500/0 to-red-500/5 opacity-0 transition group-hover:opacity-100 dark:to-red-500/10" />
-                    <div className="relative p-5">
-                      <div className="mb-3 flex items-center gap-2">
-                        <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Stadium</p>
-                      </div>
-                      <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{team?.stadium ?? "Not listed"}</p>
-                    </div>
-                  </div>
-
-                  {/* Website Card */}
-                  <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-blue-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-blue-500/40">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 transition group-hover:opacity-100 dark:to-blue-500/10" />
-                    <div className="relative p-5">
-                      <div className="mb-3 flex items-center gap-2">
-                        <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                        <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Website</p>
-                      </div>
-                      {team?.website ? (
-                        <a
-                          href={team.website.startsWith('http') ? team.website : `https://${team.website}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block truncate text-lg font-black leading-tight text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          {team.website.replace(/^https?:\/\//, "")}
-                        </a>
-                      ) : (
-                        <p className="text-lg font-black leading-tight text-slate-400 dark:text-white/30">Not listed</p>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
+                <CompactFactGrid columns={2} facts={[
+                  { label: "Stadium", value: team?.stadium ?? "Not listed" },
+                  { label: "Website", value: team?.website?.replace(/^https?:\/\//, "") ?? "Not listed", href: team?.website ? (team.website.startsWith("http") ? team.website : `https://${team.website}`) : null, external: true }
+                ]} />
               </div>
             </section>
 
@@ -653,8 +607,8 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
 
           </div>
 
-          <aside className="min-w-0 space-y-6">
-            <section className="border border-red-200 bg-white p-7 dark:border-red-500/25 dark:bg-[#1a1a1a]">
+          <aside className="min-w-0 space-y-4">
+            <section className="rounded-lg border border-red-200 bg-white p-4 dark:border-red-500/25 dark:bg-[#1a1a1a]">
               <p className="mb-5 text-sm font-black uppercase text-red-500">Contact Club</p>
                 {canContact && teamId ? (
                   <div className="grid gap-3">
@@ -670,21 +624,21 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                 ) : isOwner ? (
                   <Link
                     href="/account"
-                    className="inline-flex h-14 w-full items-center justify-center bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
+                    className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Edit profile
                   </Link>
                 ) : isMember && !isOwner ? (
                   <Link
                     href="/messages"
-                    className="inline-flex h-14 w-full items-center justify-center bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
+                    className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Club inbox
                   </Link>
                 ) : !isAuthenticated ? (
                   <Link
                     href={`/auth/sign-in?return_url=/scouts/${scoutId}`}
-                    className="inline-flex h-16 w-full items-center justify-center bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
+                    className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-red-600 px-5 text-sm font-black uppercase text-white transition hover:bg-red-700"
                   >
                     Sign in to message
                   </Link>
@@ -696,7 +650,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
 
               </section>
 
-              <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
+              <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#1a1a1a]">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-black uppercase text-red-500">Share Club</p>
@@ -722,7 +676,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
               </section>
 
               {team && (
-                <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
+                <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#1a1a1a]">
                   <p className="text-sm font-black uppercase text-red-500">Recruiting Status</p>
                   <div className="mt-5 flex items-center gap-3 text-lg font-black text-slate-950 dark:text-white">
                     <span
@@ -735,7 +689,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                 </section>
               )}
 
-              <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
+              <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#1a1a1a]">
                 <p className="text-sm font-black uppercase text-red-500">Roster Specifications</p>
                 <div className="mt-5 space-y-3">
                   {(rosterNeeds.length ? rosterNeeds : openSpots > 0 ? Array.from({ length: openSpots }).map((_, index) => `Roster Spot ${index + 1}`) : ["No open spots listed"]).map((need, index) => (
@@ -749,7 +703,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                 </div>
               </section>
 
-              <section className="border border-slate-200 bg-white p-7 dark:border-white/10 dark:bg-[#1a1a1a]">
+              <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#1a1a1a]">
                 <p className="text-sm font-black uppercase text-red-500">Staff Directory</p>
                 <div className="mt-5 divide-y divide-slate-200 dark:divide-white/10">
                   {staff.length ? (
