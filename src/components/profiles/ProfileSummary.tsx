@@ -322,7 +322,12 @@ export default function ProfileSummary({
             />
           ) : null}
 
-          {isPlayer ? <CareerStatsPanel stats={roleProfile?.career_stats as Record<string, unknown> | null | undefined} /> : null}
+          {isPlayer ? (
+            <CareerStatsPanel
+              stats={roleProfile?.career_stats as Record<string, unknown> | null | undefined}
+              position={stringValue(roleProfile?.position)}
+            />
+          ) : null}
 
           {isPlayer ? <PublicNotesPanel notes={publicNotes} /> : null}
 

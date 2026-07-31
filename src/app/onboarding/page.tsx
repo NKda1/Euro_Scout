@@ -53,27 +53,15 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
 
   return (
     <main className="app-surface min-h-screen">
-      <section className="mx-auto grid max-w-[96rem] gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(260px,0.34fr)_minmax(0,1fr)] lg:px-8">
-        <div className="lg:sticky lg:top-28 lg:self-start">
+      <section className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <div className="mb-6 border-b border-slate-200 pb-5 dark:border-white/10">
           <p className="eyebrow-red">Getting started</p>
-          <h1 className="mt-3 max-w-xl text-4xl font-black tracking-tight text-slate-950 dark:text-white sm:text-5xl lg:text-4xl">
-            Set up your EuroScout identity.
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+            Get into your workspace.
           </h1>
-          <p className="mt-4 max-w-lg text-base leading-7 text-slate-500 dark:text-slate-400">
-            Build your role, profile and football pathway in one focused setup flow.
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
+            Choose your role and add only the essentials. Photos, media, career history and detailed recruitment data can be completed later.
           </p>
-          <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-            {[
-              ["Accounts", "Players publish film, combine metrics and career history. Clubs manage recruitment, watchlists and verified team profiles. Journalists submit league news links."],
-              ["Recruitment", "European club routes, free-agent visibility, campus-to-pro discovery, Canadian pathways through U Sports and CJFL, plus BUCS profiles for UK-based players."],
-              ["Messaging", "EuroScout keeps outreach focused: clubs can contact players, players can contact clubs, and each account keeps one clean inbox record."]
-            ].map(([item, copy]) => (
-              <div key={item} className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600 dark:text-red-400">{item}</p>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-400">{copy}</p>
-              </div>
-            ))}
-          </div>
         </div>
 
         <div>
@@ -83,7 +71,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
             </p>
           ) : null}
 
-          <div className="border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#101010] sm:p-7">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#101010] sm:p-7">
           <OnboardingWizard
             action={completeOnboardingAction}
             allowAdminRole={!isAdminPreview && isReservedAdminEmail(user.email)}

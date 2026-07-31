@@ -1,81 +1,74 @@
-import type { LucideIcon } from "lucide-react";
-import { Activity, Hash, Shield, Target, Trophy, Zap } from "lucide-react";
-
-type CareerStats = Record<string, unknown>;
+import { normaliseSeasonStats, POSITION_STAT_FIELDS } from "@/lib/player-stats";
 
 interface CareerStatsPanelProps {
-  stats?: CareerStats | null;
+  stats?: Record<string, unknown> | null;
+  position?: string | null;
 }
 
-function labelForKey(key: string) {
-  return key
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase())
-    .replace("Pbus", "PBUs")
-    .replace("Tfls", "TFLs")
-    .replace("Fg", "FG")
-    .replace("Xp", "XP");
+function displayValue(value: number | null | undefined, unit?: string) {
+  if (value == null) return "—";
+  return `${Number.isInteger(value) ? value : value.toFixed(1)}${unit === "%" ? "%" : unit ? ` ${unit}` : ""}`;
 }
 
-function numericValue(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+export default function CareerStatsPanel({ stats, position }: CareerStatsPanelProps) {
+  const seasons = normaliseSeasonStats(stats, position);
+  if (!seasons.length) return null;
 
-function iconForKey(key: string): LucideIcon {
-  if (key.includes("touchdown") || key.includes("score")) return Trophy;
-  if (key.includes("target") || key.includes("reception") || key.includes("catch")) return Target;
-  if (key.includes("tackle") || key.includes("interception") || key.includes("breakup") || key.includes("sack")) return Shield;
-  if (key.includes("yard") || key.includes("carry") || key.includes("rush")) return Zap;
-  if (key.includes("percentage") || key.includes("rate")) return Activity;
-  return Hash;
-}
-
-export default function CareerStatsPanel({ stats }: CareerStatsPanelProps) {
-  const rows = Object.entries(stats ?? {})
-    .map(([key, value]) => [key, numericValue(value)] as const)
-    .filter(([, value]) => value != null && value > 0);
-
-  if (!rows.length) return null;
+  const fieldMap = new Map<string, { key: string; label: string; shortLabel?: string; unit?: string }>();
+  for (const season of seasons) {
+    for (const field of POSITION_STAT_FIELDS[season.positionGroup] ?? []) fieldMap.set(field.key, field);
+  }
+  for (const season of seasons) {
+    for (const key of Object.keys(season.stats)) {
+      if (!fieldMap.has(key)) {
+        fieldMap.set(key, { key, label: key.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase()) });
+      }
+    }
+  }
+  const fields = Array.from(fieldMap.values());
 
   return (
-    <section>
-      <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Career Stats</p>
-      <div className="mt-5 overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
-        <table className="w-full">
+    <section aria-labelledby="career-statistics-title">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-600 dark:text-red-400">Performance</p>
+          <h2 id="career-statistics-title" className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white">Season statistics</h2>
+        </div>
+        <p className="text-xs font-semibold text-slate-500 dark:text-white/40">Scroll horizontally to compare every column</p>
+      </div>
+      <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#111]">
+        <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
-              <th className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-[0.16em] text-slate-400 dark:text-white/30">
-                Stat
-              </th>
-              <th className="px-4 py-3 text-right text-[11px] font-black uppercase tracking-[0.16em] text-slate-400 dark:text-white/30">
-                Value
-              </th>
+              <th className="sticky left-0 z-10 min-w-40 bg-slate-50 px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 dark:bg-[#171717] dark:text-white/35">Club</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-white/35">Season</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-white/35">Games</th>
+              {fields.map((field) => (
+                <th key={field.key} title={field.label} className="whitespace-nowrap px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-white/35">
+                  {field.shortLabel ?? field.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/[0.06]">
-            {rows.map(([key, value]) => {
-              const Icon = iconForKey(key);
-              return (
-                <tr key={key} className="transition hover:bg-slate-50 dark:hover:bg-white/[0.02]">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-red-200 bg-red-50 text-red-500 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300">
-                        <Icon aria-hidden className="h-3.5 w-3.5" />
-                      </span>
-                      <span className="text-sm font-semibold text-slate-600 dark:text-white/55">{labelForKey(key)}</span>
-                    </div>
+            {seasons.map((season) => (
+              <tr key={season.id} className="transition hover:bg-slate-50/80 dark:hover:bg-white/[0.025]">
+                <th scope="row" className="sticky left-0 z-10 bg-white px-3 py-3 text-left font-black text-slate-950 dark:bg-[#111] dark:text-white">
+                  <span className="block max-w-52 truncate">{season.club || "Unlisted club"}</span>
+                  <span className="mt-0.5 block text-[10px] font-black uppercase tracking-[0.12em] text-red-600 dark:text-red-400">{season.positionGroup}</span>
+                </th>
+                <td className="whitespace-nowrap px-3 py-3 font-bold text-slate-600 dark:text-white/55">{season.season || "—"}</td>
+                <td className="px-3 py-3 text-right font-black tabular-nums text-slate-900 dark:text-white">{displayValue(season.games)}</td>
+                {fields.map((field) => (
+                  <td key={field.key} className="px-3 py-3 text-right font-black tabular-nums text-slate-900 dark:text-white">
+                    {displayValue(season.stats[field.key], field.unit)}
                   </td>
-                  <td className="px-4 py-3 text-right text-base font-black text-slate-950 dark:text-white">
-                    {value}
-                  </td>
-                </tr>
-              );
-            })}
+                ))}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
     </section>
   );
 }
-

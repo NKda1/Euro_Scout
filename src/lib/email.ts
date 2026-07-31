@@ -1,22 +1,88 @@
 /**
- * Transactional email helper via Resend.
+ * Transactional email helper via Postmark.
  *
- * Environment variable required:
- *   RESEND_API_KEY   – your Resend API key
- *   RESEND_FROM      – sender address, e.g. "EuroScout Pro <noreply@euroscoutpro.com>"
+ * Environment variables:
+ *   POSTMARK_SERVER_TOKEN – token for the EuroScout transactional server
+ *   POSTMARK_FROM         – verified sender, e.g. "EuroScout Pro <noreply@euroscoutpro.com>"
+ *   POSTMARK_MESSAGE_STREAM – optional stream ID; defaults to "outbound"
  *
- * All functions silently no-op when RESEND_API_KEY is not set.
+ * Delivery failures are logged with Postmark's error code and then thrown so
+ * callers and production monitoring can distinguish a saved action from a
+ * successfully delivered notification.
  */
 
-import { Resend } from "resend";
+const POSTMARK_EMAIL_ENDPOINT = "https://api.postmarkapp.com/email";
+const FROM = process.env.POSTMARK_FROM ?? "EuroScout Pro <noreply@euroscoutpro.com>";
+const MESSAGE_STREAM = process.env.POSTMARK_MESSAGE_STREAM ?? "outbound";
 
-function getClient() {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return null;
-  return new Resend(key);
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;"
+    };
+    return entities[character];
+  });
 }
 
-const FROM = process.env.RESEND_FROM ?? "EuroScout Pro <noreply@euroscoutpro.com>";
+interface PostmarkResponse {
+  ErrorCode?: number;
+  Message?: string;
+  MessageID?: string;
+}
+
+async function sendEmail(params: { to: string; subject: string; html: string; text: string; tag: string }) {
+  const token = process.env.POSTMARK_SERVER_TOKEN?.trim();
+  if (!token) {
+    console.error("[email.postmark.configuration_missing]", { tag: params.tag });
+    throw new Error("Transactional email is not configured.");
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(POSTMARK_EMAIL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Postmark-Server-Token": token
+      },
+      body: JSON.stringify({
+        From: FROM,
+        To: params.to,
+        Subject: params.subject,
+        HtmlBody: params.html,
+        TextBody: params.text,
+        MessageStream: MESSAGE_STREAM,
+        Tag: params.tag,
+        Metadata: { application: "euroscout-pro" }
+      }),
+      signal: AbortSignal.timeout(10_000)
+    });
+  } catch (error) {
+    console.error("[email.postmark.network_failed]", {
+      tag: params.tag,
+      reason: error instanceof Error ? error.name : "unknown"
+    });
+    throw new Error("Transactional email delivery could not be reached.");
+  }
+
+  const payload = (await response.json().catch(() => null)) as PostmarkResponse | null;
+
+  if (!response.ok) {
+    console.error("[email.postmark.delivery_failed]", {
+      tag: params.tag,
+      status: response.status,
+      errorCode: payload?.ErrorCode
+    });
+    throw new Error(payload?.Message ?? `Postmark email delivery failed with status ${response.status}.`);
+  }
+
+  console.info("[email.postmark.delivered]", { tag: params.tag, messageId: payload?.MessageID });
+}
 
 export interface CallRequestEmailParams {
   to: string;
@@ -85,55 +151,83 @@ function wrap(title: string, bodyHtml: string) {
 }
 
 export async function sendCallRequestEmail(params: CallRequestEmailParams) {
-  const client = getClient();
-  if (!client) return;
   const { to, recipientName, senderName, teamName, reason, preferredTime, backupTime, note, conversationUrl } = params;
+  const safeRecipientName = escapeHtml(recipientName);
+  const safeSenderName = escapeHtml(senderName);
+  const safeTeamName = escapeHtml(teamName);
+  const safeReason = escapeHtml(reason);
+  const safePreferredTime = escapeHtml(preferredTime);
+  const safeBackupTime = backupTime ? escapeHtml(backupTime) : "";
+  const safeNote = note ? escapeHtml(note) : "";
+  const safeConversationUrl = escapeHtml(conversationUrl);
   const html = wrap(
-    `Video call request — ${teamName}`,
-    `<p>Hi <strong>${recipientName}</strong>,</p>
-<p><strong>${senderName}</strong> has sent you a video call request on behalf of <strong>${teamName}</strong>.</p>
+    `Video call request — ${safeTeamName}`,
+    `<p>Hi <strong>${safeRecipientName}</strong>,</p>
+<p><strong>${safeSenderName}</strong> has sent you a video call request on behalf of <strong>${safeTeamName}</strong>.</p>
 <div class="meta">
-  <p><span class="label">Reason</span><br><span class="value">${reason}</span></p>
-  <p><span class="label">Preferred time</span><br><span class="value">${preferredTime}</span></p>
-  ${backupTime ? `<p><span class="label">Backup time</span><br><span class="value">${backupTime}</span></p>` : ""}
+  <p><span class="label">Reason</span><br><span class="value">${safeReason}</span></p>
+  <p><span class="label">Preferred time</span><br><span class="value">${safePreferredTime}</span></p>
+  ${safeBackupTime ? `<p><span class="label">Backup time</span><br><span class="value">${safeBackupTime}</span></p>` : ""}
 </div>
-${note ? `<div class="note"><p>${note}</p></div>` : ""}
+${safeNote ? `<div class="note"><p>${safeNote}</p></div>` : ""}
 <p>Head to your inbox to accept, decline, or propose a new time.</p>
-<a class="cta" href="${conversationUrl}">View call request</a>`
+<a class="cta" href="${safeConversationUrl}">View call request</a>`
   );
-  await client.emails.send({ from: FROM, to, subject: `Video call request from ${teamName}`, html });
+  await sendEmail({
+    to,
+    tag: "video-call-request",
+    subject: `Video call request from ${teamName}`,
+    html,
+    text: `Hi ${recipientName},\n\n${senderName} sent you a video call request on behalf of ${teamName}.\nReason: ${reason}\nPreferred time: ${preferredTime}${backupTime ? `\nBackup time: ${backupTime}` : ""}${note ? `\nNote: ${note}` : ""}\n\nView call request: ${conversationUrl}`
+  });
 }
 
 export async function sendCallConfirmedEmail(params: CallConfirmedEmailParams) {
-  const client = getClient();
-  if (!client) return;
   const { to, recipientName, counterpartName, scheduledTime, conversationUrl } = params;
+  const safeRecipientName = escapeHtml(recipientName);
+  const safeCounterpartName = escapeHtml(counterpartName);
+  const safeScheduledTime = escapeHtml(scheduledTime);
+  const safeConversationUrl = escapeHtml(conversationUrl);
   const html = wrap(
     "Video call confirmed",
-    `<p>Hi <strong>${recipientName}</strong>,</p>
-<p>Your video call with <strong>${counterpartName}</strong> has been confirmed.</p>
+    `<p>Hi <strong>${safeRecipientName}</strong>,</p>
+<p>Your video call with <strong>${safeCounterpartName}</strong> has been confirmed.</p>
 <div class="meta">
-  <p><span class="label">Confirmed time</span><br><span class="value">${scheduledTime}</span></p>
+  <p><span class="label">Confirmed time</span><br><span class="value">${safeScheduledTime}</span></p>
 </div>
 <p>The Daily call room will open 5 minutes before your confirmed time. You'll be able to join from your inbox or account page.</p>
-<a class="cta" href="${conversationUrl}">Open inbox</a>`
+<a class="cta" href="${safeConversationUrl}">Open inbox</a>`
   );
-  await client.emails.send({ from: FROM, to, subject: `Call confirmed — ${scheduledTime}`, html });
+  await sendEmail({
+    to,
+    tag: "video-call-confirmed",
+    subject: `Call confirmed — ${scheduledTime}`,
+    html,
+    text: `Hi ${recipientName},\n\nYour video call with ${counterpartName} is confirmed for ${scheduledTime}. The call room opens 5 minutes beforehand.\n\nOpen inbox: ${conversationUrl}`
+  });
 }
 
 export async function sendCallReminderEmail(params: CallReminderEmailParams) {
-  const client = getClient();
-  if (!client) return;
   const { to, recipientName, counterpartName, scheduledTime, roomUrl } = params;
+  const safeRecipientName = escapeHtml(recipientName);
+  const safeCounterpartName = escapeHtml(counterpartName);
+  const safeScheduledTime = escapeHtml(scheduledTime);
+  const safeRoomUrl = escapeHtml(roomUrl);
   const html = wrap(
     "Your call starts in 15 minutes",
-    `<p>Hi <strong>${recipientName}</strong>,</p>
-<p>Your video call with <strong>${counterpartName}</strong> starts in approximately <strong>15 minutes</strong>.</p>
+    `<p>Hi <strong>${safeRecipientName}</strong>,</p>
+<p>Your video call with <strong>${safeCounterpartName}</strong> starts in approximately <strong>15 minutes</strong>.</p>
 <div class="meta">
-  <p><span class="label">Scheduled time</span><br><span class="value">${scheduledTime}</span></p>
+  <p><span class="label">Scheduled time</span><br><span class="value">${safeScheduledTime}</span></p>
 </div>
 <p>Click below to join your call room now.</p>
-<a class="cta" href="${roomUrl}">Join call now</a>`
+<a class="cta" href="${safeRoomUrl}">Join call now</a>`
   );
-  await client.emails.send({ from: FROM, to, subject: `Your call starts in 15 minutes — ${counterpartName}`, html });
+  await sendEmail({
+    to,
+    tag: "video-call-reminder",
+    subject: `Your call starts in 15 minutes — ${counterpartName}`,
+    html,
+    text: `Hi ${recipientName},\n\nYour video call with ${counterpartName} starts in approximately 15 minutes at ${scheduledTime}.\n\nJoin call: ${roomUrl}`
+  });
 }

@@ -31,6 +31,8 @@ import AccountActionBar from "@/components/account/AccountActionBar";
 import AccountManagement from "@/components/account/AccountManagement";
 import AccountQuickNav from "@/components/account/AccountQuickNav";
 import AccountSection from "@/components/account/AccountSection";
+import AccountSettingsPanel from "@/components/account/AccountSettingsPanel";
+import AccountWorkspaceOverview from "@/components/account/AccountWorkspaceOverview";
 import CareerStatsBuilder from "@/components/account/CareerStatsBuilder";
 import CareerTimelineBuilder from "@/components/account/CareerTimelineBuilder";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
@@ -788,6 +790,19 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const isPremiumAccount = isPremiumActive(profile);
   const billingPlan = planForRole(profile.role);
   const premiumFeatures = rolePremiumFeatures(profile.role);
+  const completionSignals = [
+    Boolean(profile.display_name),
+    Boolean(profile.location),
+    Boolean(profile.bio),
+    Boolean(profile.avatar_url || (profile.role === "club" && team?.logo_url)),
+    profile.is_public,
+    profile.role === "player"
+      ? Boolean(textValue(roleProfile, "position"))
+      : profile.role === "club"
+        ? Boolean(team)
+        : true
+  ];
+  const accountCompletion = Math.round((completionSignals.filter(Boolean).length / completionSignals.length) * 100);
 
   return (
     <main className="theme-private min-h-screen bg-white text-slate-950 dark:bg-[#090909] dark:text-white">
@@ -886,27 +901,46 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           {profile.role === "player" ? (
             <AccountQuickNav items={[
-              { id: "billing", label: "Billing" },
+              { id: "overview", label: "Overview" },
               { id: "profile", label: "Profile" },
-              { id: "calls", label: "Video Calls", badge: pendingMeetingCount || null },
-              { id: "notes", label: "Club Notes", badge: (playerNoteReviews ?? []).length || null },
-              { id: "media", label: "Media" },
-              { id: "views", label: "Profile Views" },
+              { id: "recruitment", label: "Recruitment", badge: pendingMeetingCount || null },
+              { id: "communication", label: "Communication", badge: unreadMessageCount || null },
+              { id: "membership", label: "Membership" },
+              { id: "settings", label: "Settings" },
             ]} />
-          ) : profile.role === "club" && team ? (
+          ) : profile.role === "club" ? (
             <AccountQuickNav items={[
-              { id: "billing", label: "Billing" },
-              { id: "interest", label: "Interest", badge: newInterestCount || null },
-              { id: "calls", label: "Video Calls", badge: pendingMeetingCount || null },
-              { id: "club-profile", label: "Club Profile" },
-              { id: "staff", label: "Staff" },
-              { id: "messaging", label: "Messaging" },
-              { id: "club-media", label: "Media" },
+              { id: "overview", label: "Overview" },
+              { id: "profile", label: "Profile" },
+              { id: "organisation", label: "Organisation" },
+              { id: "recruitment", label: "Recruitment", badge: newInterestCount + pendingMeetingCount || null },
+              { id: "communication", label: "Communication", badge: unreadMessageCount || null },
+              { id: "membership", label: "Membership" },
+              { id: "settings", label: "Settings" },
             ]} />
-          ) : null}
+          ) : (
+            <AccountQuickNav items={[
+              { id: "overview", label: "Overview" },
+              { id: "profile", label: "Profile" },
+              { id: "communication", label: "Communication", badge: unreadMessageCount || null },
+              { id: "membership", label: "Membership" },
+              { id: "settings", label: "Settings" },
+            ]} />
+          )}
+
+          <AccountWorkspaceOverview
+            completion={accountCompletion}
+            unreadMessages={unreadMessageCount}
+            pendingCalls={pendingMeetingCount}
+            planLabel={accountTierLabel(profile)}
+            isPublic={profile.is_public}
+            publicHref={publicHref}
+            role={profile.role}
+            organisationName={team?.name}
+          />
 
           {(profile.role === "player" || profile.role === "club") && billingPlan ? (
-            <Panel id="billing" eyebrow="Account Management" title="Subscription & Billing">
+            <Panel id="membership" eyebrow="Membership" title="Subscription & billing">
               <AccountManagement
                 isPremium={isPremiumAccount}
                 billingPlan={billingPlan}
@@ -917,7 +951,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role !== "admin" && (profile.role !== "player" && profile.role !== "club") ? (
-            <Panel id="billing" eyebrow="Membership" title={`${accountTierLabel(profile)} account`}>
+            <Panel id="membership" eyebrow="Membership" title={`${accountTierLabel(profile)} account`}>
               <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
                 <div className={`rounded-lg border p-5 ${isPremiumAccount ? "border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10" : "border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-black/20"}`}>
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500 dark:text-white/35">Current tier</p>
@@ -956,7 +990,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           ) : null}
 
           {profile.role === "club" && team ? (
-            <Panel id="interest" eyebrow="Interest Notifications" title={newInterestCount ? `${newInterestCount} new player interest${newInterestCount === 1 ? "" : "s"}` : "Player interest"}>
+            <Panel id="recruitment" eyebrow="Recruitment" title={newInterestCount ? `${newInterestCount} new player interest${newInterestCount === 1 ? "" : "s"}` : "Player interest"}>
               {(clubInterestNotifications ?? []).length ? (
                 <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-black/20">
                   {(clubInterestNotifications ?? []).map((interest) => {
@@ -1002,7 +1036,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           {(profile.role === "player" || (profile.role === "club" && team)) ? (
             <Panel
-              id="calls"
+              id={profile.role === "player" ? "recruitment" : "calls"}
               eyebrow="Video Calls"
               title={profile.role === "club" ? (pendingMeetingCount ? `${pendingMeetingCount} pending call request${pendingMeetingCount === 1 ? "" : "s"}` : "Club call requests") : "Your club call requests"}
             >
@@ -1201,6 +1235,32 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </Panel>
           ) : null}
 
+          <Panel id="communication" defaultOpen={false} eyebrow="Communication" title="Inbox, calls & notifications">
+            <div className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 dark:divide-white/10 dark:border-white/10">
+              <Link href="/messages" className="flex items-center justify-between gap-4 bg-white px-4 py-3 transition hover:bg-slate-50 dark:bg-black/20 dark:hover:bg-white/[0.04]">
+                <span>
+                  <span className="block text-sm font-black text-slate-950 dark:text-white">Inbox</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-white/40">Recruitment conversations and direct messages</span>
+                </span>
+                <span className="shrink-0 rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">{unreadMessageCount} unread</span>
+              </Link>
+              <Link href="/notifications" className="flex items-center justify-between gap-4 bg-white px-4 py-3 transition hover:bg-slate-50 dark:bg-black/20 dark:hover:bg-white/[0.04]">
+                <span>
+                  <span className="block text-sm font-black text-slate-950 dark:text-white">Notifications</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-white/40">Interest, activity and account updates</span>
+                </span>
+                <span aria-hidden className="text-slate-300 dark:text-white/20">→</span>
+              </Link>
+              <a href="mailto:info@euroscoutpro.com?subject=EuroScout%20notification%20preferences" className="flex items-center justify-between gap-4 bg-white px-4 py-3 transition hover:bg-slate-50 dark:bg-black/20 dark:hover:bg-white/[0.04]">
+                <span>
+                  <span className="block text-sm font-black text-slate-950 dark:text-white">Email preferences</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-white/40">Request a change to transactional notifications</span>
+                </span>
+                <span aria-hidden className="text-slate-300 dark:text-white/20">→</span>
+              </a>
+            </div>
+          </Panel>
+
           {profile.role === "player" ? (
             <Panel id="views" defaultOpen={false} eyebrow="Profile Views" title="Who has viewed your account">
               {profileViewsError ? (
@@ -1384,7 +1444,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       <CareerStatsBuilder
                         name="career_stats_json"
                         position={textValue(roleProfile, "position")}
-                        defaultValue={(roleProfile?.career_stats as Record<string, number | string> | null) ?? null}
+                        defaultValue={(roleProfile?.career_stats as Record<string, unknown> | null) ?? null}
                       />
                     </Field>
                   </div>
@@ -1926,43 +1986,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               )}
             </Panel>
           ) : null}
+
+          <Panel id="settings" defaultOpen={false} eyebrow="Settings" title="Security, privacy & account">
+            <AccountSettingsPanel
+              email={user.email ?? "No email available"}
+              provider={typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : null}
+            />
+          </Panel>
         </div>
 
-        {profile.role === "club" ? (
-        <aside className="order-1 overflow-hidden border border-white/10 bg-[#111]">
-            <Panel eyebrow="Club Access" title={team ? "Connected club" : "Claim or create"}>
-              {team ? (
-                <div>
-                  <h3 className="text-2xl font-black text-white">{team.name}</h3>
-                  <p className="mt-1 text-sm font-semibold text-white/45">{[team.city, team.country].filter(Boolean).join(", ")}</p>
-                  <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10">
-                    {[
-                      ["Role", clubMembership?.club_role ?? "staff"],
-                      ["Status", team.claim_status ?? "pending"],
-                      ["Recruiting", team.recruiting_active ? "Active" : "Inactive"],
-                      ["Open spots", String(team.open_roster_spots ?? 0)]
-                    ].map(([label, value]) => (
-                      <div key={label} className="bg-[#111] p-4">
-                        <p className="text-xs font-bold uppercase text-white/35">{label}</p>
-                        <p className="mt-1 text-lg font-black capitalize text-white">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <Link href={`/scouts/${team.id}`} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-black text-white transition hover:bg-red-700">
-                    View club profile
-                  </Link>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-                  <p className="text-sm font-black text-white">No connected club</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-white/40">
-                    Club creation and claiming are only available during onboarding.
-                  </p>
-                </div>
-              )}
-            </Panel>
-        </aside>
-        ) : null}
       </section>
     </main>
   );

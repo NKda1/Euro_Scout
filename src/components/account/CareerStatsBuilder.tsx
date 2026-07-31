@@ -1,136 +1,128 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
-type CareerStats = Record<string, number | string>;
+import { Plus, Trash2 } from "lucide-react";
+import {
+  normaliseSeasonStats,
+  POSITION_GROUPS,
+  POSITION_STAT_FIELDS,
+  positionGroupFor,
+  statsPayload,
+  type SeasonStatRow
+} from "@/lib/player-stats";
 
 interface CareerStatsBuilderProps {
   name: string;
   position?: string | null;
-  defaultValue?: CareerStats | null;
+  defaultValue?: Record<string, unknown> | null;
 }
 
-const statGroups: Record<string, Array<{ key: string; label: string; max: number; step?: number; unit?: string }>> = {
-  QB: [
-    { key: "passing_yards", label: "Passing yards", max: 8000, step: 25, unit: "yds" },
-    { key: "passing_touchdowns", label: "Passing TDs", max: 80, unit: "TD" },
-    { key: "completion_percentage", label: "Completion", max: 100, step: 0.1, unit: "%" },
-    { key: "interceptions", label: "Interceptions", max: 40 },
-    { key: "rushing_yards", label: "Rushing yards", max: 2500, step: 25, unit: "yds" }
-  ],
-  WR: [
-    { key: "receptions", label: "Receptions", max: 180 },
-    { key: "targets", label: "Targets", max: 240 },
-    { key: "receiving_yards", label: "Receiving yards", max: 3000, step: 25, unit: "yds" },
-    { key: "touchdowns", label: "Touchdowns", max: 40, unit: "TD" }
-  ],
-  TE: [
-    { key: "receptions", label: "Receptions", max: 150 },
-    { key: "targets", label: "Targets", max: 200 },
-    { key: "receiving_yards", label: "Receiving yards", max: 2500, step: 25, unit: "yds" },
-    { key: "touchdowns", label: "Touchdowns", max: 35, unit: "TD" }
-  ],
-  RB: [
-    { key: "carries", label: "Carries", max: 350 },
-    { key: "rushing_yards", label: "Rushing yards", max: 3000, step: 25, unit: "yds" },
-    { key: "receptions", label: "Receptions", max: 120 },
-    { key: "touchdowns", label: "Touchdowns", max: 45, unit: "TD" }
-  ],
-  DB: [
-    { key: "tackles", label: "Tackles", max: 180 },
-    { key: "interceptions", label: "Picks", max: 20 },
-    { key: "pass_breakups", label: "PBUs", max: 40 },
-    { key: "touchdowns", label: "Touchdowns", max: 12, unit: "TD" }
-  ],
-  LB: [
-    { key: "tackles", label: "Tackles", max: 220 },
-    { key: "sacks", label: "Sacks", max: 35, step: 0.5 },
-    { key: "tackles_for_loss", label: "TFLs", max: 50, step: 0.5 },
-    { key: "forced_fumbles", label: "Forced fumbles", max: 15 }
-  ],
-  DL: [
-    { key: "tackles", label: "Tackles", max: 160 },
-    { key: "sacks", label: "Sacks", max: 35, step: 0.5 },
-    { key: "tackles_for_loss", label: "TFLs", max: 50, step: 0.5 },
-    { key: "forced_fumbles", label: "Forced fumbles", max: 15 }
-  ],
-  OL: [
-    { key: "games_started", label: "Games started", max: 80 },
-    { key: "sacks_allowed", label: "Sacks allowed", max: 40, step: 0.5 },
-    { key: "pressures_allowed", label: "Pressures allowed", max: 80 },
-    { key: "penalties", label: "Penalties", max: 40 }
-  ],
-  K: [
-    { key: "field_goal_percentage", label: "FG made", max: 100, step: 0.1, unit: "%" },
-    { key: "extra_point_percentage", label: "XP made", max: 100, step: 0.1, unit: "%" },
-    { key: "longest_field_goal", label: "Long FG", max: 70, unit: "yd" },
-    { key: "touchbacks", label: "Touchbacks", max: 120 }
-  ],
-  P: [
-    { key: "punt_average", label: "Punt average", max: 60, step: 0.1, unit: "yd" },
-    { key: "inside_20", label: "Inside 20", max: 80 },
-    { key: "longest_punt", label: "Long punt", max: 90, unit: "yd" },
-    { key: "touchbacks", label: "Touchbacks", max: 40 }
-  ]
-};
-
-function groupForPosition(position?: string | null) {
-  const clean = String(position ?? "").toUpperCase();
-  if (clean.includes("QB")) return "QB";
-  if (clean.includes("WR")) return "WR";
-  if (clean.includes("TE")) return "TE";
-  if (clean.includes("RB")) return "RB";
-  if (clean.includes("DB") || clean.includes("CB") || clean.includes("S")) return "DB";
-  if (clean.includes("LB")) return "LB";
-  if (clean.includes("DL") || clean.includes("DE") || clean.includes("DT") || clean.includes("EDGE")) return "DL";
-  if (clean.includes("OL") || clean.includes("OT") || clean.includes("OG") || clean.includes("C")) return "OL";
-  if (clean.includes("K")) return "K";
-  if (clean.includes("P")) return "P";
-  return "WR";
+function newSeason(position?: string | null): SeasonStatRow {
+  return {
+    id: `season-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    club: "",
+    season: "",
+    games: null,
+    positionGroup: positionGroupFor(position),
+    stats: {}
+  };
 }
+
+const inputClass = "h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-sm font-bold text-slate-900 outline-none transition focus:border-red-500 dark:border-white/10 dark:bg-black/30 dark:text-white";
 
 export default function CareerStatsBuilder({ name, position, defaultValue }: CareerStatsBuilderProps) {
-  const [group, setGroup] = useState(groupForPosition(position));
-  const [stats, setStats] = useState<CareerStats>(() => defaultValue ?? {});
-  const fields = statGroups[group] ?? statGroups.WR;
-  const serialized = useMemo(() => JSON.stringify(stats), [stats]);
+  const [seasons, setSeasons] = useState<SeasonStatRow[]>(() => normaliseSeasonStats(defaultValue, position));
+  const serialized = useMemo(() => JSON.stringify(statsPayload(seasons)), [seasons]);
+
+  function updateSeason(id: string, update: Partial<SeasonStatRow>) {
+    setSeasons((current) => current.map((season) => season.id === id ? { ...season, ...update } : season));
+  }
+
+  function updateStat(id: string, key: string, value: string) {
+    setSeasons((current) => current.map((season) => {
+      if (season.id !== id) return season;
+      const stats = { ...season.stats };
+      if (value === "") delete stats[key];
+      else stats[key] = Math.max(0, Number(value));
+      return { ...season, stats };
+    }));
+  }
 
   return (
-    <div className="space-y-4 rounded-lg border border-white/10 bg-black/20 p-4">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-black/20">
       <input type="hidden" name={name} value={serialized} />
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-black text-white">Career stats</p>
-          <p className="mt-1 text-xs font-semibold text-white/40">Pick a position group and use sliders for season or career totals.</p>
+          <p className="text-sm font-black text-slate-950 dark:text-white">Season statistics</p>
+          <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-white/40">One row per club season. Columns adapt to the position group.</p>
         </div>
-        <select value={group} onChange={(event) => setGroup(event.target.value)} className="h-10 border border-white/10 bg-black px-3 text-xs font-black text-white">
-          {Object.keys(statGroups).map((key) => <option key={key} value={key}>{key}</option>)}
-        </select>
+        <button
+          type="button"
+          onClick={() => setSeasons((current) => [...current, newSeason(position)])}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-red-600 px-3 text-xs font-black text-white transition hover:bg-red-700"
+        >
+          <Plus className="h-4 w-4" aria-hidden /> Add season
+        </button>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {fields.map((field) => {
-          const value = Number(stats[field.key] ?? 0);
-          return (
-            <label key={field.key} className="block border border-white/10 bg-black/25 p-3">
-              <span className="text-xs font-black uppercase text-white/40">{field.label}</span>
-              <div className="mt-2 flex items-center gap-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={field.max}
-                  step={field.step ?? 1}
-                  value={Number.isFinite(value) ? value : 0}
-                  onChange={(event) => setStats((current) => ({ ...current, [field.key]: Number(event.target.value) }))}
-                  className="h-2 flex-1 accent-red-600"
-                />
-                <span className="w-20 text-right text-sm font-black text-white">
-                  {Number.isFinite(value) ? value : 0}{field.unit ? ` ${field.unit}` : ""}
-                </span>
-              </div>
-            </label>
-          );
-        })}
-      </div>
+
+      {seasons.length ? (
+        <div className="divide-y divide-slate-200 dark:divide-white/10">
+          {seasons.map((season, index) => {
+            const fields = POSITION_STAT_FIELDS[season.positionGroup] ?? POSITION_STAT_FIELDS.WR;
+            return (
+              <fieldset key={season.id} className="p-4">
+                <legend className="sr-only">Season {index + 1}</legend>
+                <div className="grid gap-2 sm:grid-cols-[minmax(150px,1.2fr)_120px_86px_88px_auto] sm:items-end">
+                  <label>
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-white/35">Club</span>
+                    <input value={season.club} onChange={(event) => updateSeason(season.id, { club: event.target.value })} placeholder="Rhein Fire" className={inputClass} />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-white/35">Season</span>
+                    <input value={season.season} onChange={(event) => updateSeason(season.id, { season: event.target.value })} placeholder="2025/26" className={inputClass} />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-white/35">Games</span>
+                    <input type="number" min={0} max={99} value={season.games ?? ""} onChange={(event) => updateSeason(season.id, { games: event.target.value === "" ? null : Number(event.target.value) })} className={inputClass} />
+                  </label>
+                  <label>
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-white/35">Group</span>
+                    <select value={season.positionGroup} onChange={(event) => updateSeason(season.id, { positionGroup: event.target.value, stats: {} })} className={inputClass}>
+                      {POSITION_GROUPS.map((group) => <option key={group}>{group}</option>)}
+                    </select>
+                  </label>
+                  <button type="button" onClick={() => setSeasons((current) => current.filter((item) => item.id !== season.id))} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-xs font-black text-slate-500 transition hover:border-red-300 hover:text-red-700 dark:border-white/10 dark:bg-white/5 dark:text-white/45">
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden /> <span className="sm:sr-only">Remove season</span>
+                  </button>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                  {fields.map((field) => (
+                    <label key={field.key}>
+                      <span className="mb-1 block truncate text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-white/35" title={field.label}>{field.shortLabel ?? field.label}</span>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={0}
+                          step={field.step ?? 1}
+                          value={season.stats[field.key] ?? ""}
+                          onChange={(event) => updateStat(season.id, field.key, event.target.value)}
+                          className={`${inputClass} ${field.unit ? "pr-9" : ""}`}
+                        />
+                        {field.unit ? <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] font-black text-slate-400">{field.unit}</span> : null}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="px-4 py-8 text-center">
+          <p className="text-sm font-black text-slate-700 dark:text-white/70">No seasons added</p>
+          <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-white/35">Add only verified statistics. You can return to this later.</p>
+        </div>
+      )}
     </div>
   );
 }

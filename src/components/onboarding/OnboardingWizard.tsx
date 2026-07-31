@@ -452,6 +452,50 @@ function IdentityStep(props: {
 
 type PlayerPipelineOrigin = "europe" | CampusPipeline | "other";
 
+function PlayerEssentialsStep(props: {
+  position: string;
+  setPosition: (value: string) => void;
+  currentTeamId: string;
+  setCurrentTeamId: (value: string) => void;
+  availableForTransfer: boolean;
+  setAvailableForTransfer: (value: boolean) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Start your player profile.</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">Position is the only required football detail. Add verified measurements, film, seasons and eligibility later in your workspace.</p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <FieldLabel required>Primary position</FieldLabel>
+          <select value={props.position} onChange={(event) => props.setPosition(event.target.value)} className={selectClass}>
+            <option value="">Select position</option>
+            {POSITIONS.map((item) => <option key={item.code} value={item.code}>{item.code} – {item.label}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <FieldLabel>Current club</FieldLabel>
+          <select value={props.currentTeamId} onChange={(event) => props.setCurrentTeamId(event.target.value)} className={selectClass}>
+            <option value="">Unattached / add later</option>
+            {teams.map((team) => <option key={team.id} value={team.id}>{team.name} ({team.country})</option>)}
+          </select>
+        </label>
+      </div>
+      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3.5 transition hover:border-red-200 dark:border-white/10 dark:bg-white/5 dark:hover:border-red-500/30">
+        <input type="checkbox" checked={props.availableForTransfer} onChange={(event) => props.setAvailableForTransfer(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-red-600" />
+        <span>
+          <span className="block text-sm font-bold text-slate-900 dark:text-white">Available for recruitment</span>
+          <span className="block text-xs text-slate-500 dark:text-slate-400">Show clubs that you are open to opportunities.</span>
+        </span>
+      </label>
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold leading-6 text-blue-800 dark:border-blue-400/25 dark:bg-blue-500/10 dark:text-blue-100">
+        Next, you will land on the dashboard. Your Account Workspace will guide you through photos, media, statistics and career history without blocking access to the platform.
+      </div>
+    </div>
+  );
+}
+
 function PlayerStep(props: {
   dob:                  string; setDob:                  (v: string) => void;
   nationality:          string; setNationality:          (v: string) => void;
@@ -1124,14 +1168,14 @@ export default function OnboardingWizard({
 
   // Derived
   const hasRoleStep    = ROLE_CONFIG[role]?.hasRoleStep ?? false;
-  const hasPerformanceStep = role === "player";
+  const hasPerformanceStep = previewMode && role === "player";
   const totalSteps     = hasPerformanceStep ? 5 : hasRoleStep ? 4 : 3;
   const roleStepNum    = hasRoleStep ? 3 : null;
   const performanceStepNum = hasPerformanceStep ? 4 : null;
   const confirmStepNum = hasPerformanceStep ? 5 : hasRoleStep ? 4 : 3;
 
   const roleStepLabels: Record<string, string>       = { player: "Player details", club: "Your club" };
-  const roleStepDescriptions: Record<string, string> = { player: "Position, pathway and team", club: "Find and connect to your team" };
+  const roleStepDescriptions: Record<string, string> = { player: "Position now, everything else later", club: "Find and connect to your team" };
 
   const stepConfig: StepMeta[] = [
     { label: "Your role", description: "How you use EuroScout" },
@@ -1141,7 +1185,11 @@ export default function OnboardingWizard({
     { label: "All set",   description: "Review and publish" },
   ];
 
-  const canAdvance = step === 2 ? displayName.trim().length > 0 : true;
+  const canAdvance = step === 2
+    ? displayName.trim().length > 0
+    : step === roleStepNum && role === "player" && !previewMode
+      ? Boolean(position)
+      : true;
 
   const handleSubmit = () => {
     const heightCm = feetInchesToCm(Number(heightFt) || 0, Number(heightIn) || 0);
@@ -1239,7 +1287,14 @@ export default function OnboardingWizard({
               bio={bio}                 setBio={setBio}
             />
           )}
-          {step === roleStepNum && role === "player" && (
+          {step === roleStepNum && role === "player" && !previewMode && (
+            <PlayerEssentialsStep
+              position={position}                         setPosition={setPosition}
+              currentTeamId={currentTeamId}               setCurrentTeamId={setCurrentTeamId}
+              availableForTransfer={availableForTransfer} setAvailableForTransfer={setAvailableForTransfer}
+            />
+          )}
+          {step === roleStepNum && role === "player" && previewMode && (
             <PlayerStep
               dob={dob}                                   setDob={setDob}
               nationality={nationality}                   setNationality={setNationality}
