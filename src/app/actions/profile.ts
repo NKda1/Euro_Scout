@@ -405,6 +405,7 @@ export async function completeOnboardingAction(formData: FormData) {
   }
 
   await serviceClient.from("profiles").update({ welcome_tour_seen: true }).eq("id", user.id);
+  await ensurePublicUserRow(serviceClient, user, roleValue as UserRole, displayName);
 
   if (roleValue === "player") {
     const playerProfileId = await upsertPlayerProfile(supabase, serviceClient, user.id, formData);
@@ -415,8 +416,6 @@ export async function completeOnboardingAction(formData: FormData) {
     const teamId = text(formData, "team_id");
     const clubAction = text(formData, "club_action");
     const teamNameRequest = text(formData, "team_name_request");
-
-    await ensurePublicUserRow(serviceClient, user, roleValue as UserRole, displayName);
 
     if (teamId && clubAction === "claim") {
       await requireNoExistingClubMembership(serviceClient, user.id, "/onboarding");

@@ -5,6 +5,7 @@ import AuthShell from "@/components/auth/AuthShell";
 import OAuthButtons from "@/components/auth/OAuthButtons";
 import PasswordInput from "@/components/auth/PasswordInput";
 import { Notice } from "@/components/ui/StateDisplay";
+import PendingSubmitButton from "@/components/forms/PendingSubmitButton";
 
 export const metadata: Metadata = {
   title: "Sign In | EuroScout Pro",
@@ -72,7 +73,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           </div>
           <PasswordInput name="password" required />
         </label>
-        <button className="h-12 w-full bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">Sign in</button>
+        <PendingSubmitButton pendingLabel="Signing in…" className="h-12 w-full bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-70">Sign in</PendingSubmitButton>
       </form>
       <p className="mt-5 text-center text-sm font-semibold text-slate-400 dark:text-slate-400">
         New here?{" "}

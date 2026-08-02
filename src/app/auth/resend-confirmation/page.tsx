@@ -27,7 +27,7 @@ export default async function ResendConfirmationPage({ searchParams }: ResendCon
       ) : null}
       {error ? (
         <div className="mb-4">
-          <Notice tone="danger" title="Something went wrong.">{error}</Notice>
+          <Notice tone="danger" title="We could not resend the confirmation email.">{error}</Notice>
         </div>
       ) : null}
       <p className="mb-6 text-sm font-semibold text-slate-500 dark:text-slate-400">

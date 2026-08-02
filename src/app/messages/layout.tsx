@@ -4,6 +4,7 @@ import { countUnreadMessages, getDisplayProfile, type MessageRow } from "@/lib/m
 import { isPremiumActive } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import InboxSidebar, { type SidebarCallItem, type SidebarItem, type SidebarProfile, type TokenInfo } from "@/components/messages/InboxSidebar";
+import IncomingCallManager, { type IncomingCall } from "@/components/messages/IncomingCallManager";
 
 interface ParticipantRow {
   conversation_id: string;
@@ -205,14 +206,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
   };
 
   // --- Call items for sidebar panel ---
-  const playerProfileIdForCalls = profile.role === "player"
-    ? await serviceClient
-        .from("player_profiles")
-        .select("id")
-        .eq("profile_id", profile.id)
-        .maybeSingle<{ id: string }>()
-        .then(({ data }) => data?.id ?? null)
-    : null;
+  const playerProfileIdForCalls = profile.role === "player" ? profile.id : null;
 
   const clubTeamIdsForCalls = profile.role === "club"
     ? await serviceClient
@@ -232,6 +226,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
     proposed_start_at: string | null;
     scheduled_at: string | null;
     conversation_id: string | null;
+    requested_by: string | null;
     teams: { id: string; name: string; logo_url: string | null } | null;
     profiles: { id: string; display_name: string; avatar_url: string | null } | null;
   }
@@ -240,7 +235,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
   if (playerProfileIdForCalls) {
     const { data } = await serviceClient
       .from("meeting_requests")
-      .select(`id, team_id, player_profile_id, status, request_reason, proposed_start_at, scheduled_at, conversation_id,
+      .select(`id, team_id, player_profile_id, requested_by, status, request_reason, proposed_start_at, scheduled_at, conversation_id,
         teams:meeting_requests_team_id_fkey(id, name, logo_url),
         profiles:meeting_requests_player_profile_id_fkey(id, display_name, avatar_url)`)
       .eq("player_profile_id", playerProfileIdForCalls)
@@ -252,7 +247,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
   } else if (clubTeamIdsForCalls.length) {
     const { data } = await serviceClient
       .from("meeting_requests")
-      .select(`id, team_id, player_profile_id, status, request_reason, proposed_start_at, scheduled_at, conversation_id,
+      .select(`id, team_id, player_profile_id, requested_by, status, request_reason, proposed_start_at, scheduled_at, conversation_id,
         teams:meeting_requests_team_id_fkey(id, name, logo_url),
         profiles:meeting_requests_player_profile_id_fkey(id, display_name, avatar_url)`)
       .in("team_id", clubTeamIdsForCalls)
@@ -280,8 +275,26 @@ export default async function MessagesLayout({ children }: { children: ReactNode
         : (r.profiles?.avatar_url ?? null),
   }));
 
+  const incomingCalls: IncomingCall[] = rawCallItems
+    .filter((call) => call.status === "accepted" && call.request_reason === "Call now" && call.requested_by !== profile.id)
+    .map((call) => ({
+      id: call.id,
+      teamId: call.team_id,
+      playerProfileId: call.player_profile_id,
+      requestedBy: call.requested_by,
+      conversationId: call.conversation_id,
+      callerName: profilesById.get(call.requested_by ?? "")?.display_name ?? (profile.role === "player" ? call.teams?.name : call.profiles?.display_name) ?? "EuroScout contact"
+    }));
+
   return (
     <div className="flex h-[calc(100dvh-72px)] overflow-hidden bg-white dark:bg-[#090909]">
+      <IncomingCallManager
+        currentProfileId={profile.id}
+        currentRole={profile.role}
+        teamIds={clubTeamIdsForCalls}
+        initialCalls={incomingCalls}
+        profileNames={Object.fromEntries((participantProfiles ?? []).map((participant) => [participant.id, participant.display_name]))}
+      />
       <InboxSidebar
         initialItems={sidebarItems}
         profiles={sidebarProfiles}

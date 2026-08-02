@@ -1,6 +1,6 @@
 "use client";
 
-import { SendHorizontal } from "lucide-react";
+import { RefreshCw, SendHorizontal, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -90,10 +90,20 @@ export default function MessageThread({
   const [flagReason, setFlagReason] = useState("");
   const [flagPending, setFlagPending] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "live" | "recovering" | "offline">("connecting");
+  const [retryKey, setRetryKey] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+  useEffect(() => {
+    setMessages((current) => {
+      const byId = new Map(current.filter((message) => message.id.startsWith("optimistic-")).map((message) => [message.id, message]));
+      initialMessages.forEach((message) => byId.set(message.id, message));
+      return sortMessages(Array.from(byId.values()));
+    });
+  }, [initialMessages]);
 
   // Mark as read on mount
   useEffect(() => {
@@ -118,8 +128,26 @@ export default function MessageThread({
 
   // Realtime subscription
   useEffect(() => {
+    let retryTimer: number | null = null;
+    let cancelled = false;
+
+    async function backfillMessages() {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("id, sender_profile_id, body, created_at")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true })
+        .returns<Message[]>();
+      if (cancelled || error || !data) return;
+      setMessages((current) => {
+        const byId = new Map(current.filter((message) => message.id.startsWith("optimistic-")).map((message) => [message.id, message]));
+        data.forEach((message) => byId.set(message.id, message));
+        return sortMessages(Array.from(byId.values()));
+      });
+    }
+
     const channel = supabase
-      .channel(`thread:${conversationId}`)
+      .channel(`conversation:${conversationId}:thread`, { config: { private: true } })
       .on(
         "postgres_changes",
         {
@@ -165,22 +193,61 @@ export default function MessageThread({
         setOtherTyping(true);
         if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
         typingTimerRef.current = setTimeout(() => setOtherTyping(false), 1800);
-      })
-      .subscribe();
+      });
+
+    void supabase.realtime.setAuth().then(() => {
+      if (cancelled) return;
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          setRealtimeStatus("live");
+          void backfillMessages();
+          return;
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          const offline = typeof navigator !== "undefined" && !navigator.onLine;
+          setRealtimeStatus(offline ? "offline" : "recovering");
+          if (!offline && retryTimer === null) retryTimer = window.setTimeout(() => setRetryKey((value) => value + 1), 1500);
+        }
+      });
+    }).catch(() => {
+      if (cancelled) return;
+      const offline = typeof navigator !== "undefined" && !navigator.onLine;
+      setRealtimeStatus(offline ? "offline" : "recovering");
+      if (!offline && retryTimer === null) retryTimer = window.setTimeout(() => setRetryKey((value) => value + 1), 1500);
+    });
 
     channelRef.current = channel;
 
     return () => {
+      cancelled = true;
       channelRef.current = null;
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
       void supabase.removeChannel(channel);
     };
-  }, [conversationId, currentProfileId, isAdminAudit, supabase]);
+  }, [conversationId, currentProfileId, isAdminAudit, retryKey, supabase]);
+
+  useEffect(() => {
+    function handleOffline() { setRealtimeStatus("offline"); }
+    function handleOnline() { setRealtimeStatus("recovering"); setRetryKey((value) => value + 1); }
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    if (!navigator.onLine) setRealtimeStatus("offline");
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = body.trim().slice(0, 5000);
     if (!trimmed || sending) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setSendError("You are offline. Your message remains in the composer; reconnect and try again.");
+      setRealtimeStatus("offline");
+      return;
+    }
     setSending(true);
     setSendError(null);
 
@@ -199,27 +266,35 @@ export default function MessageThread({
     setBody("");
     setMessages((prev) => sortMessages([...prev, optimisticMessage]));
 
-    const result = await sendMessageAction(formData);
-    if (result.ok) {
-      setRemainingReplies(result.replyAllowanceRemaining);
-      setMessages((prev) => {
-        const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
-        if (withoutOptimistic.some((message) => message.id === result.message.id)) {
-          return sortMessages(withoutOptimistic);
-        }
-        return sortMessages([...withoutOptimistic, result.message]);
-      });
-      setReadStates((prev) =>
-        prev.map((state) =>
-          state.profile_id === currentProfileId ? { ...state, last_seen_at: new Date().toISOString() } : state
-        )
-      );
-    } else {
+    try {
+      const result = await sendMessageAction(formData);
+      if (result.ok) {
+        setRemainingReplies(result.replyAllowanceRemaining);
+        setMessages((prev) => {
+          const withoutOptimistic = prev.filter((message) => message.id !== optimisticId);
+          if (withoutOptimistic.some((message) => message.id === result.message.id)) {
+            return sortMessages(withoutOptimistic);
+          }
+          return sortMessages([...withoutOptimistic, result.message]);
+        });
+        setReadStates((prev) =>
+          prev.map((state) =>
+            state.profile_id === currentProfileId ? { ...state, last_seen_at: new Date().toISOString() } : state
+          )
+        );
+      } else {
+        setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+        setBody(trimmed);
+        setSendError(result.error ?? "The message could not be sent. Try again.");
+      }
+    } catch {
       setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
       setBody(trimmed);
-      setSendError(result.error ?? "Could not send message.");
+      setSendError("The messaging service could not be reached. Your draft was restored; check your connection and retry.");
+      setRealtimeStatus(typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "recovering");
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   }
 
   const isClubInbox = Boolean(conversationTeamId);
@@ -247,6 +322,7 @@ export default function MessageThread({
 
   function getReadReceipt(message: Message) {
     if (message.sender_profile_id !== currentProfileId) return null;
+    if (message.id.startsWith("optimistic-")) return "Sending…";
 
     const readers = readStates
       .filter((state) => state.profile_id !== currentProfileId)
@@ -262,6 +338,13 @@ export default function MessageThread({
 
   return (
     <div className={`flex flex-col ${className ?? ""}`}>
+      {realtimeStatus !== "live" ? (
+        <div className={`flex shrink-0 items-center gap-2 border-b px-4 py-2 text-xs font-bold ${realtimeStatus === "offline" ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/25 dark:bg-amber-500/10 dark:text-amber-200" : "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-400/25 dark:bg-blue-500/10 dark:text-blue-200"}`} role="status">
+          {realtimeStatus === "offline" ? <WifiOff className="h-3.5 w-3.5" aria-hidden /> : <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+          <span className="flex-1">{realtimeStatus === "offline" ? "Offline — live messages will recover automatically when your connection returns." : "Reconnecting to live messages and checking for missed updates…"}</span>
+          <button type="button" onClick={() => setRetryKey((value) => value + 1)} className="rounded border border-current/25 px-2 py-1 text-[10px] font-black uppercase">Retry</button>
+        </div>
+      ) : null}
       {/* Compact info bar */}
       {(isClubInbox || flagged || !isAdminAudit) ? (
         <div className="shrink-0 flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-white/10 dark:bg-black/20">
@@ -382,7 +465,8 @@ export default function MessageThread({
                 value={body}
                 onChange={(e) => {
                   setBody(e.target.value);
-                  void channelRef.current?.send({ type: "broadcast", event: "typing", payload: { profile_id: currentProfileId } });
+                  const channel = channelRef.current;
+                  if (channel) void channel.send({ type: "broadcast", event: "typing", payload: { profile_id: currentProfileId } }).catch(() => undefined);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {

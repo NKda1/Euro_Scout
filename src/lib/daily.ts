@@ -95,6 +95,22 @@ async function dailyPost<T>(path: string, body: Record<string, unknown>) {
   throw new Error(`Video provider request failed. ${lastError}`);
 }
 
+export async function deleteDailyRoom(roomName: string) {
+  const apiKey = getDailyApiKey();
+  if (!apiKey || !roomName) return;
+
+  const response = await fetch(`${DAILY_API_BASE}/rooms/${encodeURIComponent(roomName)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    cache: "no-store",
+    signal: AbortSignal.timeout(DAILY_REQUEST_TIMEOUT_MS)
+  }).catch(() => null);
+
+  if (response && !response.ok && response.status !== 404) {
+    console.error("[daily.room_cleanup.failed]", { roomName, status: response.status });
+  }
+}
+
 export async function createDailyRoom({ meetingId, scheduledAt, durationMinutes = DEFAULT_CALL_DURATION_MINUTES }: CreateDailyRoomInput) {
   const roomName = roomNameForMeeting(meetingId);
   const { startsAt, endsAt } = callWindow(scheduledAt, durationMinutes);

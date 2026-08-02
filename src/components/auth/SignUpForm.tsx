@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signUpAction } from "@/app/actions/auth";
 import OAuthButtons from "@/components/auth/OAuthButtons";
 import PasswordInput from "@/components/auth/PasswordInput";
+import PendingSubmitButton from "@/components/forms/PendingSubmitButton";
 
 const inputClass =
   "mt-2 h-12 w-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-[#090909] dark:text-white dark:focus:ring-red-500/20";
@@ -59,15 +60,15 @@ export default function SignUpForm({ error, defaultEmail, next }: SignUpFormProp
         </label>
         <label className="block">
           <span className={labelClass}>Password</span>
-          <PasswordInput name="password" required minLength={6} />
+          <PasswordInput name="password" required minLength={8} autoComplete="new-password" />
         </label>
         <label className="block">
           <span className={labelClass}>Confirm password</span>
-          <PasswordInput name="confirm_password" required minLength={6} />
+          <PasswordInput name="confirm_password" required minLength={8} autoComplete="new-password" />
         </label>
-        <button className="h-12 w-full bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
+        <PendingSubmitButton pendingLabel="Creating account…" className="h-12 w-full bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-70">
           Create account
-        </button>
+        </PendingSubmitButton>
       </form>
       <p className="mt-5 text-center text-sm font-semibold text-slate-400 dark:text-slate-400">
         Already have an account?{" "}

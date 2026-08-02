@@ -1,15 +1,56 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getBaseUrl } from "@/lib/api";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isValidRecoveryMarker, RECOVERY_COOKIE_NAME } from "@/lib/auth-recovery";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // ─── Input constraints ────────────────────────────────────────────────────────
 const MAX_EMAIL_LENGTH = 254;   // RFC 5321
 const MAX_PASSWORD_LENGTH = 72; // bcrypt effective max
 const MAX_NAME_LENGTH = 100;
+const MIN_PASSWORD_LENGTH = 8;
+
+interface AuthFailure {
+  code?: string;
+  message?: string;
+  status?: number;
+}
+
+function authFailureMessage(error: AuthFailure, context: "sign-up" | "sign-in" | "recovery" | "password") {
+  const code = error.code?.toLowerCase() ?? "";
+  const message = error.message?.toLowerCase() ?? "";
+
+  if (code === "email_address_invalid" || message.includes("invalid email")) return "Enter a valid email address.";
+  if (code === "weak_password" || message.includes("password should be") || message.includes("weak password")) {
+    return `Use at least ${MIN_PASSWORD_LENGTH} characters with a mix of letters and numbers.`;
+  }
+  if (code === "email_exists" || code === "user_already_exists" || message.includes("already registered")) {
+    return "An account already exists for this email. Sign in or reset your password instead.";
+  }
+  if (code === "email_not_confirmed" || message.includes("email not confirmed")) {
+    return "Confirm your email before signing in. You can request a fresh confirmation link below.";
+  }
+  if (code === "invalid_credentials" || message.includes("invalid login credentials")) {
+    return "The email or password is incorrect. Check both fields or reset your password.";
+  }
+  if (code.includes("rate") || error.status === 429 || message.includes("rate limit")) {
+    return "Too many attempts were made. Wait a few minutes, then try again.";
+  }
+  if (code.includes("session") || message.includes("auth session missing")) {
+    return "This recovery session is no longer valid. Request a new password reset link.";
+  }
+  if (message.includes("fetch") || message.includes("network") || message.includes("timeout")) {
+    return "The authentication service could not be reached. Check your connection and try again.";
+  }
+
+  if (context === "sign-up") return "Your account could not be created right now. Please try again.";
+  if (context === "sign-in") return "Sign-in is temporarily unavailable. Please try again.";
+  if (context === "recovery") return "The reset email could not be sent. Please try again in a few minutes.";
+  return "Your password could not be updated. Request a fresh reset link and try again.";
+}
 
 function safeNextPath(value: FormDataEntryValue | string | null | undefined, fallback = "/welcome") {
   const next = String(value ?? "").trim();
@@ -76,8 +117,8 @@ export async function signUpAction(formData: FormData) {
   if (password !== confirmPassword) {
     redirect(authPathWithParams(signUpPath, { error: "Passwords do not match." }));
   }
-  if (password.length < 6) {
-    redirect(authPathWithParams(signUpPath, { error: "Password must be at least 6 characters." }));
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    redirect(authPathWithParams(signUpPath, { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` }));
   }
 
   const baseUrl = await getRequestBaseUrl();
@@ -92,7 +133,15 @@ export async function signUpAction(formData: FormData) {
 
   if (error) {
     console.error("[auth.signup.failed]", { code: error.code, status: error.status });
-    redirect(authPathWithParams(signUpPath, { error: "Could not create the account. Please try again or sign in if you already registered." }));
+    redirect(authPathWithParams(signUpPath, { error: authFailureMessage(error, "sign-up") }));
+  }
+
+  // Supabase intentionally returns a synthetic user for some duplicate signups.
+  // An empty identities collection is the only reliable signal that no account was created.
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    redirect(authPathWithParams(signUpPath, {
+      error: "An account already exists for this email. Sign in or reset your password instead."
+    }));
   }
 
   // Projects with email confirmation disabled return a session immediately.
@@ -117,7 +166,7 @@ export async function signInAction(formData: FormData) {
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    redirect(authPathWithParams("/auth/sign-in", { next, error: error.message }));
+    redirect(authPathWithParams("/auth/sign-in", { next, email, error: authFailureMessage(error, "sign-in") }));
   }
   redirect(next);
 }
@@ -133,11 +182,12 @@ export async function forgotPasswordAction(formData: FormData) {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent("/auth/reset-password")}`
+    redirectTo: `${baseUrl}/auth/callback?type=recovery&next=${encodeURIComponent("/auth/reset-password")}`
   });
 
   if (error) {
-    redirect(`/auth/forgot-password?error=${encodeURIComponent(error.message)}`);
+    console.error("[auth.recovery_email.failed]", { code: error.code, status: error.status });
+    redirect(`/auth/forgot-password?error=${encodeURIComponent(authFailureMessage(error, "recovery"))}`);
   }
 
   redirect("/auth/forgot-password?notice=If that email is registered you'll receive a reset link shortly.");
@@ -146,6 +196,11 @@ export async function forgotPasswordAction(formData: FormData) {
 export async function resetPasswordAction(formData: FormData) {
   await checkAuthRateLimit("reset-password", "/auth/reset-password");
   const supabase = await createSupabaseServerClient();
+  const cookieStore = await cookies();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !isValidRecoveryMarker(cookieStore.get(RECOVERY_COOKIE_NAME)?.value, user.id)) {
+    redirect(`/auth/forgot-password?error=${encodeURIComponent("This password reset link is invalid, expired, or has already been used. Request a new one.")}`);
+  }
   const password = getRequired(formData, "password");
   const confirmPassword = String(formData.get("confirm_password") ?? "");
 
@@ -153,8 +208,8 @@ export async function resetPasswordAction(formData: FormData) {
     redirect(`/auth/reset-password?error=${encodeURIComponent("Passwords do not match.")}`);
   }
 
-  if (password.length < 6) {
-    redirect(`/auth/reset-password?error=${encodeURIComponent("Password must be at least 6 characters.")}`);
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    redirect(`/auth/reset-password?error=${encodeURIComponent(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`)}`);
   }
 
   if (password.length > MAX_PASSWORD_LENGTH) {
@@ -164,10 +219,18 @@ export async function resetPasswordAction(formData: FormData) {
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {
-    redirect(`/auth/reset-password?error=${encodeURIComponent(error.message)}`);
+    console.error("[auth.password_update.failed]", { code: error.code, status: error.status });
+    redirect(`/auth/reset-password?error=${encodeURIComponent(authFailureMessage(error, "password"))}`);
   }
 
-  redirect("/auth/sign-in?notice=Password updated. Sign in with your new password.");
+  const { error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError) {
+    console.error("[auth.password_session_refresh.failed]", { code: refreshError.code, status: refreshError.status });
+    redirect("/auth/sign-in?notice=Password updated. Sign in once more to continue securely.");
+  }
+
+  cookieStore.delete(RECOVERY_COOKIE_NAME);
+  redirect("/dashboard?notice=Password updated successfully.");
 }
 
 export async function oauthSignInAction(formData: FormData) {

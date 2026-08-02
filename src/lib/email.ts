@@ -41,47 +41,59 @@ async function sendEmail(params: { to: string; subject: string; html: string; te
     throw new Error("Transactional email is not configured.");
   }
 
-  let response: Response;
-  try {
-    response = await fetch(POSTMARK_EMAIL_ENDPOINT, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-Postmark-Server-Token": token
-      },
-      body: JSON.stringify({
-        From: FROM,
-        To: params.to,
-        Subject: params.subject,
-        HtmlBody: params.html,
-        TextBody: params.text,
-        MessageStream: MESSAGE_STREAM,
-        Tag: params.tag,
-        Metadata: { application: "euroscout-pro" }
-      }),
-      signal: AbortSignal.timeout(10_000)
-    });
-  } catch (error) {
-    console.error("[email.postmark.network_failed]", {
-      tag: params.tag,
-      reason: error instanceof Error ? error.name : "unknown"
-    });
-    throw new Error("Transactional email delivery could not be reached.");
+  let lastMessage = "Transactional email delivery could not be reached.";
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(POSTMARK_EMAIL_ENDPOINT, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Postmark-Server-Token": token
+        },
+        body: JSON.stringify({
+          From: FROM,
+          To: params.to,
+          Subject: params.subject,
+          HtmlBody: params.html,
+          TextBody: params.text,
+          MessageStream: MESSAGE_STREAM,
+          Tag: params.tag,
+          Metadata: { application: "euroscout-pro" }
+        }),
+        signal: AbortSignal.timeout(10_000)
+      });
+      const payload = (await response.json().catch(() => null)) as PostmarkResponse | null;
+
+      if (response.ok) {
+        console.info("[email.postmark.delivered]", { tag: params.tag, messageId: payload?.MessageID, attempt });
+        return;
+      }
+
+      lastMessage = payload?.Message ?? `Postmark email delivery failed with status ${response.status}.`;
+      const retryable = response.status === 429 || response.status >= 500;
+      console.error("[email.postmark.delivery_failed]", {
+        tag: params.tag,
+        status: response.status,
+        errorCode: payload?.ErrorCode,
+        attempt
+      });
+      if (!retryable) break;
+    } catch (error) {
+      lastMessage = error instanceof Error && error.name === "TimeoutError"
+        ? "Transactional email delivery timed out."
+        : "Transactional email delivery could not be reached.";
+      console.error("[email.postmark.network_failed]", {
+        tag: params.tag,
+        reason: error instanceof Error ? error.name : "unknown",
+        attempt
+      });
+    }
+
+    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** (attempt - 1)));
   }
 
-  const payload = (await response.json().catch(() => null)) as PostmarkResponse | null;
-
-  if (!response.ok) {
-    console.error("[email.postmark.delivery_failed]", {
-      tag: params.tag,
-      status: response.status,
-      errorCode: payload?.ErrorCode
-    });
-    throw new Error(payload?.Message ?? `Postmark email delivery failed with status ${response.status}.`);
-  }
-
-  console.info("[email.postmark.delivered]", { tag: params.tag, messageId: payload?.MessageID });
+  throw new Error(lastMessage);
 }
 
 export interface CallRequestEmailParams {
@@ -119,6 +131,8 @@ function wrap(title: string, bodyHtml: string) {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<meta name="supported-color-schemes" content="light dark" />
 <title>${title}</title>
 <style>
   body { margin:0; padding:0; background:#f1f5f9; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
@@ -138,6 +152,8 @@ function wrap(title: string, bodyHtml: string) {
   .cta { display:block; text-align:center; background:#dc2626; color:#fff; text-decoration:none; font-weight:900; font-size:14px; text-transform:uppercase; letter-spacing:.06em; padding:14px 24px; border-radius:6px; margin:24px 0 0; }
   .footer { background:#f8fafc; border-top:1px solid #e2e8f0; padding:16px 32px; text-align:center; }
   .footer p { margin:0; color:#94a3b8; font-size:12px; }
+  @media (max-width:600px) { .wrap { margin:0; border-radius:0; } .header,.body,.footer { padding-left:20px; padding-right:20px; } }
+  @media (prefers-color-scheme:dark) { body { background:#090909 !important; } .wrap { background:#111 !important; border-color:#292929 !important; } .body p { color:#d1d5db !important; } .meta,.footer { background:#171717 !important; border-color:#292929 !important; } .meta .label,.footer p { color:#9ca3af !important; } .meta .value { color:#fff !important; } }
 </style>
 </head>
 <body>
@@ -229,5 +245,36 @@ export async function sendCallReminderEmail(params: CallReminderEmailParams) {
     subject: `Your call starts in 15 minutes — ${counterpartName}`,
     html,
     text: `Hi ${recipientName},\n\nYour video call with ${counterpartName} starts in approximately 15 minutes at ${scheduledTime}.\n\nJoin call: ${roomUrl}`
+  });
+}
+
+export interface StaffInviteEmailParams {
+  to: string;
+  inviterName: string;
+  teamName: string;
+  roleLabel: string;
+  inviteUrl: string;
+  expiresAt: string;
+}
+
+export async function sendStaffInviteEmail(params: StaffInviteEmailParams) {
+  const safeInviter = escapeHtml(params.inviterName);
+  const safeTeam = escapeHtml(params.teamName);
+  const safeRole = escapeHtml(params.roleLabel);
+  const safeUrl = escapeHtml(params.inviteUrl);
+  const safeExpiry = escapeHtml(params.expiresAt);
+  const html = wrap(
+    `Join ${safeTeam} on EuroScout Pro`,
+    `<p><strong>${safeInviter}</strong> invited you to join <strong>${safeTeam}</strong> as ${safeRole}.</p>
+<div class="meta"><p><span class="label">Club role</span><br><span class="value">${safeRole}</span></p><p><span class="label">Link expires</span><br><span class="value">${safeExpiry}</span></p></div>
+<p>The secure link works whether you already have a EuroScout account or need to create one with this email address.</p>
+<a class="cta" href="${safeUrl}">Review club invitation</a>`
+  );
+  await sendEmail({
+    to: params.to,
+    tag: "club-staff-invite",
+    subject: `${params.inviterName} invited you to join ${params.teamName}`,
+    html,
+    text: `${params.inviterName} invited you to join ${params.teamName} as ${params.roleLabel}.\n\nThis link expires ${params.expiresAt}:\n${params.inviteUrl}`
   });
 }

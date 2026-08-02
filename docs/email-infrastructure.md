@@ -89,6 +89,7 @@ After SPF and DKIM consistently align, change only the policy inside that single
 ## Operational notes
 
 - Rotate a secret immediately if it is pasted into chat, committed, or included in a public log.
+- After rotating `POSTMARK_SERVER_TOKEN`, update local and Vercel values and run `npm run supabase:config:push`; the wrapper redacts the token if the Supabase CLI echoes SMTP configuration.
 - Keep Auth and application traffic in separate Postmark message streams when volume grows, so one category cannot damage the reputation of the other.
 - Supabase's built-in SMTP is for development only. Production requires custom SMTP and appropriate rate limits.
 - Postmark acceptance means the provider accepted the message; use Postmark Activity to distinguish delivered, bounced, suppressed and rejected states.

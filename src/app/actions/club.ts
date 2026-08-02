@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { getAuthenticatedProfile } from "@/lib/auth";
 import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { getBaseUrl } from "@/lib/api";
+import { sendStaffInviteEmail } from "@/lib/email";
 import { PUBLIC_CACHE_TAGS } from "@/lib/cache-tags";
 import { regionForEuropeanCountry } from "@/lib/europe";
 import { hasPremiumFeature } from "@/lib/premium";
@@ -639,6 +640,10 @@ export async function inviteStaffFromAccountAction(formData: FormData) {
     redirect(`${returnPath}?error=Staff email and club are required.`);
   }
 
+  if (email.length > 254 || !/^\S+@\S+\.\S+$/.test(email)) {
+    redirect(`${returnPath}?error=Enter a valid staff email address.`);
+  }
+
   if (!["coach", "recruiter", "analyst"].includes(clubRole)) {
     redirect(`${returnPath}?error=Choose coach, recruiter or analyst for invited staff.`);
   }
@@ -749,18 +754,20 @@ export async function inviteStaffFromAccountAction(formData: FormData) {
   }
 
   const absoluteInviteUrl = new URL(inviteLink, getBaseUrl()).toString();
-  const { error: inviteEmailError } = await serviceClient.auth.admin.inviteUserByEmail(
-    normalizedEmail,
-    {
-      redirectTo: absoluteInviteUrl,
-      data: {
-        staff_invite_path: inviteLink,
-        invited_team_id: teamId,
-        invited_team_name: team.name,
-        invited_club_role: clubRole
-      }
-    }
-  );
+  let inviteEmailError: string | null = null;
+  try {
+    await sendStaffInviteEmail({
+      to: normalizedEmail,
+      inviterName: profile.display_name,
+      teamName: team.name,
+      roleLabel: clubRole.charAt(0).toUpperCase() + clubRole.slice(1),
+      inviteUrl: absoluteInviteUrl,
+      expiresAt: new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(payload.expires_at))
+    });
+  } catch (emailError) {
+    inviteEmailError = emailError instanceof Error ? emailError.message : "Invitation email could not be delivered.";
+    console.error("[club.staff_invite.email_failed]", { teamId, invitedProfileExists: Boolean(invitedProfileId) });
+  }
 
   revalidatePath("/account");
   revalidatePath("/dashboard");
@@ -794,10 +801,10 @@ export async function refreshClubStaffInviteLinkAction(formData: FormData) {
 
   const { data: invite, error: inviteError } = await serviceClient
     .from("club_staff_invites")
-    .select("id, email, status")
+    .select("id, email, status, club_role, teams!team_id ( name )")
     .eq("id", inviteId)
     .eq("team_id", teamId)
-    .maybeSingle<{ id: string; email: string; status: string }>();
+    .maybeSingle<{ id: string; email: string; status: string; club_role: string; teams: { name: string } | null }>();
 
   if (inviteError || !invite) {
     redirect(`${returnPath}?error=${encodeURIComponent(inviteError?.message ?? "Invite not found.")}`);
@@ -810,12 +817,13 @@ export async function refreshClubStaffInviteLinkAction(formData: FormData) {
   const inviteToken = createStaffInviteToken();
   const inviteLink = staffInvitePath(inviteToken);
   const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
   const { error } = await serviceClient
     .from("club_staff_invites")
     .update({
       invite_token_hash: hashStaffInviteToken(inviteToken),
       invite_token_created_at: now,
-      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      expires_at: expiresAt,
       updated_at: now
     })
     .eq("id", invite.id);
@@ -824,11 +832,28 @@ export async function refreshClubStaffInviteLinkAction(formData: FormData) {
     redirect(`${returnPath}?error=${encodeURIComponent(error.message)}`);
   }
 
+  let delivered = true;
+  try {
+    await sendStaffInviteEmail({
+      to: invite.email,
+      inviterName: profile.display_name,
+      teamName: invite.teams?.name ?? "your club",
+      roleLabel: invite.club_role.charAt(0).toUpperCase() + invite.club_role.slice(1),
+      inviteUrl: new URL(inviteLink, getBaseUrl()).toString(),
+      expiresAt: new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(expiresAt))
+    });
+  } catch {
+    delivered = false;
+    console.error("[club.staff_invite.refresh_email_failed]", { teamId });
+  }
+
   revalidatePath("/account");
   revalidatePath("/dashboard");
   redirect(
     returnPathWithParams(returnPath, {
-      notice: `New invite link generated for ${invite.email}.`,
+      notice: delivered
+        ? `A fresh invitation was emailed to ${invite.email}.`
+        : `A fresh invite link was created for ${invite.email}; copy it below because email delivery failed.`,
       staff_invite: inviteLink
     })
   );

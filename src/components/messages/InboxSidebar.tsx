@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, MessageSquare, Video } from "lucide-react";
 import { profileInitials } from "@/lib/messaging";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -138,10 +138,14 @@ export default function InboxSidebar({
   initialCallItems = [],
 }: InboxSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [items, setItems] = useState<SidebarItem[]>(initialItems);
   const [callItems, setCallItems] = useState<SidebarCallItem[]>(initialCallItems);
   const [callsOpen, setCallsOpen] = useState(initialCallItems.length > 0);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [retryKey, setRetryKey] = useState(0);
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "live" | "recovering" | "offline">("connecting");
+  const needsBackfillRef = useRef(false);
 
   const profilesById = useMemo(
     () => new Map(profiles.map((p) => [p.id, p])),
@@ -166,6 +170,7 @@ export default function InboxSidebar({
 
   // Realtime: messages + read-state
   useEffect(() => {
+    let retryTimer: number | null = null;
     const conversationIdSet = new Set(allConversationIds);
 
     const channel = supabase
@@ -220,12 +225,36 @@ export default function InboxSidebar({
           );
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          setRealtimeStatus("live");
+          if (needsBackfillRef.current) {
+            needsBackfillRef.current = false;
+            router.refresh();
+          }
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          needsBackfillRef.current = true;
+          const offline = typeof navigator !== "undefined" && !navigator.onLine;
+          setRealtimeStatus(offline ? "offline" : "recovering");
+          if (!offline && retryTimer === null) retryTimer = window.setTimeout(() => setRetryKey((value) => value + 1), 1500);
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      void supabase.removeChannel(channel);
     };
-  }, [supabase, allConversationIds, currentProfileId, profilesById]);
+  }, [supabase, allConversationIds, currentProfileId, profilesById, retryKey, router]);
+
+  useEffect(() => {
+    function handleOnline() { needsBackfillRef.current = true; setRealtimeStatus("recovering"); setRetryKey((value) => value + 1); }
+    function handleOffline() { needsBackfillRef.current = true; setRealtimeStatus("offline"); }
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    if (!navigator.onLine) handleOffline();
+    return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
+  }, []);
 
   // Realtime: meeting_requests status changes
   useEffect(() => {
@@ -321,6 +350,7 @@ export default function InboxSidebar({
               {totalUnread}
             </span>
           )}
+          <button type="button" onClick={() => setRetryKey((value) => value + 1)} className={`h-2.5 w-2.5 rounded-full ${realtimeStatus === "live" ? "bg-emerald-500" : realtimeStatus === "offline" ? "bg-amber-500" : "animate-pulse bg-blue-500"}`} title={`Realtime ${realtimeStatus}. Click to retry.`} aria-label={`Realtime ${realtimeStatus}; retry connection`} />
         </div>
         <div>
           {tokenInfo.isPremium ? (

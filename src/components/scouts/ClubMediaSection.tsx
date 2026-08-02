@@ -6,6 +6,7 @@ import { deleteClubMediaAction, saveClubVideoAction, saveClubPhotoAction } from 
 import MediaFileInput from "@/components/account/MediaFileInput";
 import VideoLinkComposer from "@/components/account/VideoLinkComposer";
 import { getEmbeddableVideoUrl, getPreviewEmbedUrl, getVideoProviderLabel, getVideoThumbnailUrl } from "@/lib/video";
+import ClubMediaManager from "@/components/account/ClubMediaManager";
 
 export interface ClubMediaRow {
   id: string;
@@ -15,6 +16,7 @@ export interface ClubMediaRow {
   provider: string | null;
   label: string | null;
   display_order: number;
+  original_filename?: string | null;
 }
 
 interface ClubMediaSectionProps {
@@ -31,7 +33,12 @@ function getVideoEmbedUrl(url: string, provider: string | null): string | null {
   return getEmbeddableVideoUrl(url) ?? (provider === "youtube" || provider === "vimeo" ? getEmbeddableVideoUrl(url) : null);
 }
 
-export default function ClubMediaSection({ scoutId, teamId, media, isMember, returnTo }: ClubMediaSectionProps) {
+export default function ClubMediaSection(props: ClubMediaSectionProps) {
+  if (props.isMember) return <ClubMediaManager teamId={props.teamId} initialMedia={props.media} />;
+  return <PublicClubMediaSection {...props} />;
+}
+
+function PublicClubMediaSection({ scoutId, teamId, media, isMember, returnTo }: ClubMediaSectionProps) {
   const [videoPreviewActive, setVideoPreviewActive] = useState(false);
   const [videoFullscreenOpen, setVideoFullscreenOpen] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);

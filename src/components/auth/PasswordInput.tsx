@@ -7,9 +7,10 @@ interface PasswordInputProps {
   required?: boolean;
   minLength?: number;
   disabled?: boolean;
+  autoComplete?: "current-password" | "new-password";
 }
 
-export default function PasswordInput({ name, required, minLength, disabled }: PasswordInputProps) {
+export default function PasswordInput({ name, required, minLength, disabled, autoComplete }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -20,7 +21,7 @@ export default function PasswordInput({ name, required, minLength, disabled }: P
         required={required}
         minLength={minLength}
         disabled={disabled}
-        autoComplete={name === "password" ? "current-password" : "new-password"}
+        autoComplete={autoComplete ?? (name === "confirm_password" ? "new-password" : "current-password")}
         className="h-12 w-full border border-slate-200 bg-white px-4 pr-12 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-[#090909] dark:text-white dark:placeholder:text-slate-500 dark:focus:ring-red-500/20"
       />
       <button

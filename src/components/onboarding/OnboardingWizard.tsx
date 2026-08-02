@@ -1241,7 +1241,7 @@ export default function OnboardingWizard({
         await action(fd);
       } catch (err) {
         if (isRedirectError(err)) throw err;
-        setSubmitError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+        setSubmitError(err instanceof Error ? err.message : "We could not save your onboarding details. Check your connection and try again.");
       }
     });
   };

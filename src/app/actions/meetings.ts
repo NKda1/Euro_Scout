@@ -1,11 +1,11 @@
 "use server";
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { enforceActionRateLimit } from "@/lib/action-rate-limit";
 import { requireOnboardedProfile, type Profile } from "@/lib/auth";
-import { buildDailyJoinUrl, createDailyMeetingToken, createDailyRoom } from "@/lib/daily";
+import { buildDailyJoinUrl, createDailyMeetingToken, createDailyRoom, deleteDailyRoom } from "@/lib/daily";
 import { sendCallConfirmedEmail, sendCallRequestEmail } from "@/lib/email";
 import { hasPremiumFeature } from "@/lib/premium";
 import { sendPushToProfile, sendPushToProfiles } from "@/lib/push";
@@ -459,12 +459,17 @@ export async function startInstantCallAction(formData: FormData) {
   if (!player || player.role !== "player") redirectWithError(returnPath, "A player participant is required for this call.");
 
   const { data: existing } = await serviceClient
-    .from("meeting_requests").select("id").eq("team_id", teamId).eq("player_profile_id", playerProfileId)
-    .in("status", OPEN_MEETING_STATUSES).limit(1).maybeSingle<{ id: string }>();
-  if (existing) redirect(`${returnPath}?notice=${encodeURIComponent("An active call already exists in this conversation.")}`);
+    .from("meeting_requests").select("id, status, request_reason").eq("team_id", teamId).eq("player_profile_id", playerProfileId)
+    .in("status", OPEN_MEETING_STATUSES).limit(1).maybeSingle<{ id: string; status: string; request_reason: string | null }>();
+  if (existing) {
+    if (existing.status === "accepted" && existing.request_reason === "Call now") redirect(`/meetings/${existing.id}/room`);
+    redirect(`${returnPath}?notice=${encodeURIComponent("An active scheduled call already exists in this conversation.")}`);
+  }
 
   const now = new Date().toISOString();
+  const meetingId = randomUUID();
   const { data: meeting, error } = await serviceClient.from("meeting_requests").insert({
+    id: meetingId,
     team_id: teamId,
     player_profile_id: playerProfileId,
     requested_by: profile.id,
@@ -481,8 +486,64 @@ export async function startInstantCallAction(formData: FormData) {
   }).select("id, team_id, player_profile_id, conversation_id").single<Pick<MeetingRequest, "id" | "team_id" | "player_profile_id" | "conversation_id">>();
 
   if (error || !meeting) redirectWithError(returnPath, error?.message ?? "Could not start the call.");
+
+  let createdRoom: Awaited<ReturnType<typeof createDailyRoom>>;
+  try {
+    createdRoom = await createDailyRoom({ meetingId, scheduledAt: now, durationMinutes: 30 });
+  } catch (roomError) {
+    await serviceClient.from("meeting_requests").delete().eq("id", meetingId);
+    redirectWithError(returnPath, roomError instanceof Error ? roomError.message : "The video provider could not open a room.");
+  }
+
+  const { error: roomUpdateError } = await serviceClient.from("meeting_requests").update({
+    daily_provider: "daily",
+    daily_room_id: createdRoom.room.id,
+    daily_room_name: createdRoom.room.name,
+    daily_room_url: createdRoom.room.url,
+    daily_room_expires_at: createdRoom.roomExpiresAt,
+    daily_sfu_enabled: true,
+    daily_room_config: createdRoom.room.config ?? {},
+    room_opened_at: now,
+    updated_at: now
+  }).eq("id", meetingId);
+
+  if (roomUpdateError) {
+    await deleteDailyRoom(createdRoom.room.name);
+    await serviceClient.from("meeting_requests").delete().eq("id", meetingId);
+    redirectWithError(returnPath, "The live room opened but could not be attached to this call. Please try again.");
+  }
+
+  let joinToken: Awaited<ReturnType<typeof createDailyMeetingToken>>;
+  try {
+    joinToken = await createDailyMeetingToken({
+      roomName: createdRoom.room.name,
+      user: profile,
+      isOwner: profile.role !== "player",
+      expiresAt: createdRoom.roomExpiresAt
+    });
+  } catch (tokenError) {
+    redirectWithError(`/meetings/${meetingId}/room`, tokenError instanceof Error ? tokenError.message : "The secure join token could not be created.");
+  }
+
+  await serviceClient.from("meeting_join_tokens").insert({
+    meeting_request_id: meetingId,
+    profile_id: profile.id,
+    daily_room_name: createdRoom.room.name,
+    token_fingerprint: createHash("sha256").update(joinToken.token).digest("hex").slice(0, 48),
+    expires_at: joinToken.expiresAt,
+    is_owner: profile.role !== "player"
+  });
+
+  const recipientIds = participantIds.filter((participantId) => participantId !== profile.id);
+  await sendPushToProfiles(recipientIds, {
+    title: `Incoming video call from ${profile.display_name}`,
+    body: "Open the conversation to accept or decline the live call.",
+    url: `/messages/${conversationId}`,
+    tag: `incoming-call-${meetingId}`
+  });
+
   revalidateMeetingPaths(meeting);
-  redirect(`${returnPath}?notice=${encodeURIComponent("Live call created. Open the call card to join.")}`);
+  redirect(buildDailyJoinUrl(`/meetings/${meetingId}/room`, joinToken.token));
 }
 
 export async function requestClubCallAction(formData: FormData) {
@@ -877,7 +938,8 @@ export async function declineMeetingRequestAction(formData: FormData) {
     await requireMeetingManager(serviceClient, profile, meeting.team_id, returnPath);
   }
 
-  if (!["pending", "club_proposed"].includes(meeting.status)) {
+  const isIncomingInstantCall = meeting.status === "accepted" && meeting.request_reason === "Call now" && meeting.requested_by !== profile.id;
+  if (!["pending", "club_proposed"].includes(meeting.status) && !isIncomingInstantCall) {
     redirectWithError(returnPath, "Only pending call requests can be declined.");
   }
 
@@ -892,11 +954,13 @@ export async function declineMeetingRequestAction(formData: FormData) {
       updated_at: now
     })
     .eq("id", meeting.id)
-    .in("status", ["pending", "club_proposed"]);
+    .in("status", isIncomingInstantCall ? ["accepted"] : ["pending", "club_proposed"]);
 
   if (error) {
     redirectWithError(returnPath, error.message);
   }
+
+  if (meeting.daily_room_name) await deleteDailyRoom(meeting.daily_room_name);
 
   revalidateMeetingPaths(meeting);
   redirect(`${returnPath}?notice=${encodeURIComponent("Call request declined.")}`);
@@ -940,6 +1004,8 @@ export async function cancelMeetingRequestAction(formData: FormData) {
     redirectWithError(returnPath, error.message);
   }
 
+  if (meeting.daily_room_name) await deleteDailyRoom(meeting.daily_room_name);
+
   revalidateMeetingPaths(meeting);
   redirect(`${returnPath}?notice=${encodeURIComponent("Call request cancelled.")}`);
 }
@@ -979,10 +1045,18 @@ export async function rescheduleMeetingRequestAction(formData: FormData) {
     club_response_note: isClub ? "New time proposed" : null,
     player_confirmed_at: null,
     accepted_at: null,
+    daily_room_id: null,
+    daily_room_name: null,
+    daily_room_url: null,
+    daily_room_expires_at: null,
+    daily_room_config: {},
+    daily_sfu_enabled: false,
+    room_opened_at: null,
     updated_at: now
   }).eq("id", meeting.id).eq("status", "accepted");
 
   if (error) redirectWithError(returnPath, error.message);
+  if (meeting.daily_room_name) await deleteDailyRoom(meeting.daily_room_name);
   revalidateMeetingPaths(meeting);
   redirect(`${returnPath}?notice=${encodeURIComponent(mode === "postpone" ? "Call postponed by 24 hours and sent for confirmation." : "New call time sent for confirmation.")}`);
 }
@@ -1063,6 +1137,7 @@ export async function createMeetingJoinLinkAction(formData: FormData) {
       .eq("id", meeting.id);
 
     if (error) {
+      await deleteDailyRoom(createdRoom.room.name);
       redirectWithError(returnPath, error.message);
     }
 

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
+import { createRecoveryMarker, RECOVERY_COOKIE_NAME, recoveryCookieOptions } from "@/lib/auth-recovery";
 
 function safeNextPath(value: string | null, fallback = "/welcome") {
   const next = value?.trim();
@@ -15,11 +16,17 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") as EmailOtpType | null;
   const fallbackNext = type === "recovery" ? "/auth/reset-password" : "/welcome";
   const next = safeNextPath(searchParams.get("next"), fallbackNext);
+  const isRecovery = type === "recovery" || next === "/auth/reset-password";
 
   const baseUrl = request.nextUrl.origin;
   const redirectTo = `${baseUrl}${next}`;
-  const errorRedirect = () =>
-    NextResponse.redirect(`${baseUrl}/auth/sign-in?error=${encodeURIComponent("This sign-in link is invalid or has expired. Please request a new one.")}`);
+  const errorRedirect = () => {
+    const path = isRecovery ? "/auth/forgot-password" : "/auth/resend-confirmation";
+    const message = isRecovery
+      ? "This password reset link is invalid, expired, or has already been used. Request a new one."
+      : "This confirmation link is invalid or expired. Request a new confirmation email.";
+    return NextResponse.redirect(`${baseUrl}${path}?error=${encodeURIComponent(message)}`);
+  };
 
   // Build the redirect response first so we can attach session cookies to it
   const response = NextResponse.redirect(redirectTo);
@@ -63,6 +70,15 @@ export async function GET(request: NextRequest) {
   } else {
     console.error("[auth.callback.parameters_missing]", { hasCode: Boolean(code), hasTokenHash: Boolean(token_hash), type });
     return errorRedirect();
+  }
+
+  if (isRecovery) {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      console.error("[auth.callback.recovery_user_missing]", { code: error?.code, status: error?.status });
+      return errorRedirect();
+    }
+    response.cookies.set(RECOVERY_COOKIE_NAME, createRecoveryMarker(user.id), recoveryCookieOptions());
   }
 
   return response;

@@ -50,7 +50,40 @@ export async function getAuthenticatedUser() {
 
 export async function getAuthenticatedProfile() {
   const { supabase, user } = await getAuthenticatedUser();
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle<Profile>();
+  const { data: storedProfile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle<Profile>();
+  let profile = storedProfile;
+
+  // Repair legacy and OAuth accounts created before the database provisioning trigger existed.
+  if (!profile) {
+    const serviceClient = createSupabaseServiceRoleClient();
+    const displayName = String(user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "EuroScout member").slice(0, 100);
+    const { data: repairedProfile, error } = await serviceClient
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          role: "fan",
+          display_name: displayName,
+          is_public: false,
+          onboarding_complete: false,
+          welcome_tour_seen: false,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: "id" }
+      )
+      .select("*")
+      .single<Profile>();
+
+    if (!error && repairedProfile) {
+      profile = repairedProfile;
+      if (user.email) {
+        await serviceClient.from("users").upsert(
+          { id: user.id, email: user.email.toLowerCase(), role: "fan", display_name: displayName },
+          { onConflict: "id" }
+        );
+      }
+    }
+  }
 
   if (isReservedAdminEmail(user.email) && (!profile || profile.role !== "admin" || !profile.onboarding_complete)) {
     const displayName = String(user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "EuroScout Admin");
@@ -80,6 +113,12 @@ export async function getAuthenticatedProfile() {
 
     if (!error && adminProfile) {
       await serviceClient.from("profiles").update({ welcome_tour_seen: true }).eq("id", user.id);
+      if (user.email) {
+        await serviceClient.from("users").upsert(
+          { id: user.id, email: user.email.toLowerCase(), role: "admin", display_name: adminProfile.display_name },
+          { onConflict: "id" }
+        );
+      }
       return { supabase, user, profile: { ...adminProfile, welcome_tour_seen: true } };
     }
   }

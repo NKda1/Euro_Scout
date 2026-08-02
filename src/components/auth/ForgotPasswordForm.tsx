@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { forgotPasswordAction } from "@/app/actions/auth";
+import PendingSubmitButton from "@/components/forms/PendingSubmitButton";
 
 const inputClass =
   "mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-white/85 px-4 text-sm font-semibold text-slate-900 outline-none backdrop-blur-xl transition focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:border-white/10 dark:bg-white/10 dark:text-white dark:focus:ring-red-500/20";
@@ -29,9 +30,9 @@ export default function ForgotPasswordForm({ notice, error }: ForgotPasswordForm
             <span className={labelClass}>Email address</span>
             <input name="email" type="email" required autoComplete="email" className={inputClass} />
           </label>
-          <button className="h-12 w-full rounded-2xl bg-red-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-red-700">
+          <PendingSubmitButton pendingLabel="Sending secure link…" className="h-12 w-full rounded-2xl bg-red-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-70">
             Send reset link
-          </button>
+          </PendingSubmitButton>
         </form>
       ) : null}
       <p className="mt-5 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">

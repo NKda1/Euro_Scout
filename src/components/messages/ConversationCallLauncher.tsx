@@ -4,6 +4,7 @@ import { CalendarClock, Phone, PhoneCall, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { requestClubCallAction, requestPlayerCallAction, startInstantCallAction } from "@/app/actions/meetings";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import PendingSubmitButton from "@/components/forms/PendingSubmitButton";
 
 interface ConversationCallLauncherProps {
   conversationId: string;
@@ -24,20 +25,49 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
   const [open, setOpen] = useState(false);
   const [preferred, setPreferred] = useState(() => localTime(24 * 60));
   const [recipientOnline, setRecipientOnline] = useState(false);
+  const [presenceStatus, setPresenceStatus] = useState<"connecting" | "live" | "recovering">("connecting");
+  const [presenceRetryKey, setPresenceRetryKey] = useState(0);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const action = currentRole === "player" ? requestClubCallAction : requestPlayerCallAction;
   const returnTo = `/messages/${conversationId}`;
 
   useEffect(() => {
-    const channel = supabase.channel(`conversation-presence:${conversationId}`, { config: { presence: { key: currentProfileId } } });
+    let cancelled = false;
+    let retryTimer: number | null = null;
+    const channel = supabase.channel(`conversation:${conversationId}:presence`, {
+      config: { private: true, presence: { key: currentProfileId } }
+    });
     channel.on("presence", { event: "sync" }, () => {
       const onlineIds = Object.keys(channel.presenceState());
       setRecipientOnline(onlineIds.some((id) => id !== currentProfileId));
-    }).subscribe(async (status) => {
-      if (status === "SUBSCRIBED") await channel.track({ profile_id: currentProfileId, online_at: new Date().toISOString() });
     });
-    return () => { void supabase.removeChannel(channel); };
-  }, [conversationId, currentProfileId, supabase]);
+
+    void supabase.realtime.setAuth().then(() => {
+      if (cancelled) return;
+      channel.subscribe(async (status) => {
+        if (cancelled) return;
+        if (status === "SUBSCRIBED") {
+          setPresenceStatus("live");
+          await channel.track({ profile_id: currentProfileId, online_at: new Date().toISOString() });
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          setPresenceStatus("recovering");
+          if (navigator.onLine && retryTimer === null) retryTimer = window.setTimeout(() => setPresenceRetryKey((value) => value + 1), 1500);
+        }
+      });
+    }).catch(() => {
+      if (!cancelled) {
+        setPresenceStatus("recovering");
+        if (navigator.onLine && retryTimer === null) retryTimer = window.setTimeout(() => setPresenceRetryKey((value) => value + 1), 1500);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [conversationId, currentProfileId, presenceRetryKey, supabase]);
 
   return (
     <>
@@ -72,10 +102,10 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
               <div className="mt-5 space-y-4">
                 <form action={startInstantCallAction}>
                   <input type="hidden" name="team_id" value={teamId} /><input type="hidden" name="target_profile_id" value={targetPlayerId} /><input type="hidden" name="conversation_id" value={conversationId} /><input type="hidden" name="return_to" value={returnTo} />
-                  <button disabled={!recipientOnline} className="w-full rounded-xl border border-red-300 bg-red-50 p-3 text-left text-red-800 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200 dark:disabled:border-white/10 dark:disabled:bg-white/5 dark:disabled:text-white/35">
+                  <PendingSubmitButton pendingLabel="Opening secure Daily room…" className="w-full rounded-xl border border-red-300 bg-red-50 p-3 text-left text-red-800 transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-70 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
                     <span className="flex items-center justify-between"><span className="flex items-center gap-2 text-xs font-black"><PhoneCall className="h-4 w-4" aria-hidden />Call now</span><span className={`h-2.5 w-2.5 rounded-full ${recipientOnline ? "bg-emerald-500" : "bg-slate-400"}`} /></span>
-                    <span className="mt-1 block text-[10px] font-semibold opacity-75">{recipientOnline ? "Recipient is online — create a live Daily call" : "Available when another participant is online"}</span>
-                  </button>
+                    <span className="mt-1 block text-[10px] font-semibold opacity-75">{recipientOnline ? "Recipient is online — ring them now" : presenceStatus === "recovering" ? "Presence is reconnecting — the call notification will still be delivered" : "Recipient may be away — they will see the incoming call if connected"}</span>
+                  </PendingSubmitButton>
                 </form>
                 <form action={action} className="space-y-4">
                 <input type="hidden" name="team_id" value={teamId} />

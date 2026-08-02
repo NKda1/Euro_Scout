@@ -570,7 +570,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const { data: clubMedia } = team
     ? await serviceClient
         .from("club_media")
-        .select("id, team_id, media_type, url, provider, label, display_order")
+        .select("id, team_id, media_type, url, provider, label, display_order, original_filename")
         .eq("team_id", team.id)
         .order("display_order", { ascending: true })
         .returns<ClubMediaRow[]>()
@@ -1302,13 +1302,13 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 </span>
                 <span aria-hidden className="text-slate-300 dark:text-white/20">→</span>
               </Link>
-              <a href="mailto:info@euroscoutpro.com?subject=EuroScout%20notification%20preferences" className="flex items-center justify-between gap-4 bg-white px-4 py-3 transition hover:bg-slate-50 dark:bg-black/20 dark:hover:bg-white/[0.04]">
+              <div className="flex items-center justify-between gap-4 bg-white px-4 py-3 dark:bg-black/20">
                 <span>
-                  <span className="block text-sm font-black text-slate-950 dark:text-white">Email preferences</span>
-                  <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-white/40">Request a change to transactional notifications</span>
+                  <span className="block text-sm font-black text-slate-950 dark:text-white">Transactional email</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-white/40">Required security, invitation and call emails are enabled for this account</span>
                 </span>
-                <span aria-hidden className="text-slate-300 dark:text-white/20">→</span>
-              </a>
+                <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-500/10 dark:text-emerald-200">Enabled</span>
+              </div>
             </div>
           </Panel>
 
@@ -1316,7 +1316,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <Panel id="views" defaultOpen={false} eyebrow="Profile Views" title="Who has viewed your account">
               {profileViewsError ? (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-200">
-                  Profile view tracking needs the `src/db/013_player_profile_views.sql` Supabase migration.
+                  Profile analytics are temporarily unavailable. Reload the page; if the issue continues, contact support.
                 </div>
               ) : null}
 
@@ -2042,6 +2042,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <AccountSettingsPanel
               email={user.email ?? "No email available"}
               provider={typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : null}
+              hasPasswordIdentity={Boolean(user.identities?.some((identity) => identity.provider === "email"))}
+              isPublic={profile.is_public}
             />
           </Panel>
         </div>
