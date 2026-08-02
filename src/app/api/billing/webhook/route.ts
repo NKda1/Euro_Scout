@@ -1,4 +1,4 @@
-import { after, NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { createStripeClient, stripePlanPriceId, stripeTimestampToIso } from "@/lib/billing";
 import { errorSummary, recordServiceHealthEvent } from "@/lib/observability";
@@ -120,10 +120,17 @@ async function processStripeEvent(event: Stripe.Event) {
   if (claimError) throw claimError;
   if (!claimed) return;
 
-  await serviceClient
+  const { error: attemptError } = await serviceClient
     .from("billing_webhook_events")
     .update({ attempt_count: (claimed.attempt_count ?? 0) + 1 })
     .eq("stripe_event_id", event.id);
+  if (attemptError) {
+    await serviceClient
+      .from("billing_webhook_events")
+      .update({ processing_status: "failed", processing_error: attemptError.message })
+      .eq("stripe_event_id", event.id);
+    throw attemptError;
+  }
 
   try {
     const object = event.data.object as unknown as Record<string, unknown>;
@@ -234,23 +241,34 @@ export async function POST(request: NextRequest) {
   }
 
   if (insertError?.code === "23505") {
-    const { data: existing } = await serviceClient
+    const { data: existing, error: existingError } = await serviceClient
       .from("billing_webhook_events")
-      .select("processing_status")
+      .select("processing_status, last_attempt_at")
       .eq("stripe_event_id", event.id)
-      .maybeSingle<{ processing_status: string }>();
-    if (existing?.processing_status === "processed" || existing?.processing_status === "ignored" || existing?.processing_status === "processing") {
+      .maybeSingle<{ processing_status: string; last_attempt_at: string | null }>();
+    if (existingError) {
+      return NextResponse.json({ error: "Webhook receipt could not be checked." }, { status: 503 });
+    }
+    if (existing?.processing_status === "processed" || existing?.processing_status === "ignored") {
       return NextResponse.json({ received: true, duplicate: true });
+    }
+    if (existing?.processing_status === "processing") {
+      const attemptAge = existing.last_attempt_at ? Date.now() - new Date(existing.last_attempt_at).getTime() : Number.POSITIVE_INFINITY;
+      if (attemptAge < 5 * 60_000) return NextResponse.json({ received: true, duplicate: true, processing: true });
+      const { error: releaseError } = await serviceClient
+        .from("billing_webhook_events")
+        .update({ processing_status: "failed", processing_error: "A stale processing claim was released for retry." })
+        .eq("stripe_event_id", event.id)
+        .eq("processing_status", "processing");
+      if (releaseError) return NextResponse.json({ error: "Stale webhook processing could not be retried." }, { status: 503 });
     }
   }
 
-  after(async () => {
-    try {
-      await processStripeEvent(event);
-    } catch (error) {
-      console.error({ event: "stripe.webhook.processing_failed", eventId: event.id, ...errorSummary(error) });
-    }
-  });
-
-  return NextResponse.json({ received: true });
+  try {
+    await processStripeEvent(event);
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error({ event: "stripe.webhook.processing_failed", eventId: event.id, ...errorSummary(error) });
+    return NextResponse.json({ error: "Webhook was persisted but processing failed and will be retried." }, { status: 500 });
+  }
 }
