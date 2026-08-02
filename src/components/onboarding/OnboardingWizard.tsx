@@ -929,7 +929,7 @@ function ClubStep(props: {
               <p className="mt-1 text-base font-black text-slate-950 dark:text-white">{selectedTeam.name}</p>
               <p className="text-sm text-slate-500 dark:text-slate-400">{selectedTeam.city}, {selectedTeam.country}</p>
             </div>
-            <button type="button" onClick={clearSelection} className="rounded-xl border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:text-red-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:border-red-500/30">
+            <button type="button" onClick={clearSelection} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-red-400 hover:text-red-700 dark:border-white/20 dark:bg-white/5 dark:text-slate-300 dark:hover:border-red-500/40">
               Change
             </button>
           </div>

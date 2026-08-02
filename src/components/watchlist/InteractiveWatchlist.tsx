@@ -230,7 +230,7 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                     <form action={removeFromWatchlistAction}>
                       <input type="hidden" name="watchlist_item_id" value={item.id} />
                       <input type="hidden" name="watchlist_id" value={watchlistId} />
-                      <button type="submit" className="text-xs font-black uppercase tracking-wide text-slate-400 transition hover:text-red-600 dark:hover:text-red-300">
+                      <button type="submit" className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-black uppercase tracking-wide text-slate-700 transition hover:border-red-400 hover:text-red-700 dark:border-white/20 dark:bg-white/5 dark:text-white/75 dark:hover:text-red-300">
                         Remove from list
                       </button>
                     </form>

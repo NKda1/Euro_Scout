@@ -383,36 +383,6 @@ async function getOrCreateMeetingConversation(params: {
   return { conversationId: conversation.id, error: participantError };
 }
 
-async function appendWorkflowMessage(params: {
-  serviceClient: ServiceClient;
-  conversationId: string | null;
-  senderProfileId: string;
-  body: string;
-}) {
-  const { serviceClient, conversationId, senderProfileId, body } = params;
-  if (!conversationId) return null;
-
-  const now = new Date().toISOString();
-  const { error } = await serviceClient.from("messages").insert({
-    conversation_id: conversationId,
-    sender_profile_id: senderProfileId,
-    body
-  });
-
-  if (error) return error.message;
-
-  await Promise.all([
-    serviceClient.from("conversations").update({ updated_at: now }).eq("id", conversationId),
-    serviceClient
-      .from("conversation_participants")
-      .update({ last_seen_at: now })
-      .eq("conversation_id", conversationId)
-      .eq("profile_id", senderProfileId)
-  ]);
-
-  return null;
-}
-
 function revalidateMeetingPaths(meeting: Pick<MeetingRequest, "id" | "team_id" | "player_profile_id" | "conversation_id">) {
   revalidatePath("/account");
   revalidatePath("/messages");
@@ -454,6 +424,65 @@ async function getMeeting(serviceClient: ServiceClient, meetingId: string) {
 
   if (error || !data) return null;
   return data;
+}
+
+export async function startInstantCallAction(formData: FormData) {
+  const { profile } = await requireOnboardedProfile();
+  const serviceClient = createSupabaseServiceRoleClient();
+  const teamId = text(formData, "team_id", 120);
+  const conversationId = text(formData, "conversation_id", 120);
+  const targetProfileId = text(formData, "target_profile_id", 120);
+  const returnPath = safeReturnPath(text(formData, "return_to", 240), conversationId ? `/messages/${conversationId}` : "/messages");
+
+  if (!teamId || !conversationId || !targetProfileId || !["player", "club", "admin"].includes(profile.role)) {
+    redirectWithError(returnPath, "This conversation cannot start a video call.");
+  }
+  if (profile.role === "club" && !hasPremiumFeature(profile, "club_call_negotiation_tools")) {
+    redirectWithError(returnPath, "Calling players is a Club Premium feature.");
+  }
+
+  await enforceActionRateLimit(`call-now:${profile.id}`, 8, 60 * 60_000, returnPath);
+
+  const [{ data: conversation }, { data: participants }] = await Promise.all([
+    serviceClient.from("conversations").select("id, team_id").eq("id", conversationId).eq("team_id", teamId).maybeSingle<{ id: string; team_id: string }>(),
+    serviceClient.from("conversation_participants").select("profile_id").eq("conversation_id", conversationId).returns<Array<{ profile_id: string }>>()
+  ]);
+  const participantIds = (participants ?? []).map((item) => item.profile_id);
+  if (!conversation || !participantIds.includes(profile.id) || !participantIds.includes(targetProfileId)) {
+    redirectWithError(returnPath, "Only conversation participants can start this call.");
+  }
+
+  const playerProfileId = profile.role === "player" ? profile.id : targetProfileId;
+  if (profile.role !== "player") await requireMeetingManager(serviceClient, profile, teamId, returnPath);
+
+  const { data: player } = await serviceClient.from("profiles").select("id, role").eq("id", playerProfileId).maybeSingle<{ id: string; role: string }>();
+  if (!player || player.role !== "player") redirectWithError(returnPath, "A player participant is required for this call.");
+
+  const { data: existing } = await serviceClient
+    .from("meeting_requests").select("id").eq("team_id", teamId).eq("player_profile_id", playerProfileId)
+    .in("status", OPEN_MEETING_STATUSES).limit(1).maybeSingle<{ id: string }>();
+  if (existing) redirect(`${returnPath}?notice=${encodeURIComponent("An active call already exists in this conversation.")}`);
+
+  const now = new Date().toISOString();
+  const { data: meeting, error } = await serviceClient.from("meeting_requests").insert({
+    team_id: teamId,
+    player_profile_id: playerProfileId,
+    requested_by: profile.id,
+    responded_by: profile.id,
+    conversation_id: conversationId,
+    status: "accepted",
+    request_reason: "Call now",
+    proposed_start_at: now,
+    scheduled_at: now,
+    scheduled_duration_minutes: 30,
+    player_confirmed_at: now,
+    accepted_at: now,
+    updated_at: now
+  }).select("id, team_id, player_profile_id, conversation_id").single<Pick<MeetingRequest, "id" | "team_id" | "player_profile_id" | "conversation_id">>();
+
+  if (error || !meeting) redirectWithError(returnPath, error?.message ?? "Could not start the call.");
+  revalidateMeetingPaths(meeting);
+  redirect(`${returnPath}?notice=${encodeURIComponent("Live call created. Open the call card to join.")}`);
 }
 
 export async function requestClubCallAction(formData: FormData) {
@@ -545,26 +574,6 @@ export async function requestClubCallAction(formData: FormData) {
 
   if (error || !meeting) {
     redirectWithError(returnPath, error?.message ?? "Could not send the call request.");
-  }
-
-  const messageError = await appendWorkflowMessage({
-    serviceClient,
-    conversationId,
-    senderProfileId: profile.id,
-    body: [
-      `Video call request for ${team.name}`,
-      requestReason ? `Reason: ${requestReason}` : null,
-      `Preferred: ${formatMeetingTime(proposedStartAt)}`,
-      proposedAlternativeAt ? `Backup: ${formatMeetingTime(proposedAlternativeAt)}` : null,
-      requestNote ? `Context: ${requestNote}` : null,
-      "Club staff can accept, decline, or propose a final time from this inbox."
-    ]
-      .filter(Boolean)
-      .join("\n")
-  });
-
-  if (messageError) {
-    redirectWithError(returnPath, messageError);
   }
 
   revalidateMeetingPaths(meeting);
@@ -701,26 +710,6 @@ export async function requestPlayerCallAction(formData: FormData) {
     redirectWithError(returnPath, error?.message ?? "Could not send the call invite.");
   }
 
-  const messageError = await appendWorkflowMessage({
-    serviceClient,
-    conversationId,
-    senderProfileId: profile.id,
-    body: [
-      `${team.name} proposed a video call with ${targetProfile.display_name}.`,
-      `Reason: ${requestReason}`,
-      `Final time: ${formatMeetingTime(proposedStartAt)}`,
-      proposedAlternativeAt ? `Backup: ${formatMeetingTime(proposedAlternativeAt)}` : null,
-      requestNote ? `Context: ${requestNote}` : null,
-      "The player can accept the final time from this inbox."
-    ]
-      .filter(Boolean)
-      .join("\n")
-  });
-
-  if (messageError) {
-    redirectWithError(returnPath, messageError);
-  }
-
   revalidateMeetingPaths(meeting);
 
   // Notify the player about the club's call invite (fire-and-forget)
@@ -783,26 +772,6 @@ export async function acceptMeetingRequestAction(formData: FormData) {
 
   if (error) {
     redirectWithError(returnPath, error.message);
-  }
-
-  const context = await getMeetingContext(serviceClient, meeting.team_id, meeting.player_profile_id);
-  const messageError = await appendWorkflowMessage({
-    serviceClient,
-    conversationId: meeting.conversation_id,
-    senderProfileId: profile.id,
-    body: [
-      `${context.teamName} sent a final video call time for ${context.playerName}.`,
-      `Final time: ${formatMeetingTime(finalScheduledAt)}`,
-      `Duration: ${durationMinutes} minutes`,
-      responseNote ? `Club note: ${responseNote}` : null,
-      "Player confirmation is needed before the call is locked."
-    ]
-      .filter(Boolean)
-      .join("\n")
-  });
-
-  if (messageError) {
-    redirectWithError(returnPath, messageError);
   }
 
   revalidateMeetingPaths(meeting);
@@ -872,21 +841,6 @@ export async function confirmMeetingTimeAction(formData: FormData) {
   }
 
   const context = await getMeetingContext(serviceClient, meeting.team_id, meeting.player_profile_id);
-  const messageError = await appendWorkflowMessage({
-    serviceClient,
-    conversationId: meeting.conversation_id,
-    senderProfileId: profile.id,
-    body: [
-      `${context.playerName} confirmed the video call with ${context.teamName}.`,
-      `Confirmed time: ${formatMeetingTime(finalScheduledAt)}`,
-      `Duration: ${durationMinutes || meeting.scheduled_duration_minutes} minutes`,
-      `The secure Daily room opens ${ROOM_OPEN_BUFFER_MINUTES} minutes before the appointment.`
-    ].join("\n")
-  });
-
-  if (messageError) {
-    redirectWithError(returnPath, messageError);
-  }
 
   revalidateMeetingPaths(meeting);
 
@@ -944,23 +898,6 @@ export async function declineMeetingRequestAction(formData: FormData) {
     redirectWithError(returnPath, error.message);
   }
 
-  const context = await getMeetingContext(serviceClient, meeting.team_id, meeting.player_profile_id);
-  const messageError = await appendWorkflowMessage({
-    serviceClient,
-    conversationId: meeting.conversation_id,
-    senderProfileId: profile.id,
-    body: [
-      `${profile.display_name} declined the video call between ${context.playerName} and ${context.teamName}.`,
-      responseNote ? `Reason: ${responseNote}` : null
-    ]
-      .filter(Boolean)
-      .join("\n")
-  });
-
-  if (messageError) {
-    redirectWithError(returnPath, messageError);
-  }
-
   revalidateMeetingPaths(meeting);
   redirect(`${returnPath}?notice=${encodeURIComponent("Call request declined.")}`);
 }
@@ -1003,16 +940,51 @@ export async function cancelMeetingRequestAction(formData: FormData) {
     redirectWithError(returnPath, error.message);
   }
 
-  const context = await getMeetingContext(serviceClient, meeting.team_id, meeting.player_profile_id);
-  await appendWorkflowMessage({
-    serviceClient,
-    conversationId: meeting.conversation_id,
-    senderProfileId: profile.id,
-    body: `${profile.display_name} cancelled the video call between ${context.playerName} and ${context.teamName}.`
-  });
-
   revalidateMeetingPaths(meeting);
   redirect(`${returnPath}?notice=${encodeURIComponent("Call request cancelled.")}`);
+}
+
+export async function rescheduleMeetingRequestAction(formData: FormData) {
+  const { profile } = await requireOnboardedProfile();
+  const serviceClient = createSupabaseServiceRoleClient();
+  const meetingId = text(formData, "meeting_request_id", 80);
+  const returnPath = safeReturnPath(text(formData, "return_to", 240), "/account");
+  const mode = text(formData, "mode", 20);
+  const meeting = await getMeeting(serviceClient, meetingId);
+
+  if (!meeting) redirectWithError(returnPath, "That call request could not be found.");
+  if (meeting.status !== "accepted") redirectWithError(returnPath, "Only confirmed calls can be rescheduled.");
+
+  const isPlayer = meeting.player_profile_id === profile.id;
+  const isClub = profile.role === "admin" || (profile.role === "club" && await isClubMember(serviceClient, meeting.team_id, profile.id));
+  if (!isPlayer && !isClub) redirectWithError(returnPath, "You cannot reschedule that call.");
+
+  await enforceActionRateLimit(`call-reschedule:${profile.id}`, 20, 60 * 60_000, returnPath);
+  const existingTime = meeting.scheduled_at ? new Date(meeting.scheduled_at).getTime() : Date.now();
+  const proposed = mode === "postpone"
+    ? new Date(Math.max(existingTime, Date.now()) + 24 * 60 * 60 * 1000).toISOString()
+    : parseDateTime(text(formData, "scheduled_at", 80));
+  if (!proposed) redirectWithError(returnPath, "Choose a new call time.");
+  ensureFutureTime(proposed, returnPath);
+
+  const now = new Date().toISOString();
+  const nextStatus = isPlayer ? "pending" : "club_proposed";
+  const { error } = await serviceClient.from("meeting_requests").update({
+    status: nextStatus,
+    requested_by: isPlayer ? profile.id : meeting.requested_by,
+    responded_by: isClub ? profile.id : null,
+    proposed_start_at: proposed,
+    scheduled_at: isClub ? proposed : null,
+    request_reason: mode === "postpone" ? "Postpone requested" : "Reschedule requested",
+    club_response_note: isClub ? "New time proposed" : null,
+    player_confirmed_at: null,
+    accepted_at: null,
+    updated_at: now
+  }).eq("id", meeting.id).eq("status", "accepted");
+
+  if (error) redirectWithError(returnPath, error.message);
+  revalidateMeetingPaths(meeting);
+  redirect(`${returnPath}?notice=${encodeURIComponent(mode === "postpone" ? "Call postponed by 24 hours and sent for confirmation." : "New call time sent for confirmation.")}`);
 }
 
 export async function createMeetingJoinLinkAction(formData: FormData) {
@@ -1098,17 +1070,6 @@ export async function createMeetingJoinLinkAction(formData: FormData) {
     roomUrl = createdRoom.room.url;
     roomExpiresAt = createdRoom.roomExpiresAt;
 
-    const context = await getMeetingContext(serviceClient, meeting.team_id, meeting.player_profile_id);
-    await appendWorkflowMessage({
-      serviceClient,
-      conversationId: meeting.conversation_id,
-      senderProfileId: profile.id,
-      body: [
-        `The secure Daily room is open for ${context.teamName} and ${context.playerName}.`,
-        `Join from EuroScout: /meetings/${meeting.id}/room`,
-        "Only authorised participants can generate a private join token."
-      ].join("\n")
-    });
   }
 
   if (!roomName || !roomUrl) {

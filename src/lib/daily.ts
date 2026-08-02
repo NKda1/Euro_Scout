@@ -55,6 +55,10 @@ function callWindow(scheduledAt: string, durationMinutes = DEFAULT_CALL_DURATION
   return { startsAt, endsAt };
 }
 
+function retryDelay(attempt: number) {
+  return new Promise((resolve) => setTimeout(resolve, 300 * 2 ** attempt));
+}
+
 async function dailyPost<T>(path: string, body: Record<string, unknown>) {
   const apiKey = getDailyApiKey();
 
@@ -62,22 +66,29 @@ async function dailyPost<T>(path: string, body: Record<string, unknown>) {
     throw new Error("Daily is not configured. Add DAILY_API_KEY to enable video calls.");
   }
 
-  const response = await fetch(`${DAILY_API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body),
-    cache: "no-store"
-  });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(`${DAILY_API_BASE}${path}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000)
+      });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || `Daily request failed with status ${response.status}.`);
+      if (response.ok) return (await response.json()) as T;
+
+      const errorText = await response.text();
+      if (attempt === 2 || (response.status < 500 && response.status !== 429)) {
+        throw new Error(errorText || `Daily request failed with status ${response.status}.`);
+      }
+    } catch (error) {
+      if (attempt === 2 || (error instanceof Error && !["AbortError", "TimeoutError"].includes(error.name))) throw error;
+    }
+    await retryDelay(attempt);
   }
 
-  return (await response.json()) as T;
+  throw new Error("Daily did not respond after three attempts.");
 }
 
 export async function createDailyRoom({ meetingId, scheduledAt, durationMinutes = DEFAULT_CALL_DURATION_MINUTES }: CreateDailyRoomInput) {

@@ -7,6 +7,7 @@ import { getDisplayProfile, profileInitials } from "@/lib/messaging";
 import { isPremiumActive } from "@/lib/premium";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import CallBookingsPanel, { type CallBookingRow } from "@/components/messages/CallBookingsPanel";
+import ConversationCallLauncher from "@/components/messages/ConversationCallLauncher";
 import MessageThread from "@/components/messages/MessageThread";
 
 interface ConversationPageProps {
@@ -86,6 +87,7 @@ export default async function ConversationPage({ params, searchParams }: Convers
     : { data: [] as Profile[] };
 
   const otherProfiles = (profiles ?? []).filter((item) => item.id !== profile.id);
+  const conversationPlayer = (profiles ?? []).find((item) => item.role === "player");
   const displayProfile = getDisplayProfile(profiles ?? [], profile.id);
   const isPremiumMessaging = isPremiumActive(profile);
   const { data: replyAllowance } = isPremiumMessaging || isAdminAudit
@@ -191,14 +193,26 @@ export default async function ConversationPage({ params, searchParams }: Convers
         replyAllowanceRemaining={replyAllowance?.replies_remaining ?? DEFAULT_FREE_REPLIES_PER_CONVERSATION}
         isAdminAudit={isAdminAudit}
         flagged={flagged === "1"}
-      />
-
-      <CallBookingsPanel
-        conversationId={conversation.id}
-        initialMeetings={(meetingRequests ?? []) as CallBookingRow[]}
-        currentProfileId={profile.id}
-        currentRole={profile.role}
-        isAdminAudit={isAdminAudit}
+        callBookings={
+          <CallBookingsPanel
+            conversationId={conversation.id}
+            initialMeetings={(meetingRequests ?? []) as CallBookingRow[]}
+            currentProfileId={profile.id}
+            currentRole={profile.role}
+            isAdminAudit={isAdminAudit}
+          />
+        }
+        callControl={!isAdminAudit && conversation.team_id && conversationPlayer && ["player", "club"].includes(profile.role) ? (
+          <ConversationCallLauncher
+            conversationId={conversation.id}
+            teamId={conversation.team_id}
+            targetPlayerId={conversationPlayer.id}
+            currentRole={profile.role}
+            counterpartName={displayProfile?.display_name ?? "this contact"}
+            hasOpenCall={(meetingRequests ?? []).some((meeting) => ["pending", "club_proposed", "accepted"].includes(meeting.status))}
+            currentProfileId={profile.id}
+          />
+        ) : null}
       />
     </div>
   );
