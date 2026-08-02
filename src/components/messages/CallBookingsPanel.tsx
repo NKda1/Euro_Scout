@@ -92,13 +92,22 @@ export default function CallBookingsPanel({ conversationId, initialMeetings, cur
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
-    const channel = supabase.channel(`call-bookings:${conversationId}`).on("postgres_changes", {
-      event: "*", schema: "public", table: "meeting_requests", filter: `conversation_id=eq.${conversationId}`,
-    }, (payload) => {
-      const id = (payload.new as { id?: string })?.id ?? (payload.old as { id?: string })?.id;
+    let cancelled = false;
+    const handleChange = ({ payload }: { payload: unknown }) => {
+      const change = payload as { table?: string; record?: { id?: string }; old_record?: { id?: string } };
+      if (change.table !== "meeting_requests") return;
+      const id = change.record?.id ?? change.old_record?.id;
       if (id) void refreshMeeting(id);
-    }).subscribe();
-    return () => { window.clearInterval(timer); void supabase.removeChannel(channel); };
+    };
+    const channel = supabase
+      .channel(`conversation:${conversationId}:call-cards`, { config: { private: true } })
+      .on("broadcast", { event: "INSERT" }, handleChange)
+      .on("broadcast", { event: "UPDATE" }, handleChange)
+      .on("broadcast", { event: "DELETE" }, handleChange);
+    void supabase.realtime.setAuth().then(() => {
+      if (!cancelled) channel.subscribe();
+    });
+    return () => { cancelled = true; window.clearInterval(timer); void supabase.removeChannel(channel); };
   }, [conversationId, refreshMeeting, supabase]);
 
   if (!meetings.length) return null;

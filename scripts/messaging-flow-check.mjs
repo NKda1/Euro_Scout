@@ -140,6 +140,56 @@ async function markReadThroughAppPath(client, profileId, conversationId, label) 
   ok(!serverRead.error && serverRead.data?.length === 1 && Boolean(serverRead.data[0]?.last_seen_at), `${label} can mark conversation read through validated server action`, serverRead.error?.message);
 }
 
+async function verifyRealtimeInsert(receiverClient, senderClient, conversationId) {
+  const body = `Realtime receipt ${stamp}`;
+  let timer;
+  const conversationChannel = receiverClient
+    .channel(`conversation:${conversationId}:thread`, { config: { private: true } });
+  const profileChannel = receiverClient
+    .channel(`profile:${ids.club}:inbox`, { config: { private: true } });
+
+  try {
+    await receiverClient.realtime.setAuth();
+    const conversationReceipt = new Promise((resolve) => {
+      conversationChannel.on("broadcast", { event: "INSERT" }, ({ payload }) => {
+        if (payload?.table === "messages" && payload?.record?.body === body) resolve(payload.record);
+      });
+    });
+    const profileReceipt = new Promise((resolve) => {
+      profileChannel.on("broadcast", { event: "INSERT" }, ({ payload }) => {
+        if (payload?.table === "messages" && payload?.record?.body === body) resolve(payload.record);
+      });
+    });
+    const subscribed = (channel, label) => new Promise((resolve, reject) => channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") resolve();
+      if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status)) reject(new Error(`${label} subscription failed: ${status}`));
+    }));
+    await Promise.all([
+      subscribed(conversationChannel, "Conversation realtime"),
+      subscribed(profileChannel, "Profile inbox realtime")
+    ]);
+    // A private Broadcast subscription can be authorised before the database
+    // replication stream is ready. Give the stream a brief readiness window.
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    const { error } = await senderClient.from("messages").insert({ conversation_id: conversationId, sender_profile_id: ids.player, body });
+    if (error) throw error;
+    const receipt = Promise.all([conversationReceipt, profileReceipt]);
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Realtime INSERT was not delivered to both private topics within 12 seconds.")), 12_000);
+    });
+    const payloads = await Promise.race([receipt, timeout]);
+    ok(payloads.every((payload) => payload?.body === body), "recipient receives message INSERT over conversation and profile inbox broadcasts");
+  } catch (error) {
+    ok(false, "recipient receives message INSERT over conversation and profile inbox broadcasts", error instanceof Error ? error.message : String(error));
+  } finally {
+    if (timer) clearTimeout(timer);
+    await Promise.all([
+      receiverClient.removeChannel(conversationChannel),
+      receiverClient.removeChannel(profileChannel)
+    ]);
+  }
+}
+
 async function createConversation({ createdBy, subject, firstBody }) {
   const now = new Date().toISOString();
   const { data: conversation, error: conversationError } = await service
@@ -265,6 +315,9 @@ try {
   await markReadThroughAppPath(clubClient, ids.club, playerToClubConversationId, "club");
   ok((await unreadCount(ids.club, playerToClubConversationId)) === 0, "club unread count clears after read receipt update");
 
+  await verifyRealtimeInsert(clubClient, playerClient, playerToClubConversationId);
+  await markReadThroughAppPath(clubClient, ids.club, playerToClubConversationId, "club after realtime receipt");
+
   const clubReply = await clubClient.from("messages").insert({
     conversation_id: playerToClubConversationId,
     sender_profile_id: ids.club,
@@ -300,6 +353,16 @@ try {
   });
   ok(!playerReply.error, "player can reply to club-started conversation", playerReply.error?.message);
   ok((await unreadCount(ids.club, clubToPlayerConversationId)) === 1, "club receives unread notification for player reply");
+
+  const { error: healthError } = await service.from("service_health_events").insert({
+    service: "realtime",
+    operation: "production.two_user_message_flow",
+    status: failures.length ? "failure" : "success",
+    error_code: failures.length ? "flow_check_failed" : null,
+    error_detail: failures.length ? failures.join("; ").slice(0, 1000) : null,
+    context: { checks_failed: failures.length, transport: "private_broadcast" }
+  });
+  ok(!healthError, "messaging flow result is visible in service health history", healthError?.message);
 
   if (failures.length) {
     throw new Error(`${failures.length} check(s) failed:\n- ${failures.join("\n- ")}`);

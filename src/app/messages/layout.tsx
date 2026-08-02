@@ -227,6 +227,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
     scheduled_at: string | null;
     conversation_id: string | null;
     requested_by: string | null;
+    ring_expires_at: string | null;
     teams: { id: string; name: string; logo_url: string | null } | null;
     profiles: { id: string; display_name: string; avatar_url: string | null } | null;
   }
@@ -235,7 +236,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
   if (playerProfileIdForCalls) {
     const { data } = await serviceClient
       .from("meeting_requests")
-      .select(`id, team_id, player_profile_id, requested_by, status, request_reason, proposed_start_at, scheduled_at, conversation_id,
+      .select(`id, team_id, player_profile_id, requested_by, status, request_reason, proposed_start_at, scheduled_at, conversation_id, ring_expires_at,
         teams:meeting_requests_team_id_fkey(id, name, logo_url),
         profiles:meeting_requests_player_profile_id_fkey(id, display_name, avatar_url)`)
       .eq("player_profile_id", playerProfileIdForCalls)
@@ -247,7 +248,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
   } else if (clubTeamIdsForCalls.length) {
     const { data } = await serviceClient
       .from("meeting_requests")
-      .select(`id, team_id, player_profile_id, requested_by, status, request_reason, proposed_start_at, scheduled_at, conversation_id,
+      .select(`id, team_id, player_profile_id, requested_by, status, request_reason, proposed_start_at, scheduled_at, conversation_id, ring_expires_at,
         teams:meeting_requests_team_id_fkey(id, name, logo_url),
         profiles:meeting_requests_player_profile_id_fkey(id, display_name, avatar_url)`)
       .in("team_id", clubTeamIdsForCalls)
@@ -283,7 +284,8 @@ export default async function MessagesLayout({ children }: { children: ReactNode
       playerProfileId: call.player_profile_id,
       requestedBy: call.requested_by,
       conversationId: call.conversation_id,
-      callerName: profilesById.get(call.requested_by ?? "")?.display_name ?? (profile.role === "player" ? call.teams?.name : call.profiles?.display_name) ?? "EuroScout contact"
+      callerName: profilesById.get(call.requested_by ?? "")?.display_name ?? (profile.role === "player" ? call.teams?.name : call.profiles?.display_name) ?? "EuroScout contact",
+      ringExpiresAt: call.ring_expires_at
     }));
 
   return (
@@ -292,6 +294,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
         currentProfileId={profile.id}
         currentRole={profile.role}
         teamIds={clubTeamIdsForCalls}
+        conversationIds={conversationIds}
         initialCalls={incomingCalls}
         profileNames={Object.fromEntries((participantProfiles ?? []).map((participant) => [participant.id, participant.display_name]))}
       />

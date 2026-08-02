@@ -1,4 +1,5 @@
 import type { Profile } from "@/lib/auth";
+import { errorSummary, recordServiceHealthEvent } from "@/lib/observability";
 
 const DAILY_API_BASE = "https://api.daily.co/v1";
 const ROOM_START_BUFFER_MINUTES = 5;
@@ -59,6 +60,7 @@ function callWindow(scheduledAt: string, durationMinutes = DEFAULT_CALL_DURATION
 
 async function dailyPost<T>(path: string, body: Record<string, unknown>) {
   const apiKey = getDailyApiKey();
+  const startedAt = Date.now();
 
   if (!apiKey) {
     throw new Error("Daily is not configured. Add DAILY_API_KEY to enable video calls.");
@@ -78,7 +80,17 @@ async function dailyPost<T>(path: string, body: Record<string, unknown>) {
         signal: AbortSignal.timeout(DAILY_REQUEST_TIMEOUT_MS)
       });
 
-      if (response.ok) return (await response.json()) as T;
+      if (response.ok) {
+        const payload = (await response.json()) as T;
+        await recordServiceHealthEvent({
+          service: "daily",
+          operation: `POST ${path}`,
+          status: "success",
+          startedAt,
+          context: { attempt }
+        });
+        return payload;
+      }
 
       const errorText = (await response.text()).slice(0, 500);
       lastError = errorText || `Daily request failed with status ${response.status}.`;
@@ -92,12 +104,23 @@ async function dailyPost<T>(path: string, body: Record<string, unknown>) {
   }
 
   console.error("Daily API request failed", { path, attempts: DAILY_MAX_ATTEMPTS, error: lastError });
+  await recordServiceHealthEvent({
+    service: "daily",
+    operation: `POST ${path}`,
+    status: "failure",
+    startedAt,
+    errorCode: "daily_api_error",
+    errorDetail: lastError,
+    context: { attempts: DAILY_MAX_ATTEMPTS }
+  });
   throw new Error(`Video provider request failed. ${lastError}`);
 }
 
 export async function deleteDailyRoom(roomName: string) {
   const apiKey = getDailyApiKey();
   if (!apiKey || !roomName) return;
+
+  const startedAt = Date.now();
 
   const response = await fetch(`${DAILY_API_BASE}/rooms/${encodeURIComponent(roomName)}`, {
     method: "DELETE",
@@ -108,6 +131,34 @@ export async function deleteDailyRoom(roomName: string) {
 
   if (response && !response.ok && response.status !== 404) {
     console.error("[daily.room_cleanup.failed]", { roomName, status: response.status });
+    await recordServiceHealthEvent({
+      service: "daily",
+      operation: "DELETE /rooms/:name",
+      status: "failure",
+      startedAt,
+      errorCode: `http_${response.status}`,
+      errorDetail: "Daily room cleanup failed.",
+      context: { roomName }
+    });
+  } else if (response) {
+    await recordServiceHealthEvent({
+      service: "daily",
+      operation: "DELETE /rooms/:name",
+      status: "success",
+      startedAt,
+      context: { roomName, alreadyDeleted: response.status === 404 }
+    });
+  } else {
+    const summary = errorSummary("Daily room cleanup network request failed.");
+    await recordServiceHealthEvent({
+      service: "daily",
+      operation: "DELETE /rooms/:name",
+      status: "failure",
+      startedAt,
+      errorCode: summary.code,
+      errorDetail: summary.detail,
+      context: { roomName }
+    });
   }
 }
 

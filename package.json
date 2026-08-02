@@ -20,6 +20,7 @@
     "@daily-co/daily-js": "^0.87.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
@@ -30,6 +31,7 @@
     "react-dom": "^18.3.1",
     "recharts": "^3.9.1",
     "sharp": "^0.35.0",
+    "stripe": "^22.4.0",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
     "web-push": "^3.6.7"

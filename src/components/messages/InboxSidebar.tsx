@@ -59,8 +59,21 @@ interface ReadStatePayload {
   last_seen_at: string;
 }
 
+interface ProfileInboxChange {
+  table?: string;
+  record?: {
+    conversation_id?: string;
+    profile_id?: string;
+  };
+  old_record?: {
+    conversation_id?: string;
+    profile_id?: string;
+  };
+}
+
 interface MeetingChangePayload {
   id?: string;
+  status?: string;
 }
 
 interface InboxSidebarProps {
@@ -171,79 +184,81 @@ export default function InboxSidebar({
   // Realtime: messages + read-state
   useEffect(() => {
     let retryTimer: number | null = null;
-    const conversationIdSet = new Set(allConversationIds);
+    let cancelled = false;
+    let refreshTimer: number | null = null;
+    const handleInsert = ({ payload }: { payload: unknown }) => {
+      const change = payload as { table?: string; record?: NewMessagePayload };
+      if (change.table !== "messages" || !change.record) return;
+      const msg = change.record;
+      const sender = profilesById.get(msg.sender_profile_id);
+      const currentActive = activeConversationIdRef.current;
+      setItems((prev) => {
+        const updated = prev.map((item) => {
+          if (!item.conversationIds.includes(msg.conversation_id)) return item;
+          const isActiveThread = currentActive !== null && item.conversationIds.includes(currentActive);
+          const isOwnMessage = msg.sender_profile_id === currentProfileId;
+          return {
+            ...item,
+            latestBody: msg.body,
+            latestSenderName: sender?.display_name ?? "Member",
+            latestAt: msg.created_at,
+            unreadCount: isActiveThread || isOwnMessage ? item.unreadCount : item.unreadCount + 1
+          };
+        });
+        return [...updated].sort((a, b) => new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime());
+      });
+    };
+    const handleUpdate = ({ payload }: { payload: unknown }) => {
+      const change = payload as { table?: string; record?: ReadStatePayload };
+      if (change.table !== "conversation_participants" || change.record?.profile_id !== currentProfileId) return;
+      const update = change.record;
+      setItems((prev) => prev.map((item) => item.conversationIds.includes(update.conversation_id) ? { ...item, unreadCount: 0 } : item));
+    };
+    const handleProfileInbox = ({ payload }: { payload: unknown }) => {
+      const change = payload as ProfileInboxChange;
+      const row = change.record ?? change.old_record;
+      const conversationId = row?.conversation_id;
+      const discoversConversation =
+        change.table === "conversation_participants" && row?.profile_id === currentProfileId;
+      const unknownMessage = change.table === "messages" && Boolean(conversationId) && !allConversationIds.includes(conversationId ?? "");
+      if (!discoversConversation && !unknownMessage) return;
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => router.refresh(), 120);
+    };
+    const channels = allConversationIds.map((conversationId) => supabase
+      .channel(`conversation:${conversationId}:inbox`, { config: { private: true } })
+      .on("broadcast", { event: "INSERT" }, handleInsert)
+      .on("broadcast", { event: "UPDATE" }, handleUpdate));
+    const profileChannel = supabase
+      .channel(`profile:${currentProfileId}:inbox`, { config: { private: true } })
+      .on("broadcast", { event: "INSERT" }, handleProfileInbox)
+      .on("broadcast", { event: "UPDATE" }, handleProfileInbox)
+      .on("broadcast", { event: "DELETE" }, handleProfileInbox);
+    channels.push(profileChannel);
 
-    const channel = supabase
-      .channel("inbox-sidebar-rt")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        (payload) => {
-          const msg = payload.new as NewMessagePayload;
-          if (!conversationIdSet.has(msg.conversation_id)) return;
-
-          const sender = profilesById.get(msg.sender_profile_id);
-          const currentActive = activeConversationIdRef.current;
-
-          setItems((prev) => {
-            const updated = prev.map((item) => {
-              if (!item.conversationIds.includes(msg.conversation_id)) return item;
-              const isActiveThread =
-                currentActive !== null && item.conversationIds.includes(currentActive);
-              const isOwnMessage = msg.sender_profile_id === currentProfileId;
-              return {
-                ...item,
-                latestBody: msg.body,
-                latestSenderName: sender?.display_name ?? "Member",
-                latestAt: msg.created_at,
-                unreadCount:
-                  isActiveThread || isOwnMessage ? item.unreadCount : item.unreadCount + 1,
-              };
-            });
-            return [...updated].sort(
-              (a, b) => new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime()
-            );
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "conversation_participants",
-          filter: `profile_id=eq.${currentProfileId}`,
-        },
-        (payload) => {
-          const update = payload.new as ReadStatePayload;
-          setItems((prev) =>
-            prev.map((item) =>
-              item.conversationIds.includes(update.conversation_id)
-                ? { ...item, unreadCount: 0 }
-                : item
-            )
-          );
-        }
-      )
-      .subscribe((status) => {
+    void supabase.realtime.setAuth().then(() => {
+      if (cancelled) return;
+      if (!channels.length) setRealtimeStatus("live");
+      channels.forEach((channel) => channel.subscribe((status) => {
+        if (cancelled) return;
         if (status === "SUBSCRIBED") {
           setRealtimeStatus("live");
-          if (needsBackfillRef.current) {
-            needsBackfillRef.current = false;
-            router.refresh();
-          }
+          if (needsBackfillRef.current) { needsBackfillRef.current = false; router.refresh(); }
         }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           needsBackfillRef.current = true;
-          const offline = typeof navigator !== "undefined" && !navigator.onLine;
+          const offline = !navigator.onLine;
           setRealtimeStatus(offline ? "offline" : "recovering");
           if (!offline && retryTimer === null) retryTimer = window.setTimeout(() => setRetryKey((value) => value + 1), 1500);
         }
-      });
+      }));
+    }).catch(() => setRealtimeStatus(navigator.onLine ? "recovering" : "offline"));
 
     return () => {
+      cancelled = true;
       if (retryTimer !== null) window.clearTimeout(retryTimer);
-      void supabase.removeChannel(channel);
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      channels.forEach((channel) => void supabase.removeChannel(channel));
     };
   }, [supabase, allConversationIds, currentProfileId, profilesById, retryKey, router]);
 
@@ -258,18 +273,14 @@ export default function InboxSidebar({
 
   // Realtime: meeting_requests status changes
   useEffect(() => {
-    const channel = supabase
-      .channel("inbox-calls-rt")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "meeting_requests" },
-        async (payload) => {
-          const id =
-            (payload.new as MeetingChangePayload)?.id ??
-            (payload.old as MeetingChangePayload)?.id;
+    let cancelled = false;
+    const handleCallChange = async ({ payload }: { payload: unknown }) => {
+          const change = payload as { table?: string; record?: MeetingChangePayload; old_record?: MeetingChangePayload };
+          if (change.table !== "meeting_requests") return;
+          const id = change.record?.id ?? change.old_record?.id;
           if (!id) return;
 
-          const newStatus = (payload.new as { status?: string })?.status;
+          const newStatus = change.record?.status;
 
           // Remove if status is now closed
           if (["declined", "cancelled", "completed"].includes(newStatus ?? "")) {
@@ -320,14 +331,26 @@ export default function InboxSidebar({
             return next;
           });
           setCallsOpen(true);
-        }
-      )
-      .subscribe();
+    };
+    const channels = allConversationIds.map((conversationId) => supabase
+      .channel(`conversation:${conversationId}:inbox-calls`, { config: { private: true } })
+      .on("broadcast", { event: "INSERT" }, handleCallChange)
+      .on("broadcast", { event: "UPDATE" }, handleCallChange)
+      .on("broadcast", { event: "DELETE" }, handleCallChange));
+    channels.push(supabase
+      .channel(`profile:${currentProfileId}:inbox-calls`, { config: { private: true } })
+      .on("broadcast", { event: "INSERT" }, handleCallChange)
+      .on("broadcast", { event: "UPDATE" }, handleCallChange)
+      .on("broadcast", { event: "DELETE" }, handleCallChange));
+    void supabase.realtime.setAuth().then(() => {
+      if (!cancelled) channels.forEach((channel) => channel.subscribe());
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      channels.forEach((channel) => void supabase.removeChannel(channel));
     };
-  }, [supabase]);
+  }, [allConversationIds, currentProfileId, supabase]);
 
   const totalUnread = items.reduce((sum, item) => sum + item.unreadCount, 0);
   const pendingCallCount = callItems.filter(

@@ -1,25 +1,35 @@
 "use client";
 
 import Daily, { type DailyCall, type DailyEventObjectFatalError } from "@daily-co/daily-js";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface DailyPrebuiltCallProps {
+  meetingId: string;
   roomUrl: string;
   token: string;
   userName: string;
 }
 
-export default function DailyPrebuiltCall({ roomUrl, token, userName }: DailyPrebuiltCallProps) {
+export default function DailyPrebuiltCall({ meetingId, roomUrl, token, userName }: DailyPrebuiltCallProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const callRef = useRef<DailyCall | null>(null);
   const [status, setStatus] = useState<"loading" | "joining" | "joined" | "left" | "error">("loading");
   const [error, setError] = useState("");
+
+  const reportState = useCallback((state: "connecting" | "connected" | "ended", eventType: string, detail?: string) => {
+    void fetch(`/api/meetings/${meetingId}/state`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state, eventType, error: detail })
+    }).catch(() => undefined);
+  }, [meetingId]);
 
   useEffect(() => {
     if (!containerRef.current || callRef.current) return;
 
     let cancelled = false;
     setStatus("joining");
+    reportState("connecting", "daily.frame_created");
 
     const callFrame = Daily.createFrame(containerRef.current, {
       showLeaveButton: true,
@@ -70,22 +80,32 @@ export default function DailyPrebuiltCall({ roomUrl, token, userName }: DailyPre
 
     callFrame
       .on("joined-meeting", () => {
-        if (!cancelled) setStatus("joined");
+        if (!cancelled) {
+          setStatus("joined");
+          reportState("connected", "daily.joined_meeting");
+        }
       })
       .on("left-meeting", () => {
-        if (!cancelled) setStatus("left");
+        if (!cancelled) {
+          setStatus("left");
+          reportState("ended", "daily.left_meeting");
+        }
       })
       .on("error", (event) => {
         if (cancelled) return;
         const fatalEvent = event as DailyEventObjectFatalError;
-        setError(fatalEvent.errorMsg || "Daily could not join the room.");
+        const message = fatalEvent.errorMsg || "Daily could not join the room.";
+        setError(message);
         setStatus("error");
+        reportState("ended", "daily.frame_error", message);
       });
 
     callFrame.join({ url: roomUrl, token }).catch((joinError: unknown) => {
       if (cancelled) return;
-      setError(joinError instanceof Error ? joinError.message : "Daily could not join the room.");
+      const message = joinError instanceof Error ? joinError.message : "Daily could not join the room.";
+      setError(message);
       setStatus("error");
+      reportState("ended", "daily.join_failed", message);
     });
 
     return () => {
@@ -94,7 +114,7 @@ export default function DailyPrebuiltCall({ roomUrl, token, userName }: DailyPre
       callRef.current = null;
       existingCall?.destroy();
     };
-  }, [roomUrl, token, userName]);
+  }, [reportState, roomUrl, token, userName]);
 
   return (
     <div className="relative h-full min-h-[66vh] overflow-hidden bg-black">

@@ -7,7 +7,8 @@ const adminLinks = [
   { href: "/admin/clubs", label: "Clubs" },
   { href: "/admin/club-verification", label: "Club Verification" },
   { href: "/admin/news", label: "News" },
-  { href: "/admin/disputes", label: "Disputes" }
+  { href: "/admin/disputes", label: "Disputes" },
+  { href: "/admin/health", label: "Health" }
 ];
 
 export default function AdminNav() {

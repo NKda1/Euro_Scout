@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { deleteDailyRoom } from "@/lib/daily";
+import { errorSummary, recordCallLifecycleEvent, recordServiceHealthEvent } from "@/lib/observability";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -8,10 +9,17 @@ export const runtime = "nodejs";
 interface DailyWebhookEvent {
   type?: string;
   id?: string;
+  event_ts?: number;
   payload?: {
     room?: string;
+    meeting_id?: string;
     start_ts?: number;
     end_ts?: number;
+    joined_at?: number;
+    duration?: number;
+    session_id?: string;
+    user_id?: string;
+    user_name?: string;
   };
   test?: string;
 }
@@ -19,6 +27,8 @@ interface DailyWebhookEvent {
 function validSignature(body: string, timestamp: string | null, signature: string | null) {
   const secret = process.env.DAILY_WEBHOOK_SECRET;
   if (!secret || !timestamp || !signature) return false;
+  const timestampNumber = Number(timestamp);
+  if (!Number.isFinite(timestampNumber) || Math.abs(Date.now() / 1000 - timestampNumber) > 300) return false;
 
   try {
     const key = Buffer.from(secret, "base64");
@@ -31,6 +41,7 @@ function validSignature(body: string, timestamp: string | null, signature: strin
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const body = await request.text();
   let event: DailyWebhookEvent;
 
@@ -44,6 +55,14 @@ export async function POST(request: Request) {
   if (event.test === "test") return NextResponse.json({ ok: true });
 
   if (!validSignature(body, request.headers.get("x-webhook-timestamp"), request.headers.get("x-webhook-signature"))) {
+    await recordServiceHealthEvent({
+      service: "daily",
+      operation: "webhook.verify",
+      status: "failure",
+      startedAt,
+      errorCode: "invalid_signature",
+      errorDetail: "Daily webhook signature was missing, invalid, or older than five minutes."
+    });
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -57,7 +76,6 @@ export async function POST(request: Request) {
     .eq("event_id", eventId)
     .maybeSingle<{ processed_at: string | null }>();
   if (receiptLookupError) {
-    console.error("Daily webhook receipt could not be checked", { eventId, code: receiptLookupError.code });
     return NextResponse.json({ error: "Webhook receipt could not be checked" }, { status: 500 });
   }
   if (existingReceipt?.processed_at) return NextResponse.json({ received: true, duplicate: true });
@@ -70,34 +88,96 @@ export async function POST(request: Request) {
       payload: event
     });
     if (receiptError?.code === "23505") return NextResponse.json({ received: true, duplicate: true });
-    if (receiptError) {
-      console.error("Daily webhook receipt could not be recorded", { eventId, code: receiptError.code });
-      return NextResponse.json({ error: "Webhook receipt could not be recorded" }, { status: 500 });
+    if (receiptError) return NextResponse.json({ error: "Webhook receipt could not be recorded" }, { status: 500 });
+  }
+
+  try {
+    let meeting: { id: string; conversation_id: string | null } | null = null;
+    if (roomName) {
+      const { data, error } = await serviceClient
+        .from("meeting_requests")
+        .select("id, conversation_id")
+        .eq("daily_room_name", roomName)
+        .maybeSingle<{ id: string; conversation_id: string | null }>();
+      if (error) throw error;
+      meeting = data;
     }
-  }
 
-  if (event.type !== "meeting.ended" || !event.payload?.room) {
-    await serviceClient.from("daily_webhook_events").update({ processed_at: new Date().toISOString() }).eq("event_id", eventId);
+    if (meeting && (eventType === "meeting.started" || eventType === "participant.joined")) {
+      await recordCallLifecycleEvent({
+        meetingRequestId: meeting.id,
+        conversationId: meeting.conversation_id,
+        actorProfileId: event.payload?.user_id ?? null,
+        eventType: `daily.${eventType}`,
+        callState: "connected",
+        context: {
+          dailyEventId: eventId,
+          meetingSessionId: event.payload?.meeting_id ?? null,
+          participantSessionId: event.payload?.session_id ?? null,
+          participantName: event.payload?.user_name ?? null
+        }
+      });
+    } else if (meeting && eventType === "participant.left") {
+      await recordCallLifecycleEvent({
+        meetingRequestId: meeting.id,
+        conversationId: meeting.conversation_id,
+        actorProfileId: event.payload?.user_id ?? null,
+        eventType: "daily.participant.left",
+        callState: "connected",
+        updateMeeting: false,
+        context: {
+          dailyEventId: eventId,
+          participantSessionId: event.payload?.session_id ?? null,
+          durationSeconds: event.payload?.duration ?? null
+        }
+      });
+    } else if (meeting && eventType === "meeting.ended") {
+      const completedAt = event.payload?.end_ts
+        ? new Date(event.payload.end_ts * 1000).toISOString()
+        : new Date().toISOString();
+      const { error } = await serviceClient
+        .from("meeting_requests")
+        .update({ status: "completed", completed_at: completedAt, updated_at: new Date().toISOString() })
+        .eq("id", meeting.id)
+        .eq("status", "accepted");
+      if (error) throw error;
+
+      await recordCallLifecycleEvent({
+        meetingRequestId: meeting.id,
+        conversationId: meeting.conversation_id,
+        eventType: "daily.meeting.ended",
+        callState: "ended",
+        context: { dailyEventId: eventId, meetingSessionId: event.payload?.meeting_id ?? null }
+      });
+      if (roomName) await deleteDailyRoom(roomName);
+    }
+
+    const { error: processedError } = await serviceClient
+      .from("daily_webhook_events")
+      .update({ processed_at: new Date().toISOString(), processing_error: null })
+      .eq("event_id", eventId);
+    if (processedError) throw processedError;
+
+    await recordServiceHealthEvent({
+      service: "daily",
+      operation: `webhook.${eventType}`,
+      status: "success",
+      startedAt,
+      context: { eventId, roomName, meetingMatched: Boolean(meeting) }
+    });
     return NextResponse.json({ received: true });
+  } catch (error) {
+    const summary = errorSummary(error);
+    await serviceClient.from("daily_webhook_events").update({ processing_error: summary.detail }).eq("event_id", eventId);
+    await recordServiceHealthEvent({
+      service: "daily",
+      operation: `webhook.${eventType}`,
+      status: "failure",
+      startedAt,
+      errorCode: summary.code,
+      errorDetail: summary.detail,
+      context: { eventId, roomName }
+    });
+    return NextResponse.json({ error: "Daily webhook processing failed" }, { status: 500 });
   }
-
-  const completedAt = event.payload.end_ts
-    ? new Date(event.payload.end_ts * 1000).toISOString()
-    : new Date().toISOString();
-  const { error } = await serviceClient
-    .from("meeting_requests")
-    .update({ status: "completed", completed_at: completedAt, updated_at: new Date().toISOString() })
-    .eq("daily_room_name", event.payload.room)
-    .eq("status", "accepted");
-
-  if (error) {
-    console.error("Daily meeting completion update failed", { eventId: event.id, room: event.payload.room, code: error.code });
-    await serviceClient.from("daily_webhook_events").update({ processing_error: error.message }).eq("event_id", eventId);
-    return NextResponse.json({ error: "Completion update failed" }, { status: 500 });
-  }
-
-  await deleteDailyRoom(event.payload.room);
-  await serviceClient.from("daily_webhook_events").update({ processed_at: new Date().toISOString(), processing_error: null }).eq("event_id", eventId);
-
-  return NextResponse.json({ received: true });
 }

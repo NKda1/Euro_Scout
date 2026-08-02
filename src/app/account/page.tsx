@@ -38,6 +38,7 @@ import CareerTimelineBuilder from "@/components/account/CareerTimelineBuilder";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
 import MetricNumberControl from "@/components/account/MetricNumberControl";
 import MediaFileInput from "@/components/account/MediaFileInput";
+import PendingSubmitButton from "@/components/forms/PendingSubmitButton";
 import MeetingCountdown from "@/components/meetings/MeetingCountdown";
 import PlayerPhotoManager from "@/components/account/PlayerPhotoManager";
 import RosterNeedsBuilder from "@/components/account/RosterNeedsBuilder";
@@ -116,6 +117,8 @@ interface ClubStaffInviteRow {
   email: string;
   club_role: string;
   status: string;
+  email_delivery_status: "pending" | "sent" | "failed";
+  email_delivery_error: string | null;
   expires_at: string;
   created_at: string;
   teams: {
@@ -608,6 +611,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             email,
             club_role,
             status,
+            email_delivery_status,
+            email_delivery_error,
             expires_at,
             created_at,
             teams!team_id (
@@ -635,6 +640,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             email,
             club_role,
             status,
+            email_delivery_status,
+            email_delivery_error,
             expires_at,
             created_at,
             teams!team_id (
@@ -901,16 +908,16 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                         <form action={acceptClubStaffInviteAction}>
                           <input type="hidden" name="invite_id" value={invite.id} />
                           <input type="hidden" name="return_to" value="/account" />
-                          <button className="h-10 rounded-lg bg-red-600 px-4 text-xs font-black uppercase text-white transition hover:bg-red-700">
+                          <PendingSubmitButton pendingLabel="Joining…" size="md" className="text-xs uppercase">
                             Join club
-                          </button>
+                          </PendingSubmitButton>
                         </form>
                         <form action={declineClubStaffInviteAction}>
                           <input type="hidden" name="invite_id" value={invite.id} />
                           <input type="hidden" name="return_to" value="/account" />
-                          <button className="h-10 rounded-lg border border-red-200 bg-white px-4 text-xs font-black uppercase text-red-700 transition hover:border-red-300 dark:border-white/10 dark:bg-transparent dark:text-white/50 dark:hover:border-red-500/40 dark:hover:text-white">
+                          <PendingSubmitButton pendingLabel="Declining…" variant="outline" size="md" className="text-xs uppercase text-red-700 dark:text-red-200">
                             Decline
-                          </button>
+                          </PendingSubmitButton>
                         </form>
                       </div>
                     </div>
@@ -1987,23 +1994,26 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                             <p className="mt-1 text-xs font-semibold text-amber-800/75 dark:text-amber-100/65">
                               Invited as {invite.club_role.replace("_", " ")} · expires {formatNotificationTime(invite.expires_at)}
                             </p>
+                            <p className={`mt-1 text-xs font-black ${invite.email_delivery_status === "failed" ? "text-red-700 dark:text-red-200" : "text-emerald-700 dark:text-emerald-200"}`}>
+                              Email {invite.email_delivery_status}{invite.email_delivery_status === "failed" ? " — generate a fresh link to retry" : ""}
+                            </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <form action={refreshClubStaffInviteLinkAction}>
                               <input type="hidden" name="team_id" value={team.id} />
                               <input type="hidden" name="invite_id" value={invite.id} />
                               <input type="hidden" name="return_to" value="/account" />
-                              <button className="h-9 rounded-lg bg-red-600 px-3 text-xs font-black uppercase text-white transition hover:bg-red-700">
-                                Generate link
-                              </button>
+                              <PendingSubmitButton pendingLabel="Sending…" size="sm" className="uppercase">
+                                Resend invite
+                              </PendingSubmitButton>
                             </form>
                             <form action={cancelClubStaffInviteAction}>
                               <input type="hidden" name="team_id" value={team.id} />
                               <input type="hidden" name="invite_id" value={invite.id} />
                               <input type="hidden" name="return_to" value="/account" />
-                              <button className="h-9 rounded-lg border border-amber-300 bg-white px-3 text-xs font-black uppercase text-amber-900 transition hover:border-red-300 hover:text-red-700 dark:border-amber-500/35 dark:bg-transparent dark:text-amber-100 dark:hover:bg-amber-500 dark:hover:text-white">
+                              <PendingSubmitButton pendingLabel="Cancelling…" variant="outline" size="sm" className="uppercase text-amber-900 dark:text-amber-100">
                                 Cancel invite
-                              </button>
+                              </PendingSubmitButton>
                             </form>
                           </div>
                         </div>
@@ -2023,9 +2033,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                     <option value="recruiter">Recruiter</option>
                     <option value="analyst">Analyst</option>
                   </select>
-                  <button disabled={availableStaffSlots === 0} className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25">
+                  <PendingSubmitButton disabled={availableStaffSlots === 0} pendingLabel="Sending invite…" className="h-11 px-5">
                     Invite staff
-                  </button>
+                  </PendingSubmitButton>
                   <p className="text-sm font-semibold text-slate-500 dark:text-white/35 md:col-span-3">
                     {availableStaffSlots} staff slot{availableStaffSlots === 1 ? "" : "s"} available. Invited staff can use the secure invite link to sign up or sign in and join this club directly.
                   </p>

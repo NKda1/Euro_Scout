@@ -13,6 +13,7 @@ export interface IncomingCall {
   requestedBy: string | null;
   conversationId: string | null;
   callerName: string;
+  ringExpiresAt: string | null;
 }
 
 interface MeetingChange {
@@ -23,9 +24,10 @@ interface MeetingChange {
   conversation_id?: string | null;
   request_reason?: string | null;
   status?: string;
+  ring_expires_at?: string | null;
 }
 
-export default function IncomingCallManager({ currentProfileId, currentRole, teamIds, initialCalls, profileNames }: { currentProfileId: string; currentRole: string; teamIds: string[]; initialCalls: IncomingCall[]; profileNames: Record<string, string> }) {
+export default function IncomingCallManager({ currentProfileId, currentRole, teamIds, conversationIds, initialCalls, profileNames }: { currentProfileId: string; currentRole: string; teamIds: string[]; conversationIds: string[]; initialCalls: IncomingCall[]; profileNames: Record<string, string> }) {
   const [calls, setCalls] = useState(initialCalls);
   const [connection, setConnection] = useState<"connecting" | "live" | "recovering" | "offline">("connecting");
   const [retryKey, setRetryKey] = useState(0);
@@ -49,7 +51,8 @@ export default function IncomingCallManager({ currentProfileId, currentRole, tea
       playerProfileId: row.player_profile_id ?? "",
       requestedBy: row.requested_by ?? null,
       conversationId: row.conversation_id ?? null,
-      callerName: profileNames[row.requested_by ?? ""] ?? "EuroScout contact"
+      callerName: profileNames[row.requested_by ?? ""] ?? "EuroScout contact",
+      ringExpiresAt: row.ring_expires_at ?? null
     };
     setCalls((current) => current.some((call) => call.id === next.id) ? current.map((call) => call.id === next.id ? next : call) : [...current, next]);
   }, [appliesToCurrentUser, profileNames]);
@@ -57,7 +60,7 @@ export default function IncomingCallManager({ currentProfileId, currentRole, tea
   const syncIncomingCalls = useCallback(async () => {
     let query = supabase
       .from("meeting_requests")
-      .select("id, team_id, player_profile_id, requested_by, conversation_id, request_reason, status")
+      .select("id, team_id, player_profile_id, requested_by, conversation_id, request_reason, status, ring_expires_at")
       .eq("status", "accepted")
       .eq("request_reason", "Call now");
     if (currentRole === "player") query = query.eq("player_profile_id", currentProfileId);
@@ -73,7 +76,8 @@ export default function IncomingCallManager({ currentProfileId, currentRole, tea
         playerProfileId: row.player_profile_id ?? "",
         requestedBy: row.requested_by ?? null,
         conversationId: row.conversation_id ?? null,
-        callerName: profileNames[row.requested_by ?? ""] ?? "EuroScout contact"
+        callerName: profileNames[row.requested_by ?? ""] ?? "EuroScout contact",
+        ringExpiresAt: row.ring_expires_at ?? null
       }))
       .filter((call) => call.id);
     setCalls(incoming);
@@ -81,21 +85,41 @@ export default function IncomingCallManager({ currentProfileId, currentRole, tea
 
   useEffect(() => {
     let retryTimer: number | null = null;
-    const channel = supabase.channel(`incoming-calls:${currentProfileId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "meeting_requests" }, (payload) => upsertFromRow((payload.new ?? payload.old) as MeetingChange))
-      .subscribe((status) => {
+    let cancelled = false;
+    const handleChange = ({ payload }: { payload: unknown }) => {
+      const change = payload as { table?: string; record?: MeetingChange; old_record?: MeetingChange };
+      if (change.table === "meeting_requests") upsertFromRow(change.record ?? change.old_record ?? {});
+    };
+    const channels = conversationIds.map((conversationId) => supabase
+      .channel(`conversation:${conversationId}:incoming`, { config: { private: true } })
+      .on("broadcast", { event: "INSERT" }, handleChange)
+      .on("broadcast", { event: "UPDATE" }, handleChange)
+      .on("broadcast", { event: "DELETE" }, handleChange));
+    channels.push(supabase
+      .channel(`profile:${currentProfileId}:incoming`, { config: { private: true } })
+      .on("broadcast", { event: "INSERT" }, handleChange)
+      .on("broadcast", { event: "UPDATE" }, handleChange)
+      .on("broadcast", { event: "DELETE" }, handleChange));
+
+    void supabase.realtime.setAuth().then(() => {
+      if (cancelled) return;
+      if (!channels.length) { setConnection("live"); return; }
+      channels.forEach((channel) => channel.subscribe((status) => {
+        if (cancelled) return;
         if (status === "SUBSCRIBED") { setConnection("live"); void syncIncomingCalls(); }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           const offline = !navigator.onLine;
           setConnection(offline ? "offline" : "recovering");
           if (!offline && retryTimer === null) retryTimer = window.setTimeout(() => setRetryKey((value) => value + 1), 1500);
         }
-      });
+      }));
+    }).catch(() => setConnection(navigator.onLine ? "recovering" : "offline"));
     return () => {
+      cancelled = true;
       if (retryTimer !== null) window.clearTimeout(retryTimer);
-      void supabase.removeChannel(channel);
+      channels.forEach((channel) => void supabase.removeChannel(channel));
     };
-  }, [currentProfileId, retryKey, supabase, syncIncomingCalls, upsertFromRow]);
+  }, [conversationIds, currentProfileId, retryKey, supabase, syncIncomingCalls, upsertFromRow]);
 
   useEffect(() => {
     const offline = () => setConnection("offline");
@@ -105,6 +129,26 @@ export default function IncomingCallManager({ currentProfileId, currentRole, tea
     if (!navigator.onLine) setConnection("offline");
     return () => { window.removeEventListener("offline", offline); window.removeEventListener("online", online); };
   }, [syncIncomingCalls]);
+
+  useEffect(() => {
+    const activeCall = calls[0];
+    if (!activeCall?.ringExpiresAt) return;
+    const remaining = new Date(activeCall.ringExpiresAt).getTime() - Date.now();
+    const markMissed = () => {
+      setCalls((current) => current.filter((call) => call.id !== activeCall.id));
+      void fetch(`/api/meetings/${activeCall.id}/state`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: "missed", eventType: "recipient.ring_timeout" })
+      });
+    };
+    if (remaining <= 0) {
+      markMissed();
+      return;
+    }
+    const timer = window.setTimeout(markMissed, remaining);
+    return () => window.clearTimeout(timer);
+  }, [calls]);
 
   const active = calls[0];
   if (!active) return null;

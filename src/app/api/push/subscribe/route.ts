@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { recordServiceHealthEvent } from "@/lib/observability";
 
 export async function POST(request: NextRequest) {
   const limit = rateLimit(`push-subscribe:${getClientIp(request)}`, 30, 60 * 60_000);
@@ -62,8 +63,19 @@ export async function POST(request: NextRequest) {
     );
 
   if (error) {
+    await recordServiceHealthEvent({ service: "push", operation: "subscription.upsert", status: "failure", errorCode: error.code, errorDetail: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await serviceClient.from("notification_preferences").upsert({
+    profile_id: profile.id,
+    permission_state: "granted",
+    prompt_state: "accepted",
+    subscription_active: true,
+    decided_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }, { onConflict: "profile_id" });
+  await recordServiceHealthEvent({ service: "push", operation: "subscription.upsert", status: "success" });
 
   return NextResponse.json({ ok: true });
 }

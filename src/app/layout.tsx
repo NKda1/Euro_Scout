@@ -8,6 +8,7 @@ import PageTransition from "@/components/layout/PageTransition";
 import NavHistoryButtons from "@/components/layout/NavHistoryButtons";
 import PushNotificationPrompt from "@/components/layout/PushNotificationPrompt";
 import CookieConsent from "@/components/layout/CookieConsent";
+import ConsentAwareAnalytics from "@/components/layout/ConsentAwareAnalytics";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <PushNotificationPrompt />
         <Footer />
         <CookieConsent />
+        <ConsentAwareAnalytics />
         <SpeedInsights />
       </body>
     </html>

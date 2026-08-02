@@ -2,29 +2,31 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-
-const STORAGE_KEY = "euroscout-cookie-consent";
+import {
+  COOKIE_CONSENT_OPEN_EVENT,
+  readCookieConsent,
+  writeCookieConsent,
+  type CookieConsentStatus
+} from "@/lib/consent";
 
 export default function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) setVisible(true);
-    } catch {
-      // localStorage not available
-    }
+    const sync = () => setVisible(!readCookieConsent());
+    const open = () => setVisible(true);
+    sync();
+    window.addEventListener(COOKIE_CONSENT_OPEN_EVENT, open);
+    return () => window.removeEventListener(COOKIE_CONSENT_OPEN_EVENT, open);
   }, []);
 
-  function accept() {
-    try { localStorage.setItem(STORAGE_KEY, "accepted"); } catch { /* noop */ }
-    setVisible(false);
-  }
-
-  function decline() {
-    try { localStorage.setItem(STORAGE_KEY, "declined"); } catch { /* noop */ }
-    setVisible(false);
+  function decide(status: CookieConsentStatus) {
+    try {
+      writeCookieConsent(status);
+      setVisible(false);
+    } catch {
+      setVisible(true);
+    }
   }
 
   if (!visible) return null;
@@ -44,14 +46,16 @@ export default function CookieConsent() {
         </p>
         <div className="flex shrink-0 gap-3">
           <button
-            onClick={decline}
-            className="h-10 px-5 text-sm font-black text-slate-600 transition hover:text-red-600 dark:text-slate-300 dark:hover:text-red-400"
+            type="button"
+            onClick={() => decide("declined")}
+            className="h-10 rounded-lg border border-slate-300 bg-white px-5 text-sm font-black text-slate-700 transition hover:border-red-300 hover:text-red-700 dark:border-white/15 dark:bg-white/5 dark:text-white"
           >
-            Decline
+            Decline optional
           </button>
           <button
-            onClick={accept}
-            className="h-10 bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700"
+            type="button"
+            onClick={() => decide("accepted")}
+            className="h-10 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700"
           >
             Accept all
           </button>

@@ -149,15 +149,12 @@ export default function MessageThread({
     const channel = supabase
       .channel(`conversation:${conversationId}:thread`, { config: { private: true } })
       .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${conversationId}`
-        },
-        async (payload) => {
-          const newMsg = payload.new as Message;
+        "broadcast",
+        { event: "INSERT" },
+        async ({ payload }) => {
+          const change = payload as { table?: string; record?: Message };
+          if (change.table !== "messages" || !change.record) return;
+          const newMsg = change.record;
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev;
             return sortMessages([...prev, newMsg]);
@@ -174,15 +171,12 @@ export default function MessageThread({
         }
       )
       .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "conversation_participants",
-          filter: `conversation_id=eq.${conversationId}`
-        },
-        (payload) => {
-          const updatedState = payload.new as ParticipantReadState;
+        "broadcast",
+        { event: "UPDATE" },
+        ({ payload }) => {
+          const change = payload as { table?: string; record?: ParticipantReadState };
+          if (change.table !== "conversation_participants" || !change.record) return;
+          const updatedState = change.record;
           setReadStates((prev) =>
             prev.map((state) => (state.profile_id === updatedState.profile_id ? { ...state, ...updatedState } : state))
           );

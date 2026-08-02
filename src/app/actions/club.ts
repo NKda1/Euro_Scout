@@ -742,6 +742,8 @@ export async function inviteStaffFromAccountAction(formData: FormData) {
     invite_token_hash: hashStaffInviteToken(inviteToken),
     invite_token_created_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    email_delivery_status: "pending",
+    email_delivery_error: null,
     updated_at: new Date().toISOString()
   };
 
@@ -764,8 +766,20 @@ export async function inviteStaffFromAccountAction(formData: FormData) {
       inviteUrl: absoluteInviteUrl,
       expiresAt: new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(payload.expires_at))
     });
+    await serviceClient
+      .from("club_staff_invites")
+      .update({ email_delivery_status: "sent", email_last_sent_at: new Date().toISOString(), email_delivery_error: null, updated_at: new Date().toISOString() })
+      .eq("team_id", teamId)
+      .eq("email", normalizedEmail)
+      .eq("status", "pending");
   } catch (emailError) {
     inviteEmailError = emailError instanceof Error ? emailError.message : "Invitation email could not be delivered.";
+    await serviceClient
+      .from("club_staff_invites")
+      .update({ email_delivery_status: "failed", email_delivery_error: inviteEmailError.slice(0, 500), updated_at: new Date().toISOString() })
+      .eq("team_id", teamId)
+      .eq("email", normalizedEmail)
+      .eq("status", "pending");
     console.error("[club.staff_invite.email_failed]", { teamId, invitedProfileExists: Boolean(invitedProfileId) });
   }
 
@@ -824,6 +838,8 @@ export async function refreshClubStaffInviteLinkAction(formData: FormData) {
       invite_token_hash: hashStaffInviteToken(inviteToken),
       invite_token_created_at: now,
       expires_at: expiresAt,
+      email_delivery_status: "pending",
+      email_delivery_error: null,
       updated_at: now
     })
     .eq("id", invite.id);
@@ -842,8 +858,11 @@ export async function refreshClubStaffInviteLinkAction(formData: FormData) {
       inviteUrl: new URL(inviteLink, getBaseUrl()).toString(),
       expiresAt: new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(expiresAt))
     });
-  } catch {
+    await serviceClient.from("club_staff_invites").update({ email_delivery_status: "sent", email_last_sent_at: new Date().toISOString(), email_delivery_error: null, updated_at: new Date().toISOString() }).eq("id", invite.id);
+  } catch (emailError) {
     delivered = false;
+    const detail = emailError instanceof Error ? emailError.message : "Invitation email could not be delivered.";
+    await serviceClient.from("club_staff_invites").update({ email_delivery_status: "failed", email_delivery_error: detail.slice(0, 500), updated_at: new Date().toISOString() }).eq("id", invite.id);
     console.error("[club.staff_invite.refresh_email_failed]", { teamId });
   }
 

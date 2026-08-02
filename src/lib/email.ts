@@ -1,3 +1,5 @@
+import { recordServiceHealthEvent } from "@/lib/observability";
+
 /**
  * Transactional email helper via Postmark.
  *
@@ -35,9 +37,11 @@ interface PostmarkResponse {
 }
 
 async function sendEmail(params: { to: string; subject: string; html: string; text: string; tag: string }) {
+  const startedAt = Date.now();
   const token = process.env.POSTMARK_SERVER_TOKEN?.trim();
   if (!token) {
     console.error("[email.postmark.configuration_missing]", { tag: params.tag });
+    await recordServiceHealthEvent({ service: "email", operation: `send.${params.tag}`, status: "failure", startedAt, errorCode: "configuration_missing", errorDetail: "POSTMARK_SERVER_TOKEN is not configured." });
     throw new Error("Transactional email is not configured.");
   }
 
@@ -67,6 +71,7 @@ async function sendEmail(params: { to: string; subject: string; html: string; te
 
       if (response.ok) {
         console.info("[email.postmark.delivered]", { tag: params.tag, messageId: payload?.MessageID, attempt });
+        await recordServiceHealthEvent({ service: "email", operation: `send.${params.tag}`, status: "success", startedAt, context: { messageId: payload?.MessageID ?? null, attempt } });
         return;
       }
 
@@ -93,6 +98,7 @@ async function sendEmail(params: { to: string; subject: string; html: string; te
     if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** (attempt - 1)));
   }
 
+  await recordServiceHealthEvent({ service: "email", operation: `send.${params.tag}`, status: "failure", startedAt, errorCode: "postmark_delivery_failed", errorDetail: lastMessage });
   throw new Error(lastMessage);
 }
 

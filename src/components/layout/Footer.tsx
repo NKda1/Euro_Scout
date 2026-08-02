@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { routes } from "@/constants/routes";
+import CookieSettingsButton from "@/components/layout/CookieSettingsButton";
 
 const navLinks = [
   { href: routes.home, label: "Home" },
@@ -57,6 +58,7 @@ export default function Footer() {
                   </Link>
                 </li>
               ))}
+              <li><CookieSettingsButton /></li>
             </ul>
           </div>
 

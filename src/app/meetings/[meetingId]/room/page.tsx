@@ -197,7 +197,7 @@ export default async function MeetingRoomPage({ params, searchParams }: MeetingR
 
           <section className="min-h-[70vh] overflow-hidden rounded-xl border border-white/10 bg-[#111] shadow-2xl shadow-black/20">
             {canLoadCall && meeting.daily_room_url && token ? (
-              <DailyPrebuiltCall roomUrl={meeting.daily_room_url} token={token} userName={profile.display_name} />
+              <DailyPrebuiltCall meetingId={meeting.id} roomUrl={meeting.daily_room_url} token={token} userName={profile.display_name} />
             ) : (
               <div className="flex min-h-[70vh] items-center justify-center p-6">
                 <div className="max-w-md text-center">

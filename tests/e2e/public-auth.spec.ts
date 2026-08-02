@@ -34,6 +34,26 @@ test.describe("authentication entry points", () => {
   });
 });
 
+test.describe("privacy consent", () => {
+  test("cookie choice is durable and can be reopened from the footer", async ({ page }) => {
+    await page.goto("/auth/sign-in");
+
+    const dialog = page.getByRole("dialog", { name: "Cookie consent" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Decline optional" }).click();
+    await expect(dialog).toBeHidden();
+
+    const stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem("euroscout-cookie-consent") ?? "null"));
+    expect(stored).toMatchObject({ version: 2, status: "declined" });
+    expect(Date.parse(stored.expiresAt)).toBeGreaterThan(Date.now());
+
+    await page.reload();
+    await expect(dialog).toBeHidden();
+    await page.getByRole("button", { name: "Cookie settings" }).click();
+    await expect(dialog).toBeVisible();
+  });
+});
+
 test.describe("API security contracts", () => {
   test("Daily connectivity probe is accepted but unsigned events are rejected", async ({ request }) => {
     const probe = await request.post("/api/webhooks/daily", { data: { test: "test" } });
