@@ -123,6 +123,8 @@ export default async function ConversationPage({ params, searchParams }: Convers
         scheduled_at,
         scheduled_duration_minutes,
         daily_room_url,
+        call_state,
+        ring_expires_at,
         teams!meeting_requests_team_id_fkey (
           id,
           name,
@@ -139,6 +141,17 @@ export default async function ConversationPage({ params, searchParams }: Convers
     .order("created_at", { ascending: false })
     .limit(6)
     .returns<MeetingRequestRow[]>();
+
+  const activeInstantCall = (meetingRequests ?? []).find(
+    (meeting) => meeting.request_reason === "Call now"
+      && meeting.status === "accepted"
+      && (["connecting", "connected"].includes(meeting.call_state ?? "")
+        || !meeting.ring_expires_at
+        || new Date(meeting.ring_expires_at).getTime() > Date.now())
+  );
+  const hasScheduledCall = (meetingRequests ?? []).some(
+    (meeting) => meeting.request_reason !== "Call now" && ["pending", "club_proposed", "accepted"].includes(meeting.status)
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -209,7 +222,8 @@ export default async function ConversationPage({ params, searchParams }: Convers
             targetPlayerId={conversationPlayer.id}
             currentRole={profile.role}
             counterpartName={displayProfile?.display_name ?? "this contact"}
-            hasOpenCall={(meetingRequests ?? []).some((meeting) => ["pending", "club_proposed", "accepted"].includes(meeting.status))}
+            activeInstantCallId={activeInstantCall?.id ?? null}
+            hasScheduledCall={hasScheduledCall}
             currentProfileId={profile.id}
           />
         ) : null}

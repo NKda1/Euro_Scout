@@ -457,12 +457,38 @@ export async function startInstantCallAction(formData: FormData) {
   const { data: player } = await serviceClient.from("profiles").select("id, role").eq("id", playerProfileId).maybeSingle<{ id: string; role: string }>();
   if (!player || player.role !== "player") redirectWithError(returnPath, "A player participant is required for this call.");
 
-  const { data: existing } = await serviceClient
-    .from("meeting_requests").select("id, status, request_reason").eq("team_id", teamId).eq("player_profile_id", playerProfileId)
-    .in("status", OPEN_MEETING_STATUSES).limit(1).maybeSingle<{ id: string; status: string; request_reason: string | null }>();
-  if (existing) {
-    if (existing.status === "accepted" && existing.request_reason === "Call now") redirect(`/meetings/${existing.id}/room`);
-    redirect(`${returnPath}?notice=${encodeURIComponent("An active scheduled call already exists in this conversation.")}`);
+  const { data: existingInstant } = await serviceClient
+    .from("meeting_requests")
+    .select("id, call_state, ring_expires_at, daily_room_name")
+    .eq("conversation_id", conversationId)
+    .eq("request_reason", "Call now")
+    .eq("status", "accepted")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string; call_state: string | null; ring_expires_at: string | null; daily_room_name: string | null }>();
+  if (existingInstant) {
+    const ringIsActive = !existingInstant.ring_expires_at || new Date(existingInstant.ring_expires_at).getTime() > Date.now();
+    const callIsConnected = ["connecting", "connected"].includes(existingInstant.call_state ?? "");
+    if (ringIsActive || callIsConnected) redirect(`/meetings/${existingInstant.id}/room`);
+
+    const recoveredAt = new Date().toISOString();
+    const { error: recoveryError } = await serviceClient
+      .from("meeting_requests")
+      .update({ status: "expired", call_state: "missed", ring_expires_at: null, last_call_event_at: recoveredAt, updated_at: recoveredAt })
+      .eq("id", existingInstant.id)
+      .eq("status", "accepted");
+    if (recoveryError) redirectWithError(returnPath, "The previous call is still closing. Please try again.");
+
+    await recordCallLifecycleEvent({
+      meetingRequestId: existingInstant.id,
+      conversationId,
+      actorProfileId: profile.id,
+      eventType: "call.stale_ring_recovered",
+      callState: "missed",
+      context: { ringExpiredAt: existingInstant.ring_expires_at },
+      updateMeeting: false
+    });
+    if (existingInstant.daily_room_name) await deleteDailyRoom(existingInstant.daily_room_name);
   }
 
   const now = new Date().toISOString();

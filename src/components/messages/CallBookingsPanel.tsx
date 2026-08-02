@@ -27,6 +27,8 @@ export interface CallBookingRow {
   scheduled_at: string | null;
   scheduled_duration_minutes: number;
   daily_room_url: string | null;
+  call_state: string | null;
+  ring_expires_at: string | null;
   teams: { id: string; name: string; logo_url: string | null } | null;
   profiles: { id: string; display_name: string; avatar_url: string | null } | null;
 }
@@ -68,10 +70,10 @@ function countdown(value: string | null, now: number) {
 }
 
 function statusStyle(status: string) {
-  if (["accepted", "confirmed", "starting_soon", "live"].includes(status)) return "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200";
+  if (["accepted", "confirmed", "starting_soon", "live", "ringing", "connecting", "connected"].includes(status)) return "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200";
   if (["club_proposed", "awaiting_confirmation"].includes(status)) return "border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200";
   if (["pending", "requested"].includes(status)) return "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200";
-  if (["cancelled", "declined"].includes(status)) return "border-red-200 bg-red-50 text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-200";
+  if (["cancelled", "declined", "missed", "expired"].includes(status)) return "border-red-200 bg-red-50 text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-200";
   return "border-slate-300 bg-slate-100 text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-white/65";
 }
 
@@ -83,7 +85,7 @@ export default function CallBookingsPanel({ conversationId, initialMeetings, cur
   const refreshMeeting = useCallback(async (id: string) => {
     const { data } = await supabase
       .from("meeting_requests")
-      .select(`id, team_id, player_profile_id, requested_by, status, request_reason, request_note, club_response_note, proposed_start_at, proposed_alternative_at, scheduled_at, scheduled_duration_minutes, daily_room_url, teams:meeting_requests_team_id_fkey(id, name, logo_url), profiles:meeting_requests_player_profile_id_fkey(id, display_name, avatar_url)`)
+      .select(`id, team_id, player_profile_id, requested_by, status, request_reason, request_note, club_response_note, proposed_start_at, proposed_alternative_at, scheduled_at, scheduled_duration_minutes, daily_room_url, call_state, ring_expires_at, teams:meeting_requests_team_id_fkey(id, name, logo_url), profiles:meeting_requests_player_profile_id_fkey(id, display_name, avatar_url)`)
       .eq("id", id)
       .maybeSingle<CallBookingRow>();
     if (!data) return;
@@ -121,6 +123,7 @@ export default function CallBookingsPanel({ conversationId, initialMeetings, cur
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         {meetings.map((meeting, index) => {
+          const isInstant = meeting.request_reason === "Call now";
           const isPending = meeting.status === "pending";
           const isClubProposed = meeting.status === "club_proposed";
           const isAccepted = meeting.status === "accepted";
@@ -132,7 +135,9 @@ export default function CallBookingsPanel({ conversationId, initialMeetings, cur
           const playerName = meeting.player_profile_id === currentProfileId ? "You" : meeting.profiles?.display_name ?? "Player";
           const scheduledMs = selectedTime ? new Date(selectedTime).getTime() : Number.NaN;
           const callEndsMs = scheduledMs + ((meeting.scheduled_duration_minutes ?? 30) + 30) * 60_000;
-          const displayStatus = isAccepted
+          const displayStatus = isInstant
+            ? (meeting.call_state === "dialling" ? "ringing" : meeting.call_state) || meeting.status
+            : isAccepted
             ? now > callEndsMs ? "expired" : now >= scheduledMs - 5 * 60_000 ? "live" : now >= scheduledMs - 30 * 60_000 ? "starting_soon" : "confirmed"
             : isClubProposed ? "awaiting_confirmation" : isPending ? "requested" : meeting.status;
           const statusLabel = displayStatus.replaceAll("_", " ");
@@ -150,7 +155,7 @@ export default function CallBookingsPanel({ conversationId, initialMeetings, cur
                   </div>
                   <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-white/45">
                     <Clock3 className="h-3 w-3" aria-hidden />
-                    {isAccepted ? countdown(selectedTime, now) : fmt(selectedTime)}
+                    {isInstant ? (isAccepted ? "Live call" : `Call ${displayStatus.replaceAll("_", " ")}`) : isAccepted ? countdown(selectedTime, now) : fmt(selectedTime)}
                     <span aria-hidden>·</span> {meeting.scheduled_duration_minutes ?? 30} min
                   </p>
                 </div>
@@ -158,11 +163,17 @@ export default function CallBookingsPanel({ conversationId, initialMeetings, cur
               </summary>
 
               <div className="space-y-3 border-t border-slate-100 p-3 dark:border-white/[0.06]">
-                <dl className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div><dt className="font-black uppercase text-slate-400">Preferred</dt><dd className="mt-0.5 font-bold text-slate-800 dark:text-white/75">{fmt(meeting.proposed_start_at)}</dd></div>
-                  <div><dt className="font-black uppercase text-slate-400">Alternative</dt><dd className="mt-0.5 font-bold text-slate-800 dark:text-white/75">{fmt(meeting.proposed_alternative_at)}</dd></div>
-                  {meeting.scheduled_at ? <div className="col-span-2"><dt className="font-black uppercase text-emerald-600">Final time</dt><dd className="mt-0.5 font-bold text-emerald-700 dark:text-emerald-300">{fmt(meeting.scheduled_at)}</dd></div> : null}
-                </dl>
+                {isInstant ? (
+                  <p className="rounded-lg bg-slate-50 p-2.5 text-xs font-semibold text-slate-600 dark:bg-black/25 dark:text-white/55">
+                    Instant call started {fmt(meeting.scheduled_at)}. Its live state and final outcome remain on this card.
+                  </p>
+                ) : (
+                  <dl className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div><dt className="font-black uppercase text-slate-400">Preferred</dt><dd className="mt-0.5 font-bold text-slate-800 dark:text-white/75">{fmt(meeting.proposed_start_at)}</dd></div>
+                    <div><dt className="font-black uppercase text-slate-400">Alternative</dt><dd className="mt-0.5 font-bold text-slate-800 dark:text-white/75">{fmt(meeting.proposed_alternative_at)}</dd></div>
+                    {meeting.scheduled_at ? <div className="col-span-2"><dt className="font-black uppercase text-emerald-600">Final time</dt><dd className="mt-0.5 font-bold text-emerald-700 dark:text-emerald-300">{fmt(meeting.scheduled_at)}</dd></div> : null}
+                  </dl>
+                )}
                 {(meeting.request_reason || meeting.request_note || meeting.club_response_note) ? (
                   <div className="rounded-lg bg-slate-50 p-2.5 text-xs font-semibold leading-5 text-slate-600 dark:bg-black/25 dark:text-white/55">
                     {meeting.request_reason ? <p className="font-black text-slate-800 dark:text-white/80">{meeting.request_reason}</p> : null}
@@ -195,8 +206,12 @@ export default function CallBookingsPanel({ conversationId, initialMeetings, cur
                   <div className="grid grid-cols-2 gap-2">
                     <form action={createMeetingJoinLinkAction}><input type="hidden" name="meeting_request_id" value={meeting.id} /><input type="hidden" name="return_to" value={`/messages/${conversationId}`} /><button className="h-9 w-full rounded-lg bg-red-600 px-3 text-[10px] font-black uppercase text-white hover:bg-red-700">{meeting.daily_room_url ? "Join call" : "Open room"}</button></form>
                     <Link href={`/meetings/${meeting.id}/room`} className={secondaryButton}>Call details</Link>
-                    <form action={rescheduleMeetingRequestAction} className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2"><input type="hidden" name="meeting_request_id" value={meeting.id} /><input type="hidden" name="return_to" value={`/messages/${conversationId}`} /><input name="scheduled_at" type="datetime-local" required defaultValue={toLocal(selectedTime)} className={inputClass} /><button className={secondaryButton}>Reschedule</button></form>
-                    <form action={rescheduleMeetingRequestAction}><input type="hidden" name="meeting_request_id" value={meeting.id} /><input type="hidden" name="return_to" value={`/messages/${conversationId}`} /><input type="hidden" name="mode" value="postpone" /><button className={`${secondaryButton} w-full`}>Postpone 24h</button></form>
+                    {!isInstant ? (
+                      <>
+                        <form action={rescheduleMeetingRequestAction} className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2"><input type="hidden" name="meeting_request_id" value={meeting.id} /><input type="hidden" name="return_to" value={`/messages/${conversationId}`} /><input name="scheduled_at" type="datetime-local" required defaultValue={toLocal(selectedTime)} className={inputClass} /><button className={secondaryButton}>Reschedule</button></form>
+                        <form action={rescheduleMeetingRequestAction}><input type="hidden" name="meeting_request_id" value={meeting.id} /><input type="hidden" name="return_to" value={`/messages/${conversationId}`} /><input type="hidden" name="mode" value="postpone" /><button className={`${secondaryButton} w-full`}>Postpone 24h</button></form>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
 
