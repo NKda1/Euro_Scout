@@ -1,7 +1,8 @@
 "use client";
 
 import { SendHorizontal } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { markConversationReadAction, flagContactAction, sendMessageAction } from "@/app/actions/messages";
 import type { Profile } from "@/lib/auth";
@@ -28,6 +29,8 @@ interface MessageThreadProps {
   isAdminAudit: boolean;
   flagged?: boolean;
   className?: string;
+  callBookings?: ReactNode;
+  callControl?: ReactNode;
 }
 
 function sortMessages(items: Message[]) {
@@ -47,6 +50,18 @@ function formatMessageTime(value: string) {
   }).format(new Date(value));
 }
 
+function formatMessageDay(value: string) {
+  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+}
+
+function isLegacyCallWorkflowMessage(body: string) {
+  return [
+    "Video call request for ",
+    "The secure Daily room is open for ",
+  ].some((prefix) => body.startsWith(prefix)) ||
+    / (proposed a video call with|sent a final video call time for|confirmed the video call with|declined the video call between|cancelled the video call between) /.test(` ${body} `);
+}
+
 export default function MessageThread({
   conversationId,
   conversationTeamId,
@@ -60,7 +75,9 @@ export default function MessageThread({
   replyAllowanceRemaining,
   isAdminAudit,
   flagged,
-  className
+  className,
+  callBookings,
+  callControl
 }: MessageThreadProps) {
   const [messages, setMessages] = useState<Message[]>(sortMessages(initialMessages));
   const [profileMap] = useState<Map<string, Profile>>(new Map(profiles.map((p) => [p.id, p])));
@@ -72,7 +89,10 @@ export default function MessageThread({
   const [flaggingMessageId, setFlaggingMessageId] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
   const [flagPending, setFlagPending] = useState(false);
+  const [otherTyping, setOtherTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   // Mark as read on mount
@@ -140,10 +160,20 @@ export default function MessageThread({
           );
         }
       )
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        if ((payload as { profile_id?: string }).profile_id === currentProfileId) return;
+        setOtherTyping(true);
+        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = setTimeout(() => setOtherTyping(false), 1800);
+      })
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      channelRef.current = null;
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      void supabase.removeChannel(channel);
     };
   }, [conversationId, currentProfileId, isAdminAudit, supabase]);
 
@@ -194,6 +224,11 @@ export default function MessageThread({
 
   const isClubInbox = Boolean(conversationTeamId);
   const otherParticipantCount = Math.max(0, profiles.filter((item) => item.id !== currentProfileId).length);
+  const visibleMessages = messages.filter((message) => !isLegacyCallWorkflowMessage(message.body));
+  const initialLastSeen = participantReadStates.find((state) => state.profile_id === currentProfileId)?.last_seen_at;
+  const unreadStartId = visibleMessages.find((message) =>
+    message.sender_profile_id !== currentProfileId && (!initialLastSeen || Date.parse(message.created_at) > Date.parse(initialLastSeen))
+  )?.id;
 
   function Avatar({ profile, mine = false }: { profile?: Profile; mine?: boolean }) {
     const name = profile?.display_name ?? "Member";
@@ -252,14 +287,29 @@ export default function MessageThread({
 
       {/* Message list */}
       <div className="flex-1 min-h-0 space-y-5 overflow-y-auto bg-slate-50/70 p-4 dark:bg-black/10 sm:p-5">
-        {messages.map((message) => {
+        {callBookings}
+        {visibleMessages.map((message, index) => {
           const sender = profileMap.get(message.sender_profile_id);
           const isMine = message.sender_profile_id === currentProfileId;
           const isSenderClub = sender?.role === "club";
           const readReceipt = getReadReceipt(message);
 
+          const previous = visibleMessages[index - 1];
+          const startsNewDay = !previous || new Date(previous.created_at).toDateString() !== new Date(message.created_at).toDateString();
+
           return (
-            <div key={message.id} className={`flex gap-3 ${isMine ? "justify-end" : "justify-start"}`}>
+            <div key={message.id}>
+              {startsNewDay ? (
+                <div className="mb-4 flex items-center gap-3" role="separator" aria-label={formatMessageDay(message.created_at)}>
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" /><span className="text-[10px] font-black uppercase tracking-wide text-slate-400">{formatMessageDay(message.created_at)}</span><span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+                </div>
+              ) : null}
+              {message.id === unreadStartId ? (
+                <div className="mb-4 flex items-center gap-3" role="separator" aria-label="Unread messages">
+                  <span className="h-px flex-1 bg-red-300" /><span className="rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">Unread</span><span className="h-px flex-1 bg-red-300" />
+                </div>
+              ) : null}
+            <div className={`flex gap-3 ${isMine ? "justify-end" : "justify-start"}`}>
               {!isMine ? <Avatar profile={sender} /> : null}
               <div className={`flex max-w-[88%] flex-col sm:max-w-[72%] ${isMine ? "items-end" : "items-start"}`}>
                 <div
@@ -290,14 +340,21 @@ export default function MessageThread({
               </div>
               {isMine ? <Avatar profile={sender} mine /> : null}
             </div>
+            </div>
           );
         })}
 
-        {!messages.length && (
+        {!visibleMessages.length && (
           <p className="rounded-lg border border-slate-200 bg-white p-5 text-sm font-bold text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
             No messages yet. Send the first note.
           </p>
         )}
+        {otherTyping ? (
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-white/45" aria-live="polite">
+            <span className="flex gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-white/5"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:120ms]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:240ms]" /></span>
+            Someone is typing
+          </div>
+        ) : null}
         <div ref={bottomRef} />
       </div>
 
@@ -319,10 +376,14 @@ export default function MessageThread({
             </p>
           )}
           <div className="flex items-end gap-2">
+            {callControl}
             <div className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-black/20">
               <textarea
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
+                onChange={(e) => {
+                  setBody(e.target.value);
+                  void channelRef.current?.send({ type: "broadcast", event: "typing", payload: { profile_id: currentProfileId } });
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -336,6 +397,7 @@ export default function MessageThread({
             </div>
             <button
               type="submit"
+              aria-label="Send message"
               disabled={sending || !body.trim()}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white transition hover:bg-red-700 disabled:opacity-40"
             >

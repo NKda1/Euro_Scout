@@ -2,36 +2,25 @@
 
 import { useEffect, useState } from "react";
 
-interface MeetingCountdownProps {
-  scheduledAt: string | null;
-  status: string;
-}
-
-function labelFor(scheduledAt: string | null, status: string) {
-  if (["cancelled", "declined", "completed", "expired"].includes(status)) return null;
-  if (!scheduledAt) return "Time awaiting confirmation";
-  const difference = new Date(scheduledAt).getTime() - Date.now();
-  if (difference < -2 * 60 * 60 * 1000) return "Call window ended";
-  if (difference <= 5 * 60 * 1000) return difference > 0 ? "Room opens now" : "Ready to join";
-  const minutes = Math.ceil(difference / 60_000);
-  if (minutes < 60) return `Starts in ${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `Starts in ${hours}h ${minutes % 60}m`;
-  const days = Math.floor(hours / 24);
-  return `Starts in ${days}d ${hours % 24}h`;
-}
-
-export default function MeetingCountdown({ scheduledAt, status }: MeetingCountdownProps) {
-  const [label, setLabel] = useState(() => labelFor(scheduledAt, status));
+export default function MeetingCountdown({ startsAt, durationMinutes = 30 }: { startsAt: string | null; durationMinutes?: number }) {
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const refresh = () => setLabel(labelFor(scheduledAt, status));
-    refresh();
-    const timer = window.setInterval(refresh, 30_000);
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
-  }, [scheduledAt, status]);
+  }, []);
 
-  return label ? (
-    <span className="text-[11px] font-black text-red-600 dark:text-red-300" aria-live="polite">{label}</span>
-  ) : null;
+  if (!startsAt) return null;
+  const start = new Date(startsAt).getTime();
+  if (Number.isNaN(start)) return null;
+  const distance = start - now;
+  const end = start + (durationMinutes + 30) * 60_000;
+  let label = "Live now";
+  if (now > end) label = "Call window ended";
+  else if (distance > 0) {
+    const minutes = Math.ceil(distance / 60_000);
+    label = minutes < 60 ? `In ${minutes}m` : minutes < 1440 ? `In ${Math.floor(minutes / 60)}h ${minutes % 60}m` : `In ${Math.floor(minutes / 1440)}d`;
+  }
+
+  return <span className="rounded border border-slate-300 bg-slate-100 px-1.5 py-px text-[9px] font-black uppercase text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-white/70">{label}</span>;
 }

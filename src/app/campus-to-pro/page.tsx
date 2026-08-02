@@ -246,31 +246,31 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
               <span className="text-sm font-bold text-slate-500 dark:text-white/45">{directoryTeams.length} teams</span>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               {directoryTeams.map((team) => {
                 const localTeam = getCampusTeam(team.id);
                 const bucsLevelLabel = localTeam ? "BUCS Premier" : team.division ?? "BUCS submitted club";
                 return (
-                  <Link key={team.id} href={`/scouts/${team.id}`} className={`${panelClass} p-4 transition hover:border-red-400/45 hover:bg-slate-50 dark:hover:bg-[#151515]`}>
+                  <Link key={team.id} href={`/scouts/${team.id}`} className={`${panelClass} min-w-0 p-2.5 transition hover:border-red-400/45 hover:bg-slate-50 dark:hover:bg-[#151515] sm:p-4`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 gap-3">
                         <div
-                          className="flex h-14 w-14 shrink-0 items-center justify-center border border-slate-200 bg-slate-100 bg-cover bg-center text-xs font-black text-slate-900 dark:border-white/10 dark:bg-[#1b1b1b] dark:text-white"
+                          className="flex h-10 w-10 shrink-0 items-center justify-center border border-slate-200 bg-slate-100 bg-cover bg-center text-[10px] font-black text-slate-900 dark:border-white/10 dark:bg-[#1b1b1b] dark:text-white sm:h-14 sm:w-14 sm:text-xs"
                           style={team.logo_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.58)), url(${team.logo_url})` } : undefined}
                         >
                           {team.logo_url ? "" : initials(team.name)}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-600 dark:text-red-300">
+                          <p className="truncate text-[9px] font-black uppercase tracking-[0.1em] text-red-600 dark:text-red-300 sm:text-xs sm:tracking-[0.16em]">
                             {activePipeline === "bucs" ? bucsLevelLabel : localTeam?.conference ?? pipeline.label}
                           </p>
-                          <h3 className="mt-2 truncate text-lg font-black text-slate-950 dark:text-white">{team.name}</h3>
-                          <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-white/45">{team.city}, {team.country}</p>
+                          <h3 className="mt-1 truncate text-sm font-black text-slate-950 dark:text-white sm:mt-2 sm:text-lg">{team.name}</h3>
+                          <p className="mt-1 truncate text-[10px] font-semibold text-slate-500 dark:text-white/55 sm:text-sm">{team.city}, {team.country}</p>
                         </div>
                       </div>
-                      <span className="border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-700 dark:border-white/10 dark:bg-black/30 dark:text-white">{flagForCountry(team.country)}</span>
+                      <span className="hidden border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-700 dark:border-white/10 dark:bg-black/30 dark:text-white sm:block">{flagForCountry(team.country)}</span>
                     </div>
-                    <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
+                    <div className="mt-3 flex flex-wrap gap-1 text-[8px] font-black uppercase tracking-[0.08em] sm:mt-4 sm:gap-2 sm:text-[10px] sm:tracking-[0.14em]">
                       <span className="border border-emerald-300 bg-emerald-100 px-2 py-1 text-emerald-950 shadow-sm dark:border-emerald-400/35 dark:bg-emerald-500/15 dark:text-emerald-100">{team.claim_status === "verified" ? "Verified" : "Available"}</span>
                       {activePipeline === "bucs" ? (
                         <span className="border border-slate-300 bg-slate-100 px-2 py-1 text-slate-800 shadow-sm dark:border-white/15 dark:bg-white/10 dark:text-white/80">
@@ -325,27 +325,27 @@ export default async function CampusToProPage({ searchParams }: CampusToProPageP
             {playersError ? (
               <div className="border border-red-500/40 bg-red-500/10 p-5 text-sm font-bold text-red-700 dark:text-red-200">{playersError.message}</div>
             ) : filteredPlayers.length ? (
-              <div className="grid gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 {filteredPlayers.map((player) => {
                   const profile = player.profiles;
                   const team = getCampusTeam(player.current_team_id);
                   const background = player.na_background?.[0];
                   return (
-                    <Link key={player.id} href={routes.player(profile.id)} className={`${panelClass} grid grid-cols-[74px_minmax(0,1fr)] transition hover:border-red-400/45 hover:bg-slate-50 dark:hover:bg-[#151515]`}>
+                    <Link key={player.id} href={routes.player(profile.id)} className={`${panelClass} min-w-0 overflow-hidden transition hover:border-red-400/45 hover:bg-slate-50 dark:hover:bg-[#151515] sm:grid sm:grid-cols-[74px_minmax(0,1fr)]`}>
                       <div
-                        className="flex min-h-24 items-center justify-center border-r border-slate-200 bg-slate-100 bg-cover bg-center text-lg font-black text-slate-900 dark:border-white/10 dark:bg-[#1b1b1b] dark:text-white"
+                        className="flex aspect-[4/3] items-center justify-center border-b border-slate-200 bg-slate-100 bg-cover bg-center text-lg font-black text-slate-900 dark:border-white/10 dark:bg-[#1b1b1b] dark:text-white sm:aspect-auto sm:min-h-24 sm:border-b-0 sm:border-r"
                         style={profile.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.62)), url(${profile.avatar_url})` } : undefined}
                       >
                         {profile.avatar_url ? "" : initials(profile.display_name)}
                       </div>
-                      <div className="min-w-0 p-4">
+                      <div className="min-w-0 p-2.5 sm:p-4">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-black uppercase tracking-[0.16em] text-red-300">{player.position ?? "ATH"}</span>
+                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-red-600 dark:text-red-300 sm:text-xs sm:tracking-[0.16em]">{player.position ?? "ATH"}</span>
                           {player.passport_ready ? <span className="border border-green-300 bg-green-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-green-950 shadow-sm dark:border-green-400/35 dark:bg-green-500/15 dark:text-green-100">Passport</span> : null}
                           {player.available_for_transfer ? <span className="border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-950 shadow-sm dark:border-red-400/35 dark:bg-red-500/15 dark:text-red-100">Available</span> : null}
                         </div>
-                        <h3 className="mt-2 truncate text-xl font-black text-slate-950 dark:text-white">{profile.display_name}</h3>
-                        <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-white/45">
+                        <h3 className="mt-1.5 truncate text-sm font-black text-slate-950 dark:text-white sm:mt-2 sm:text-xl">{profile.display_name}</h3>
+                        <p className="mt-1 line-clamp-2 text-[10px] font-semibold text-slate-600 dark:text-white/55 sm:text-sm">
                           {background?.institution ?? team?.name ?? "Campus program"} · {background?.conference ?? team?.conference ?? pipeline.label}
                         </p>
                       </div>

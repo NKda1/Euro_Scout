@@ -33,12 +33,12 @@ import AccountQuickNav from "@/components/account/AccountQuickNav";
 import AccountSection from "@/components/account/AccountSection";
 import AccountSettingsPanel from "@/components/account/AccountSettingsPanel";
 import AccountWorkspaceOverview from "@/components/account/AccountWorkspaceOverview";
-import MeetingCountdown from "@/components/meetings/MeetingCountdown";
 import CareerStatsBuilder from "@/components/account/CareerStatsBuilder";
 import CareerTimelineBuilder from "@/components/account/CareerTimelineBuilder";
 import FilmLinksManager from "@/components/account/FilmLinksManager";
 import MetricNumberControl from "@/components/account/MetricNumberControl";
 import MediaFileInput from "@/components/account/MediaFileInput";
+import MeetingCountdown from "@/components/meetings/MeetingCountdown";
 import PlayerPhotoManager from "@/components/account/PlayerPhotoManager";
 import RosterNeedsBuilder from "@/components/account/RosterNeedsBuilder";
 import StaffInviteLinkNotice from "@/components/account/StaffInviteLinkNotice";
@@ -803,6 +803,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
     return aGroup.priority <= 2 ? aTime - bTime : bTime - aTime;
   });
   const pendingMeetingCount = meetingRows.filter((meeting) => meeting.status === "pending" || meeting.status === "club_proposed").length;
+  const todayKey = new Date().toDateString();
+  const meetingSections = [
+    { label: "Today", items: meetingRows.filter((meeting) => meeting.status === "accepted" && meeting.scheduled_at && new Date(meeting.scheduled_at).toDateString() === todayKey) },
+    { label: "Upcoming", items: meetingRows.filter((meeting) => meeting.status === "accepted" && meeting.scheduled_at && new Date(meeting.scheduled_at).toDateString() !== todayKey) },
+    { label: "Pending", items: meetingRows.filter((meeting) => ["pending", "club_proposed"].includes(meeting.status)) },
+    { label: "Completed", items: meetingRows.filter((meeting) => meeting.status === "completed") },
+    { label: "Cancelled", items: meetingRows.filter((meeting) => ["cancelled", "declined"].includes(meeting.status)) },
+  ].filter((section) => section.items.length);
   const journalistPublishedCount = (journalistArticles ?? []).filter((article) => article.status === "published").length;
   const activeJoinRequest = ownJoinRequests?.[0] ?? null;
   const isPremiumAccount = isPremiumActive(profile);
@@ -1068,8 +1076,15 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               title={profile.role === "club" ? (pendingMeetingCount ? `${pendingMeetingCount} pending call request${pendingMeetingCount === 1 ? "" : "s"}` : "Club call requests") : "Your club call requests"}
             >
               {meetingRows.length ? (
-                <div className="space-y-3">
-                  {meetingRows.map((meeting, index) => {
+                <div className="space-y-5">
+                  {meetingSections.map((section) => (
+                    <section key={section.label}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <h3 className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-600 dark:text-white/55">{section.label}</h3>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600 dark:bg-white/10 dark:text-white/60">{section.items.length}</span>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                  {section.items.map((meeting) => {
                     const isPending = meeting.status === "pending";
                     const isClubProposed = meeting.status === "club_proposed";
                     const isAccepted = meeting.status === "accepted";
@@ -1085,8 +1100,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                       : [meeting.teams?.city, meeting.teams?.country].filter(Boolean).join(", ") || "Club account";
                     const avatarUrl = profile.role === "club" ? meeting.profiles?.avatar_url : meeting.teams?.logo_url;
                     const confirmedTime = meeting.scheduled_at ?? meeting.proposed_start_at;
-                    const groupLabel = meetingGroup(meeting).label;
-                    const showGroupHeading = index === 0 || meetingGroup(meetingRows[index - 1]).label !== groupLabel;
                     const statusLabel = isClubProposed ? "awaiting player" : meeting.status.replace("_", " ");
                     const statusClass = isAccepted
                       ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-300"
@@ -1099,13 +1112,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                         : "border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-white/35";
 
                     return (
-                      <div key={meeting.id}>
-                        {showGroupHeading ? (
-                          <h3 className="mb-2 mt-4 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 first:mt-0 dark:text-white/35">{groupLabel}</h3>
-                        ) : null}
-                      <div className="rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-black/20">
+                      <details key={meeting.id} className="group rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-black/20">
                         {/* Compact header row */}
-                        <div className="flex items-center gap-3 px-3 py-2.5">
+                        <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-2.5 marker:hidden">
                           <div
                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 bg-cover bg-center text-[11px] font-black text-slate-500 dark:bg-white/10 dark:text-white/55"
                             style={avatarUrl ? { backgroundImage: `linear-gradient(180deg, transparent, rgba(0,0,0,.65)), url(${avatarUrl})` } : undefined}
@@ -1116,6 +1125,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                             <div className="flex flex-wrap items-center gap-1.5">
                               <p className="text-sm font-black text-slate-950 dark:text-white">{counterpartName}</p>
                               <span className={`rounded border px-1.5 py-px text-[10px] font-black uppercase ${statusClass}`}>{statusLabel}</span>
+                              {isAccepted ? <MeetingCountdown startsAt={confirmedTime} durationMinutes={meeting.scheduled_duration_minutes} /> : null}
                               {meeting.request_reason ? (
                                 <span className="rounded border border-red-200 bg-red-50 px-1.5 py-px text-[10px] font-black uppercase text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200">
                                   {meeting.request_reason}
@@ -1129,7 +1139,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                               Inbox
                             </Link>
                           ) : null}
-                        </div>
+                          <span className="shrink-0 text-[10px] font-black uppercase text-slate-500 group-open:hidden dark:text-white/55">More</span>
+                          <span className="hidden shrink-0 text-[10px] font-black uppercase text-slate-500 group-open:inline dark:text-white/55">Less</span>
+                        </summary>
 
                         {/* Compact time row */}
                         <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 px-3 py-2 dark:border-white/[0.06]">
@@ -1149,7 +1161,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                           <span className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-white/30">
                             {meetingGroup(meeting).label}
                           </span>
-                          <MeetingCountdown scheduledAt={meeting.scheduled_at} status={meeting.status} />
                         </div>
 
                         {/* Notes (condensed) */}
@@ -1193,7 +1204,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                                 <form action={declineMeetingRequestAction} className="w-full">
                                   <input type="hidden" name="meeting_request_id" value={meeting.id} />
                                   <input type="hidden" name="return_to" value="/account" />
-                                  <button className="h-8 w-full rounded-md border border-slate-200 px-4 text-[10px] font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/40">
+                                  <button className="h-8 w-full rounded-md border border-slate-300 bg-white px-4 text-[10px] font-black uppercase text-slate-700 transition hover:border-red-400 hover:text-red-700 dark:border-white/20 dark:bg-white/5 dark:text-white/75">
                                     Decline
                                   </button>
                                 </form>
@@ -1217,7 +1228,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                                   <form action={declineMeetingRequestAction}>
                                     <input type="hidden" name="meeting_request_id" value={meeting.id} />
                                     <input type="hidden" name="return_to" value="/account" />
-                                    <button className="h-9 rounded-md border border-slate-200 px-3 text-[10px] font-black uppercase text-slate-500 transition hover:border-red-300 hover:text-red-600 dark:border-white/10 dark:text-white/40">
+                                    <button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-[10px] font-black uppercase text-slate-700 transition hover:border-red-400 hover:text-red-700 dark:border-white/20 dark:bg-white/5 dark:text-white/75">
                                       Decline
                                     </button>
                                   </form>
@@ -1258,10 +1269,12 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                             ) : null}
                           </div>
                         ) : null}
-                      </div>
-                      </div>
+                      </details>
                     );
                   })}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               ) : (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">
