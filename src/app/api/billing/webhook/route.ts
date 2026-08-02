@@ -204,14 +204,7 @@ export async function POST(request: NextRequest) {
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret, 300);
   } catch (error) {
     const summary = errorSummary(error);
-    await recordServiceHealthEvent({
-      service: "stripe",
-      operation: "webhook.verify",
-      status: "failure",
-      startedAt,
-      errorCode: summary.code,
-      errorDetail: summary.detail
-    });
+    console.warn({ event: "stripe.webhook.invalid_signature", code: summary.code });
     return NextResponse.json({ error: "Invalid Stripe signature." }, { status: 400 });
   }
 

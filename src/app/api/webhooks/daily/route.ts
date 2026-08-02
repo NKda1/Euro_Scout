@@ -55,14 +55,7 @@ export async function POST(request: Request) {
   if (event.test === "test") return NextResponse.json({ ok: true });
 
   if (!validSignature(body, request.headers.get("x-webhook-timestamp"), request.headers.get("x-webhook-signature"))) {
-    await recordServiceHealthEvent({
-      service: "daily",
-      operation: "webhook.verify",
-      status: "failure",
-      startedAt,
-      errorCode: "invalid_signature",
-      errorDetail: "Daily webhook signature was missing, invalid, or older than five minutes."
-    });
+    console.warn({ event: "daily.webhook.invalid_signature" });
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
