@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { routes } from "@/constants/routes";
+import BugReportDialog from "@/components/layout/BugReportDialog";
 
 const navLinks = [
   { href: routes.home, label: "Home" },
@@ -19,8 +20,8 @@ const legalLinks = [
 export default function Footer() {
   return (
     <footer className="site-footer border-t border-slate-200 bg-white dark:border-white/10 dark:bg-[#090909]">
-      <div className="mx-auto max-w-[92rem] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
-        <div className="grid gap-5 sm:grid-cols-[1.35fr_1fr_1fr] sm:items-start lg:grid-cols-[1.5fr_1fr_1fr_auto]">
+      <div className="mx-auto max-w-[92rem] px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+        <div className="grid gap-3 sm:grid-cols-[1.35fr_1fr_1fr] sm:items-start lg:grid-cols-[1.5fr_1fr_1fr_auto]">
 
           {/* Brand */}
           <div className="lg:col-span-1">
@@ -65,6 +66,9 @@ export default function Footer() {
             <p className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Contact</p>
             <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 sm:block sm:space-y-2">
               <li>
+                <BugReportDialog />
+              </li>
+              <li>
                 <a
                   href="mailto:info@euroscoutpro.com"
                   className="flex items-center gap-2 text-xs font-bold text-slate-600 transition hover:text-red-600 dark:text-slate-300 dark:hover:text-red-400"
@@ -92,7 +96,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 dark:border-white/10">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-1.5 border-t border-slate-200 pt-2 dark:border-white/10">
           <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
             © {new Date().getFullYear()} EuroScout Pro · All rights reserved
           </p>

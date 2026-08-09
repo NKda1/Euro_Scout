@@ -9,6 +9,28 @@ import MobileMenu from "@/components/layout/MobileMenu";
 import NavLinks from "@/components/layout/NavLinks";
 import NotificationBell from "@/components/layout/NotificationBell";
 
+export function NavbarSkeleton() {
+  return (
+    <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#090909]" aria-label="Loading navigation">
+      <div className="mx-auto flex h-[72px] max-w-[112rem] items-center justify-between gap-5 px-4 sm:px-6 lg:px-8">
+        <Link href={routes.home} className="flex shrink-0 items-center gap-3">
+          <Image src="/images/euroscout-logo-256.png" alt="EuroScout Pro" width={42} height={42} priority className="h-10 w-10 object-contain" />
+          <span className="hidden sm:block">
+            <span className="block text-[13px] font-black uppercase tracking-[0.16em] text-slate-950 dark:text-white">EuroScout</span>
+            <span className="block text-[10px] font-bold uppercase tracking-[0.25em] text-red-500">Pro</span>
+          </span>
+        </Link>
+        <div className="hidden flex-1 justify-center gap-6 lg:flex" aria-hidden="true">
+          <span className="h-3 w-16 animate-pulse bg-slate-200 dark:bg-white/10" />
+          <span className="h-3 w-20 animate-pulse bg-slate-200 dark:bg-white/10" />
+          <span className="h-3 w-16 animate-pulse bg-slate-200 dark:bg-white/10" />
+        </div>
+        <div className="h-9 w-20 animate-pulse bg-slate-100 dark:bg-white/10" aria-hidden="true" />
+      </div>
+    </nav>
+  );
+}
+
 export default async function Navbar() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -31,7 +53,7 @@ export default async function Navbar() {
           className="flex shrink-0 items-center gap-3 transition-opacity duration-150 hover:opacity-80"
         >
           <Image
-            src="/images/Euro_Scout_Logo 2.png"
+            src="/images/euroscout-logo-256.png"
             alt="EuroScout Pro"
             width={42}
             height={42}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Link from "next/link";
 import PlayerDirectory, { type PlayerDirectoryItem } from "@/components/players/PlayerDirectory";
 import PlayerFilters from "@/components/players/PlayerFilters";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -9,6 +10,8 @@ export const metadata: Metadata = {
   title: "Players | EuroScout Pro",
   description: "Browse public EuroScout Pro player accounts and filter by position."
 };
+
+const playerSignupHref = `/auth/sign-up?next=${encodeURIComponent("/welcome?role=player")}`;
 
 interface PlayersPageProps {
   searchParams: Promise<{
@@ -100,12 +103,17 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
   return (
     <main className="app-surface min-h-screen">
       <section className="mx-auto max-w-[92rem] px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mb-8 border-b border-slate-200 pb-8 dark:border-white/10">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-600 dark:text-red-500">Player Accounts</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 dark:text-white">Browse EuroScout players.</h1>
-          <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 dark:text-white/55">
-            Public player profiles are visible to everyone. Filter to find the right prospect pool.
-          </p>
+        <div className="mb-8 flex flex-col gap-5 border-b border-slate-200 pb-8 dark:border-white/10 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-red-600 dark:text-red-500">Player Accounts</p>
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 dark:text-white">Browse EuroScout players.</h1>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 dark:text-white/55">
+              Public player profiles are visible to everyone. Filter to find the right prospect pool.
+            </p>
+          </div>
+          <Link href={playerSignupHref} className="inline-flex h-11 shrink-0 items-center justify-center bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">
+            Create Player Profile
+          </Link>
         </div>
 
         <Suspense fallback={<div className="mb-5 h-28 animate-pulse border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-white/10" />}>

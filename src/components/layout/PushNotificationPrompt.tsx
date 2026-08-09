@@ -34,6 +34,19 @@ async function registerAndSubscribe(): Promise<PushSubscription | null> {
   });
 }
 
+async function persistSubscription(sub: PushSubscription) {
+  const json = sub.toJSON();
+  await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      endpoint: sub.endpoint,
+      keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth },
+      userAgent: navigator.userAgent,
+    }),
+  });
+}
+
 export default function PushNotificationPrompt() {
   const [permission, setPermission] = useState<PermissionState>("default");
   const [dismissed, setDismissed] = useState(false);
@@ -46,7 +59,16 @@ export default function PushNotificationPrompt() {
       setPermission("unsupported");
       return;
     }
-    setPermission(Notification.permission as PermissionState);
+    const currentPermission = Notification.permission as PermissionState;
+    setPermission(currentPermission);
+
+    // A granted browser can arrive with an older subscription from a legacy
+    // deployment origin. Refresh its server record on the canonical origin.
+    if (currentPermission === "granted") {
+      void registerAndSubscribe().then((subscription) => {
+        if (subscription) return persistSubscription(subscription);
+      }).catch(() => undefined);
+    }
 
     // Check if user already dismissed the banner
     const stored = localStorage.getItem("push-prompt-dismissed");
@@ -70,18 +92,7 @@ export default function PushNotificationPrompt() {
 
       if (result === "granted") {
         const sub = await registerAndSubscribe();
-        if (sub) {
-          const json = sub.toJSON();
-          await fetch("/api/push/subscribe", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              endpoint: sub.endpoint,
-              keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth },
-              userAgent: navigator.userAgent,
-            }),
-          });
-        }
+        if (sub) await persistSubscription(sub);
       }
     } catch {
       // Silently fail — push is a nice-to-have

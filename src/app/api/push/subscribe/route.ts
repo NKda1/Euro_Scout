@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
         p256dh: keys.p256dh,
         auth: keys.auth,
         user_agent: userAgent ?? null,
+        site_origin: request.nextUrl.origin,
         last_used_at: new Date().toISOString(),
       },
       { onConflict: "profile_id,endpoint" }

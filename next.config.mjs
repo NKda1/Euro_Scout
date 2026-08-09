@@ -13,6 +13,14 @@ const nextConfig = {
   turbopack: {
     root: __dirname
   },
+  async redirects() {
+    return ["euro-scout.vercel.app", "www.euroscoutpro.com"].map((host) => ({
+      source: "/:path*",
+      has: [{ type: "host", value: host }],
+      destination: "https://euroscoutpro.com/:path*",
+      permanent: true
+    }));
+  },
   async headers() {
     return [
       {

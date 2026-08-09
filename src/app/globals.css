@@ -129,7 +129,7 @@
   }
 
   .hero-cinematic-frame {
-    @apply absolute inset-0 bg-cover;
+    @apply absolute inset-0 overflow-hidden;
     animation-duration: 40s;
     animation-iteration-count: infinite;
     animation-timing-function: ease-in-out;
@@ -138,38 +138,26 @@
   }
 
   .hero-cinematic-frame-1 {
-    background-image: url("/images/euroscout-hero-line.jpeg");
-    background-position: center 42%;
     animation-name: heroCinematic1;
   }
 
   .hero-cinematic-frame-2 {
-    background-image: url("/images/euroscout-hero-tackle.jpeg");
-    background-position: center 46%;
     animation-name: heroCinematic2;
   }
 
   .hero-cinematic-frame-3 {
-    background-image: url("/images/E_S1.png");
-    background-position: center 28%;
     animation-name: heroCinematic3;
   }
 
   .hero-cinematic-frame-4 {
-    background-image: url("/images/E_S2.png");
-    background-position: center 40%;
     animation-name: heroCinematic4;
   }
 
   .hero-cinematic-frame-5 {
-    background-image: url("/images/E_S3.png");
-    background-position: center 40%;
     animation-name: heroCinematic5;
   }
 
   .hero-cinematic-frame-6 {
-    background-image: url("/images/E_S4.png");
-    background-position: center 40%;
     animation-name: heroCinematic6;
   }
 

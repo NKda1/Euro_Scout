@@ -88,9 +88,9 @@ function numberValue(item: unknown) {
 
 function Panel({ eyebrow, children }: { eyebrow: string; children: React.ReactNode }) {
   return (
-    <section className="border border-slate-200 bg-white p-6 dark:border-white/10 dark:bg-[#111]">
-      <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">{eyebrow}</p>
-      <div className="mt-5">{children}</div>
+    <section className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
+      <p className="text-[10px] font-black uppercase tracking-widest text-red-600 dark:text-red-400">{eyebrow}</p>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
@@ -221,6 +221,15 @@ export default function ProfileSummary({
 
       <div className="mx-auto grid min-w-0 max-w-[110rem] gap-7 px-4 py-7 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0 space-y-8 xl:border-r xl:border-slate-200 xl:pr-10 dark:xl:border-white/10">
+          {/* Availability strip — visible high on mobile before the aside */}
+          {isPlayer && (
+            <div className="flex items-center gap-2.5 border border-slate-200 bg-white px-4 py-2.5 dark:border-white/10 dark:bg-[#111]">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${roleProfile?.available_for_transfer ? "bg-emerald-500" : "bg-slate-400 dark:bg-white/25"}`} />
+              <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-white/70">
+                {roleProfile?.available_for_transfer ? "Available for transfer" : "Not currently available"}
+              </p>
+            </div>
+          )}
           <section>
             <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Profile</p>
             <div className="mt-5 space-y-5">
@@ -230,46 +239,46 @@ export default function ProfileSummary({
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-3 gap-2">
                 {/* Current Team Card */}
-                <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-indigo-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-indigo-500/40">
+                <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-indigo-300 hover:shadow-sm dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-indigo-500/40">
                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-indigo-500/5 opacity-0 transition group-hover:opacity-100 dark:to-indigo-500/10" />
-                  <div className="relative p-5">
-                    <div className="mb-3 flex items-center gap-2">
-                      <svg className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="relative p-3">
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <svg className="h-3.5 w-3.5 shrink-0 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
-                      <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Current Team</p>
+                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-white/35">Team</p>
                     </div>
-                    <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{currentTeam?.name ?? "Not listed"}</p>
+                    <p className="truncate text-sm font-black leading-tight text-slate-950 dark:text-white">{currentTeam?.name ?? "—"}</p>
                   </div>
                 </div>
 
                 {/* Current League Card */}
-                <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-purple-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-purple-500/40">
+                <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-purple-300 hover:shadow-sm dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-purple-500/40">
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 transition group-hover:opacity-100 dark:to-purple-500/10" />
-                  <div className="relative p-5">
-                    <div className="mb-3 flex items-center gap-2">
-                      <svg className="h-5 w-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="relative p-3">
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <svg className="h-3.5 w-3.5 shrink-0 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                       </svg>
-                      <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Current League</p>
+                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-white/35">League</p>
                     </div>
-                    <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{currentLeagueName ?? "Not listed"}</p>
+                    <p className="truncate text-sm font-black leading-tight text-slate-950 dark:text-white">{currentLeagueName ?? "—"}</p>
                   </div>
                 </div>
 
                 {/* Bio Status Card */}
-                <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-amber-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-amber-500/40">
+                <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-amber-300 hover:shadow-sm dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-amber-500/40">
                   <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/5 opacity-0 transition group-hover:opacity-100 dark:to-amber-500/10" />
-                  <div className="relative p-5">
-                    <div className="mb-3 flex items-center gap-2">
-                      <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="relative p-3">
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <svg className="h-3.5 w-3.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Bio</p>
+                      <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-white/35">Bio</p>
                     </div>
-                    <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{profile.bio ? "Complete" : "Not listed"}</p>
+                    <p className="text-sm font-black leading-tight text-slate-950 dark:text-white">{profile.bio ? "Complete" : "—"}</p>
                   </div>
                 </div>
               </div>
@@ -279,35 +288,43 @@ export default function ProfileSummary({
           {isPlayer && sortedCareerEntries.length ? (
             <section>
               <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">Career Timeline</p>
-              <div className="mt-5 border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-[#111]">
-                <div className="relative">
-                  {sortedCareerEntries.map((entry, index) => (
-                    <div key={entry.id} className="relative flex gap-4 pb-6 last:pb-0">
-                      {index < sortedCareerEntries.length - 1 && (
-                        <div className="absolute left-[17px] top-9 h-full w-px bg-red-500/30" />
-                      )}
-                      <span className="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center border border-red-500 bg-red-600 text-xs font-black text-white">
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0 pt-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-black text-slate-500 dark:text-white/35">
-                            {entry.start_year ?? "----"} – {entry.is_current ? "Present" : (entry.end_year ?? "----")}
+              <div className="mt-4 space-y-2">
+                {sortedCareerEntries.map((entry, index) => (
+                  <div key={entry.id} className="relative flex gap-3 overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111]">
+                    {/* Accent left bar */}
+                    <div className="w-1 shrink-0 bg-red-600" />
+                    <div className="flex min-w-0 flex-1 items-start justify-between gap-3 py-3 pr-4">
+                      <div className="min-w-0">
+                        {/* Club name */}
+                        <p className="truncate text-sm font-black text-slate-950 dark:text-white">{entry.team_name}</p>
+                        {/* Position badge */}
+                        {entry.position && (
+                          <span className="mt-1 inline-block border border-indigo-300 bg-indigo-50 px-1.5 py-px text-[9px] font-black uppercase tracking-wide text-indigo-700 dark:border-indigo-400/30 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            {entry.position}
                           </span>
-                          {entry.is_current && (
-                            <span className="border border-green-400 bg-green-100 px-2 py-0.5 text-[10px] font-black uppercase text-green-900 dark:border-green-500/40 dark:bg-green-500/15 dark:text-green-100">
-                              Current
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-base font-black text-slate-950 dark:text-white">{entry.team_name}</p>
-                        <p className="mt-0.5 text-xs font-bold uppercase text-slate-500 dark:text-white/35">
-                          {[entry.position, entry.league_name, entry.country].filter(Boolean).join(" · ") || "Career entry"}
+                        )}
+                        {/* League · Country */}
+                        {(entry.league_name || entry.country) && (
+                          <p className="mt-0.5 text-[10px] font-bold text-slate-400 dark:text-white/30">
+                            {[entry.league_name, entry.country].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                      </div>
+                      {/* Year range + current badge */}
+                      <div className="shrink-0 text-right">
+                        <p className="text-[10px] font-black tabular-nums text-slate-500 dark:text-white/35">
+                          {entry.start_year ?? "—"}&nbsp;–&nbsp;{entry.is_current ? "Present" : (entry.end_year ?? "—")}
                         </p>
+                        {entry.is_current && (
+                          <span className="mt-1 inline-block border border-green-400 bg-green-100 px-1.5 py-px text-[9px] font-black uppercase text-green-900 dark:border-green-500/40 dark:bg-green-500/15 dark:text-green-100">
+                            Current
+                          </span>
+                        )}
+                        <p className="mt-1 text-[9px] font-black text-slate-300 dark:text-white/20">#{index + 1}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             </section>
           ) : null}
@@ -341,8 +358,8 @@ export default function ProfileSummary({
 
         <aside className="min-w-0 space-y-6">
           <Panel eyebrow="Availability">
-            <div className="flex items-center gap-3 text-lg font-black text-slate-950 dark:text-white">
-              <span className="h-3 w-3 rounded-full bg-emerald-500" />
+            <div className="flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white">
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${isPlayer && roleProfile?.available_for_transfer ? "bg-emerald-500" : "bg-slate-400 dark:bg-white/25"}`} />
               {isPlayer && roleProfile?.available_for_transfer ? "Available for transfer" : "Open to connect"}
             </div>
           </Panel>

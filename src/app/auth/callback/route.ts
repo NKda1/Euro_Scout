@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
+import { PENDING_LEGAL_CONSENT_COOKIE, type PendingLegalConsent } from "@/lib/legal";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 function safeNextPath(value: string | null, fallback = "/welcome") {
   const next = value?.trim();
@@ -63,6 +65,29 @@ export async function GET(request: NextRequest) {
   } else {
     console.error("[auth.callback.parameters_missing]", { hasCode: Boolean(code), hasTokenHash: Boolean(token_hash), type });
     return errorRedirect();
+  }
+
+  const pendingConsent = request.cookies.get(PENDING_LEGAL_CONSENT_COOKIE)?.value;
+  if (pendingConsent) {
+    try {
+      const consent = JSON.parse(pendingConsent) as PendingLegalConsent;
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw userError ?? new Error("OAuth user was unavailable after callback.");
+      const { error: consentError } = await createSupabaseServiceRoleClient().from("legal_consents").upsert({
+        user_id: user.id,
+        email: user.email ?? null,
+        terms_version: consent.termsVersion,
+        privacy_version: consent.privacyVersion,
+        source: "oauth_signup",
+        accepted_at: consent.acceptedAt
+      }, { onConflict: "user_id,terms_version,privacy_version" });
+      if (consentError) throw consentError;
+    } catch (error) {
+      console.error("[auth.callback.legal_consent_failed]", error);
+      response.headers.set("location", `${baseUrl}/auth/sign-in?error=${encodeURIComponent("Your account was created, but we could not record legal consent. Please contact support.")}`);
+    } finally {
+      response.cookies.set(PENDING_LEGAL_CONSENT_COOKIE, "", { path: "/auth/callback", maxAge: 0 });
+    }
   }
 
   return response;

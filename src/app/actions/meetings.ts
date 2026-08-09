@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { enforceActionRateLimit } from "@/lib/action-rate-limit";
+import { enforceActionRateLimit, getActionRateLimit } from "@/lib/action-rate-limit";
 import { requireOnboardedProfile, type Profile } from "@/lib/auth";
 import { buildDailyJoinUrl, createDailyMeetingToken, createDailyRoom } from "@/lib/daily";
 import { sendCallConfirmedEmail, sendCallRequestEmail } from "@/lib/email";
@@ -481,6 +481,85 @@ export async function startInstantCallAction(formData: FormData) {
   }).select("id, team_id, player_profile_id, conversation_id").single<Pick<MeetingRequest, "id" | "team_id" | "player_profile_id" | "conversation_id">>();
 
   if (error || !meeting) redirectWithError(returnPath, error?.message ?? "Could not start the call.");
+  revalidateMeetingPaths(meeting);
+  redirect(`${returnPath}?notice=${encodeURIComponent("Live call created. Open the call card to join.")}`);
+}
+
+/** Return-value variant of startInstantCallAction — keeps the modal open on failure. */
+export async function startInstantCallReturnAction(
+  _prev: { error: string } | null,
+  formData: FormData
+): Promise<{ error: string } | null> {
+  const { profile } = await requireOnboardedProfile();
+  const serviceClient = createSupabaseServiceRoleClient();
+  const teamId = text(formData, "team_id", 120);
+  const conversationId = text(formData, "conversation_id", 120);
+  const targetProfileId = text(formData, "target_profile_id", 120);
+  const returnPath = safeReturnPath(text(formData, "return_to", 240), conversationId ? `/messages/${conversationId}` : "/messages");
+
+  if (!teamId || !conversationId || !targetProfileId || !["player", "club", "admin"].includes(profile.role)) {
+    return { error: "This conversation cannot start a video call." };
+  }
+  if (profile.role === "club" && !hasPremiumFeature(profile, "club_call_negotiation_tools")) {
+    return { error: "Calling players is a Club Premium feature." };
+  }
+
+  const rateResult = await getActionRateLimit(`call-now:${profile.id}`, 8, 60 * 60_000);
+  if (!rateResult.allowed) {
+    const waitMinutes = Math.max(1, Math.ceil((rateResult.resetAt - Date.now()) / 60_000));
+    return { error: `Rate limit reached — wait ${waitMinutes} min before starting another call.` };
+  }
+
+  const [{ data: conversation }, { data: participants }] = await Promise.all([
+    serviceClient.from("conversations").select("id, team_id").eq("id", conversationId).eq("team_id", teamId).maybeSingle<{ id: string; team_id: string }>(),
+    serviceClient.from("conversation_participants").select("profile_id").eq("conversation_id", conversationId).returns<Array<{ profile_id: string }>>()
+  ]);
+  const participantIds = (participants ?? []).map((p) => p.profile_id);
+  if (!conversation || !participantIds.includes(profile.id) || !participantIds.includes(targetProfileId)) {
+    return { error: "Only conversation participants can start this call." };
+  }
+
+  const playerProfileId = profile.role === "player" ? profile.id : targetProfileId;
+  if (profile.role !== "player") {
+    const isMember = await isClubMember(serviceClient, teamId, profile.id);
+    if (profile.role !== "admin" && !isMember) {
+      return { error: "Only staff from this club can start that call." };
+    }
+  }
+
+  const { data: player } = await serviceClient.from("profiles").select("id, role").eq("id", playerProfileId).maybeSingle<{ id: string; role: string }>();
+  if (!player || player.role !== "player") {
+    return { error: "A player participant is required for this call." };
+  }
+
+  const { data: existing } = await serviceClient
+    .from("meeting_requests").select("id").eq("team_id", teamId).eq("player_profile_id", playerProfileId)
+    .in("status", OPEN_MEETING_STATUSES).limit(1).maybeSingle<{ id: string }>();
+  if (existing) {
+    redirect(`${returnPath}?notice=${encodeURIComponent("An active call already exists in this conversation.")}`);
+  }
+
+  const now = new Date().toISOString();
+  const { data: meeting, error } = await serviceClient.from("meeting_requests").insert({
+    team_id: teamId,
+    player_profile_id: playerProfileId,
+    requested_by: profile.id,
+    responded_by: profile.id,
+    conversation_id: conversationId,
+    status: "accepted",
+    request_reason: "Call now",
+    proposed_start_at: now,
+    scheduled_at: now,
+    scheduled_duration_minutes: 30,
+    player_confirmed_at: now,
+    accepted_at: now,
+    updated_at: now
+  }).select("id, team_id, player_profile_id, conversation_id").single<Pick<MeetingRequest, "id" | "team_id" | "player_profile_id" | "conversation_id">>();
+
+  if (error || !meeting) {
+    return { error: error?.message ?? "Could not start the call. Please try again." };
+  }
+
   revalidateMeetingPaths(meeting);
   redirect(`${returnPath}?notice=${encodeURIComponent("Live call created. Open the call card to join.")}`);
 }

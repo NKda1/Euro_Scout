@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import Stripe from "stripe";
 import { getBaseUrl } from "@/lib/api";
 import { BILLING_PLANS, type BillingPlanKey } from "@/lib/billing-plans";
 
@@ -13,6 +13,16 @@ export function stripePlanPriceId(plan: BillingPlanKey) {
 
 export function stripeConfigured(plan: BillingPlanKey) {
   return Boolean(stripeSecretKey() && stripePlanPriceId(plan));
+}
+
+export function createStripeClient() {
+  const key = stripeSecretKey();
+  if (!key) return null;
+  return new Stripe(key, {
+    appInfo: { name: "EuroScout Pro", version: "1.0.0" },
+    maxNetworkRetries: 2,
+    timeout: 20_000
+  });
 }
 
 export function billingReturnUrls(baseUrl = getBaseUrl()) {
@@ -40,58 +50,28 @@ export async function createStripeCheckoutSession(params: {
   }
 
   const { successUrl, cancelUrl } = billingReturnUrls(params.baseUrl);
-  const body = new URLSearchParams({
-    mode: "subscription",
-    "line_items[0][price]": priceId,
-    "line_items[0][quantity]": "1",
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    client_reference_id: params.profileId,
-    "metadata[profile_id]": params.profileId,
-    "metadata[plan]": params.plan,
-    "subscription_data[metadata][profile_id]": params.profileId,
-    "subscription_data[metadata][plan]": params.plan,
-    allow_promotion_codes: "true"
-  });
+  const stripe = createStripeClient();
+  if (!stripe) return { url: null, error: "Stripe checkout is not configured." };
 
-  if (params.email) {
-    body.set("customer_email", params.email);
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      client_reference_id: params.profileId,
+      metadata: { profile_id: params.profileId, plan: params.plan },
+      subscription_data: { metadata: { profile_id: params.profileId, plan: params.plan } },
+      allow_promotion_codes: true,
+      ...(params.email ? { customer_email: params.email } : {})
+    });
+    return { url: session.url, error: session.url ? null : "Stripe did not return a checkout URL." };
+  } catch (error) {
+    return {
+      url: null,
+      error: error instanceof Error ? error.message : "Stripe could not create a checkout session."
+    };
   }
-
-  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secretKey}`,
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body
-  });
-
-  const payload = (await response.json()) as { url?: string; error?: { message?: string } };
-  if (!response.ok || !payload.url) {
-    return { url: null, error: payload.error?.message ?? "Stripe could not create a checkout session." };
-  }
-
-  return { url: payload.url, error: null };
-}
-
-export function verifyStripeSignature(rawBody: string, signatureHeader: string | null, webhookSecret: string) {
-  if (!signatureHeader) return false;
-
-  const fields = signatureHeader.split(",").reduce<Record<string, string>>((acc, part) => {
-    const [key, value] = part.split("=");
-    if (key && value) acc[key] = value;
-    return acc;
-  }, {});
-
-  if (!fields.t || !fields.v1) return false;
-
-  const signedPayload = `${fields.t}.${rawBody}`;
-  const expected = createHmac("sha256", webhookSecret).update(signedPayload).digest("hex");
-  const actual = fields.v1;
-
-  if (expected.length !== actual.length) return false;
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(actual));
 }
 
 export function stripeTimestampToIso(value: unknown) {
