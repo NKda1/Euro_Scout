@@ -36,7 +36,8 @@ export default function CareerStatsPanel({ stats, position }: CareerStatsPanelPr
         </div>
         <p className="text-xs font-semibold text-slate-500 dark:text-white/40">Scroll horizontally to compare every column</p>
       </div>
-      <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#111]">
+      <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#111]">
+        <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]">
@@ -68,6 +69,7 @@ export default function CareerStatsPanel({ stats, position }: CareerStatsPanelPr
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </section>
   );

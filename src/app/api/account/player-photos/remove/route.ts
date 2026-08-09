@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -75,5 +76,7 @@ export async function POST(request: NextRequest) {
     await serviceClient.storage.from(PROFILE_MEDIA_BUCKET).remove([storagePath]);
   }
 
+  revalidatePath("/account");
+  revalidatePath(`/players/${profile.id}`);
   return accountRedirect(request, { notice: "Profile picture removed." });
 }

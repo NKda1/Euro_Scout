@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -16,20 +19,26 @@ interface EuroScoutImageCarouselProps {
 }
 
 export default function EuroScoutImageCarousel({ className, label, title }: EuroScoutImageCarouselProps) {
+  const [showSecondaryFrames, setShowSecondaryFrames] = useState(false);
+
   return (
     <div className={cn("relative isolate min-h-80 overflow-hidden border border-slate-200 bg-slate-950 dark:border-white/10", className)}>
-      {frames.map((src, index) => (
-        <Image
-          key={src}
-          src={src}
-          alt=""
-          fill
-          sizes="(min-width: 1024px) 560px, 100vw"
-          className="es-carousel-frame object-cover"
-          style={{ animationDelay: `${index * 5}s` }}
-          priority={index === 0}
-        />
-      ))}
+      {frames.map((src, index) =>
+        index === 0 || showSecondaryFrames ? (
+          <Image
+            key={src}
+            src={src}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 560px, 100vw"
+            quality={72}
+            className="es-carousel-frame object-cover"
+            style={{ animationDelay: `${index * 5}s` }}
+            priority={index === 0}
+            onLoad={index === 0 ? () => setShowSecondaryFrames(true) : undefined}
+          />
+        ) : null
+      )}
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,.2),rgba(2,6,23,.88))]" />
       {(label || title) ? (
         <div className="absolute inset-x-0 bottom-0 p-5">

@@ -6,6 +6,7 @@ import { getBaseUrl } from "@/lib/api";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isValidRecoveryMarker, RECOVERY_COOKIE_NAME } from "@/lib/auth-recovery";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { PENDING_LEGAL_CONSENT_COOKIE, PRIVACY_VERSION, TERMS_VERSION } from "@/lib/legal";
 
 // ─── Input constraints ────────────────────────────────────────────────────────
 const MAX_EMAIL_LENGTH = 254;   // RFC 5321
@@ -105,6 +106,10 @@ export async function signUpAction(formData: FormData) {
   const next = safeNextPath(formData.get("next"), "/welcome");
   const signUpPath = authPathWithParams("/auth/sign-up", { next });
 
+  if (formData.get("terms_accepted") !== "on") {
+    redirect(authPathWithParams(signUpPath, { error: "You must accept the Terms of Service and Privacy Policy to create an account." }));
+  }
+
   if (email.length > MAX_EMAIL_LENGTH) {
     redirect(authPathWithParams(signUpPath, { error: "Invalid email address." }));
   }
@@ -126,7 +131,14 @@ export async function signUpAction(formData: FormData) {
     email,
     password,
     options: {
-      data: { display_name: displayName },
+      data: {
+        display_name: displayName,
+        legal_consent: true,
+        terms_version: TERMS_VERSION,
+        privacy_version: PRIVACY_VERSION,
+        legal_consent_source: "email_signup",
+        legal_consent_accepted_at: new Date().toISOString()
+      },
       emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`
     }
   });
@@ -245,6 +257,10 @@ export async function oauthSignInAction(formData: FormData) {
     redirect(authPathWithParams(authPath, { next, error: "Unsupported sign-in provider." }));
   }
 
+  if (mode === "sign-up" && formData.get("terms_accepted") !== "on") {
+    redirect(authPathWithParams(authPath, { next, error: "You must accept the Terms of Service and Privacy Policy to create an account." }));
+  }
+
   const supabase = await createSupabaseServerClient();
   const baseUrl = await getRequestBaseUrl();
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -256,6 +272,21 @@ export async function oauthSignInAction(formData: FormData) {
 
   if (error || !data.url) {
     redirect(authPathWithParams(authPath, { next, error: error?.message ?? "Could not start OAuth sign-in." }));
+  }
+
+  if (mode === "sign-up") {
+    const cookieStore = await cookies();
+    cookieStore.set(PENDING_LEGAL_CONSENT_COOKIE, JSON.stringify({
+      termsVersion: TERMS_VERSION,
+      privacyVersion: PRIVACY_VERSION,
+      acceptedAt: new Date().toISOString()
+    }), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/auth/callback",
+      maxAge: 15 * 60
+    });
   }
 
   redirect(data.url);
@@ -290,5 +321,9 @@ export async function resendConfirmationAction(formData: FormData) {
 export async function signOutAction() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
+  const cookieStore = await cookies();
+  for (const cookie of cookieStore.getAll()) {
+    if (cookie.name.startsWith("sb-")) cookieStore.delete(cookie.name);
+  }
   redirect("/");
 }

@@ -1,11 +1,10 @@
 import "./globals.css";
 import "@/styles/map.css";
 import type { Metadata } from "next";
-import { ReactNode } from "react";
-import Navbar from "@/components/layout/Navbar";
+import { Suspense, type ReactNode } from "react";
+import Navbar, { NavbarSkeleton } from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import PageTransition from "@/components/layout/PageTransition";
-import NavHistoryButtons from "@/components/layout/NavHistoryButtons";
 import PushNotificationPrompt from "@/components/layout/PushNotificationPrompt";
 import CookieConsent from "@/components/layout/CookieConsent";
 import ConsentAwareAnalytics from "@/components/layout/ConsentAwareAnalytics";
@@ -21,11 +20,11 @@ export const metadata: Metadata = {
   description: "Premium European American football league and team intelligence.",
   icons: {
     icon: [
-      { url: "/images/Euro_Scout_Logo%202.png", type: "image/png" }
+      { url: "/images/euroscout-logo-256.png", type: "image/png" }
     ],
-    shortcut: "/images/Euro_Scout_Logo%202.png",
+    shortcut: "/images/euroscout-logo-256.png",
     apple: [
-      { url: "/images/Euro_Scout_Logo%202.png", type: "image/png" }
+      { url: "/images/euroscout-logo-256.png", type: "image/png" }
     ]
   },
   openGraph: {
@@ -52,8 +51,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <Navbar />
-        <NavHistoryButtons />
+        <Suspense fallback={<NavbarSkeleton />}>
+          <Navbar />
+        </Suspense>
         <PageTransition>{children}</PageTransition>
         <PushNotificationPrompt />
         <Footer />

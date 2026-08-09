@@ -599,6 +599,7 @@ export async function updateAccountAction(formData: FormData) {
 
   revalidatePath("/account");
   revalidatePath("/players");
+  revalidatePath(`/players/${user.id}`);
   redirect("/account");
 }
 

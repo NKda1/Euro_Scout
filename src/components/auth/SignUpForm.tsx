@@ -19,6 +19,7 @@ interface SignUpFormProps {
 
 export default function SignUpForm({ error, defaultEmail, next }: SignUpFormProps) {
   const [matchError, setMatchError] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/welcome";
   const signInParams = new URLSearchParams({ next: safeNext });
   if (defaultEmail) signInParams.set("email", defaultEmail);
@@ -42,7 +43,20 @@ export default function SignUpForm({ error, defaultEmail, next }: SignUpFormProp
           {matchError ?? error}
         </p>
       )}
-      <OAuthButtons next={safeNext} mode="sign-up" />
+      <label className="mb-5 flex items-start gap-3 text-sm font-semibold leading-5 text-slate-600 dark:text-slate-300">
+        <input
+          type="checkbox"
+          checked={termsAccepted}
+          onChange={(event) => setTermsAccepted(event.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-red-600"
+          required
+        />
+        <span>
+          I agree to the <Link href="/terms" target="_blank" className="font-black text-red-600 hover:underline">Terms of Service</Link>{" "}
+          and <Link href="/privacy" target="_blank" className="font-black text-red-600 hover:underline">Privacy Policy</Link>.
+        </span>
+      </label>
+      <OAuthButtons next={safeNext} mode="sign-up" disabled={!termsAccepted} termsAccepted={termsAccepted} />
       <div className="my-5 flex items-center gap-3 text-xs font-black uppercase text-slate-400">
         <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
         <span>or use email</span>
@@ -50,6 +64,7 @@ export default function SignUpForm({ error, defaultEmail, next }: SignUpFormProp
       </div>
       <form action={signUpAction} onSubmit={handleSubmit} className="space-y-4">
         <input type="hidden" name="next" value={safeNext} />
+        <input type="hidden" name="terms_accepted" value={termsAccepted ? "on" : ""} />
         <label className="block">
           <span className={labelClass}>Display name</span>
           <input name="display_name" required autoComplete="name" className={inputClass} />
@@ -66,7 +81,7 @@ export default function SignUpForm({ error, defaultEmail, next }: SignUpFormProp
           <span className={labelClass}>Confirm password</span>
           <PasswordInput name="confirm_password" required minLength={8} autoComplete="new-password" />
         </label>
-        <PendingSubmitButton pendingLabel="Creating account…" className="h-12 w-full bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-70">
+        <PendingSubmitButton disabled={!termsAccepted} pendingLabel="Creating account…" className="h-12 w-full bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
           Create account
         </PendingSubmitButton>
       </form>

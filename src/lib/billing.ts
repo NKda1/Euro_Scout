@@ -51,9 +51,7 @@ export async function createStripeCheckoutSession(params: {
 
   const { successUrl, cancelUrl } = billingReturnUrls(params.baseUrl);
   const stripe = createStripeClient();
-  if (!stripe) {
-    return { url: null, error: "Stripe checkout is not configured." };
-  }
+  if (!stripe) return { url: null, error: "Stripe checkout is not configured." };
 
   try {
     const session = await stripe.checkout.sessions.create({

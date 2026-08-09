@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -106,5 +107,7 @@ export async function POST(request: NextRequest) {
     return accountRedirect(request, { error: updateError.message });
   }
 
+  revalidatePath("/account");
+  revalidatePath(`/players/${profile.id}`);
   return accountRedirect(request, { notice: "Profile picture added." });
 }
