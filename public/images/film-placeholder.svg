@@ -1,0 +1,49 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="esBg" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#1c0a0a"/>
+      <stop offset="100%" stop-color="#060914"/>
+    </radialGradient>
+    <radialGradient id="esGlow" cx="50%" cy="38%" r="38%">
+      <stop offset="0%" stop-color="#dc2626" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#dc2626" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="720" fill="url(#esBg)"/>
+  <rect width="1280" height="720" fill="url(#esGlow)"/>
+
+  <!-- Subtle field yard lines -->
+  <line x1="0" y1="185" x2="1280" y2="185" stroke="#ffffff" stroke-width="1" opacity="0.03"/>
+  <line x1="0" y1="360" x2="1280" y2="360" stroke="#ffffff" stroke-width="1.5" opacity="0.05"/>
+  <line x1="0" y1="535" x2="1280" y2="535" stroke="#ffffff" stroke-width="1" opacity="0.03"/>
+  <line x1="200" y1="0" x2="200" y2="720" stroke="#ffffff" stroke-width="1" opacity="0.02"/>
+  <line x1="640" y1="0" x2="640" y2="720" stroke="#ffffff" stroke-width="1" opacity="0.025"/>
+  <line x1="1080" y1="0" x2="1080" y2="720" stroke="#ffffff" stroke-width="1" opacity="0.02"/>
+
+  <!-- Play button -->
+  <circle cx="640" cy="310" r="60" fill="white" fill-opacity="0.06" stroke="white" stroke-opacity="0.14" stroke-width="1.5"/>
+  <polygon points="624,285 624,335 672,310" fill="white" fill-opacity="0.65"/>
+
+  <!-- Football below play button -->
+  <ellipse cx="640" cy="430" rx="30" ry="18" fill="#92400e" opacity="0.65"/>
+  <ellipse cx="640" cy="430" rx="30" ry="18" fill="none" stroke="#78350f" stroke-width="0.8" opacity="0.65"/>
+  <line x1="640" y1="414" x2="640" y2="446" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.65"/>
+  <line x1="631" y1="422" x2="649" y2="422" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.65"/>
+  <line x1="631" y1="430" x2="649" y2="430" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.65"/>
+  <line x1="631" y1="438" x2="649" y2="438" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.65"/>
+
+  <!-- EuroScout Pro top-left badge -->
+  <text x="40" y="47" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="800" letter-spacing="3.5" fill="#dc2626" opacity="0.9">EUROSCOUT PRO</text>
+  <rect x="40" y="53" width="148" height="1.5" fill="#dc2626" opacity="0.55"/>
+
+  <!-- "FILM PREVIEW" subtitle -->
+  <text x="640" y="480" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="800" letter-spacing="6" fill="white" fill-opacity="0.28" text-anchor="middle">FILM PREVIEW</text>
+
+  <!-- Bottom red accent bar -->
+  <rect x="0" y="715" width="1280" height="5" fill="#dc2626" opacity="0.75"/>
+
+  <!-- Bottom-right hint -->
+  <text x="1240" y="700" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="700" letter-spacing="2" fill="white" fill-opacity="0.18" text-anchor="end">HUDL FILM</text>
+</svg>

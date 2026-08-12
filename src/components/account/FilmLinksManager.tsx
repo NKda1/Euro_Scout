@@ -4,6 +4,7 @@ import VideoLinkComposer from "@/components/account/VideoLinkComposer";
 import FilmSubmitButton from "@/components/account/FilmSubmitButton";
 import FilmUploadGuide from "@/components/account/FilmUploadGuide";
 import { detectVideoProvider, getEmbeddableVideoUrl, getVideoProviderLabel, getVideoThumbnailUrl, normalizeVideoUrl } from "@/lib/video";
+import { Youtube } from "lucide-react";
 
 const inputClass = "h-11 w-full rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/25 focus:border-red-500";
 const filmTypeLabels: Record<string, string> = {
@@ -29,6 +30,17 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-sm font-black text-slate-950 dark:text-white">Film reel</p>
         <FilmUploadGuide />
+      </div>
+
+      {/* YouTube recommendation */}
+      <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-500/20 bg-red-500/[0.07] p-3">
+        <Youtube className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-red-400">Host on YouTube for the best experience</p>
+          <p className="mt-1 text-[11px] font-semibold leading-5 text-white/50">
+            YouTube film embeds directly in your profile so scouts can watch without leaving EuroScout. Hudl links open externally. Upload your highlights to YouTube, set the video to <strong className="text-white/70">Unlisted</strong>, then paste the link here — your profile gets a live preview and every view is tracked.
+          </p>
+        </div>
       </div>
 
       <div className="mt-5 overflow-hidden rounded-lg border border-white/15 bg-black/30">
