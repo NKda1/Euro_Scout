@@ -228,7 +228,7 @@ export const getCachedPublicClubDirectory = unstable_cache(
     const ownerByTeam = new Map((ownerRows ?? []).map((owner) => [owner.team_id, owner]));
     const profileById = new Map((fallbackProfiles ?? []).map((profile) => [profile.id, profile]));
 
-    return (teams ?? []).map((team) => {
+    const items = (teams ?? []).map((team) => {
       const owner = ownerByTeam.get(team.id);
       const profile = owner?.profiles ?? (team.claimed_by ? profileById.get(team.claimed_by) ?? null : null);
 
@@ -237,6 +237,17 @@ export const getCachedPublicClubDirectory = unstable_cache(
         profile,
         profileId: owner?.profile_id ?? team.claimed_by
       };
+    });
+
+    // Sort: verified before pending, then by profile completeness (bio + avatar + headline)
+    return items.sort((a, b) => {
+      const verifiedA = a.team.claim_status === "verified" ? 0 : 1;
+      const verifiedB = b.team.claim_status === "verified" ? 0 : 1;
+      if (verifiedA !== verifiedB) return verifiedA - verifiedB;
+
+      const scoreProfile = (p: typeof a.profile) =>
+        (p?.bio ? 2 : 0) + (p?.avatar_url ? 2 : 0) + (p?.headline ? 1 : 0);
+      return scoreProfile(b.profile) - scoreProfile(a.profile);
     });
   },
   ["public-club-directory-v1"],

@@ -37,6 +37,14 @@ export function getEmbeddableVideoUrl(url: string) {
   const vimeo = normalized.match(/vimeo\.com\/(?:video\/)?(\d+)/);
   if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
 
+  // Hudl public highlight videos — /video/3/{userId}/{videoId}
+  const hudlVideo = normalized.match(/hudl\.com\/video\/(\d+)\/(\d+)\/([A-Za-z0-9_-]+)/);
+  if (hudlVideo) return `https://www.hudl.com/embed/video/${hudlVideo[2]}/${hudlVideo[3]}`;
+
+  // Hudl v/ short-link form — /v/{hash}
+  const hudlShort = normalized.match(/hudl\.com\/v\/([A-Za-z0-9_-]+)/);
+  if (hudlShort) return `https://www.hudl.com/embed/video/${hudlShort[1]}`;
+
   return null;
 }
 
