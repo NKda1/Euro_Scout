@@ -7,6 +7,7 @@ import Footer from "@/components/layout/Footer";
 import PageTransition from "@/components/layout/PageTransition";
 import PushNotificationPrompt from "@/components/layout/PushNotificationPrompt";
 import CookieConsent from "@/components/layout/CookieConsent";
+import FootballLoader from "@/components/layout/FootballLoader";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <Suspense fallback={<NavbarSkeleton />}>
           <Navbar />
         </Suspense>
+        <FootballLoader />
         <PageTransition>{children}</PageTransition>
         <PushNotificationPrompt />
         <Footer />

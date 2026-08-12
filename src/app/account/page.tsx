@@ -704,14 +704,20 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         .returns<JoinableTeamRow[]>()
     : { data: [] as JoinableTeamRow[] };
   const staffProfileIds = (staffRows ?? []).map((staffMember) => staffMember.profile_id);
-  const { data: staffUsers } = staffProfileIds.length
-    ? await serviceClient
-        .from("users")
-        .select("id, email")
-        .in("id", staffProfileIds)
-        .returns<PublicUserRow[]>()
-    : { data: [] as PublicUserRow[] };
-  const staffEmailById = new Map((staffUsers ?? []).map((userRow) => [userRow.id, userRow.email]));
+  // Fetch auth emails via admin API; `.from("users")` does not exist in the public schema.
+  const staffEmailById = new Map<string, string>();
+  if (staffProfileIds.length) {
+    try {
+      const { data: { users: authUsers } } = await serviceClient.auth.admin.listUsers({ perPage: 200 });
+      for (const authUser of authUsers) {
+        if (staffProfileIds.includes(authUser.id) && authUser.email) {
+          staffEmailById.set(authUser.id, authUser.email);
+        }
+      }
+    } catch {
+      // Non-critical — staff emails simply won't display
+    }
+  }
   const staff = staffRows ?? [];
   const nonOwnerStaff = staff.filter((staffMember) => staffMember.club_role !== "owner");
   const pendingStaffInvites = pendingTeamInvites ?? [];

@@ -1,6 +1,8 @@
 import { deleteFilmLinkAction, saveFilmLinkAction } from "@/app/actions/film";
 import type { FilmLink } from "@/components/players/HudlFilmViewer";
 import VideoLinkComposer from "@/components/account/VideoLinkComposer";
+import FilmSubmitButton from "@/components/account/FilmSubmitButton";
+import FilmUploadGuide from "@/components/account/FilmUploadGuide";
 import { detectVideoProvider, getEmbeddableVideoUrl, getVideoProviderLabel, getVideoThumbnailUrl, normalizeVideoUrl } from "@/lib/video";
 
 const inputClass = "h-11 w-full rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/25 focus:border-red-500";
@@ -24,7 +26,10 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
 
   return (
     <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">
-      <p className="text-sm font-black text-slate-950 dark:text-white">Film reel</p>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-sm font-black text-slate-950 dark:text-white">Film reel</p>
+        <FilmUploadGuide />
+      </div>
 
       <div className="mt-5 overflow-hidden rounded-lg border border-white/15 bg-black/30">
         <div className="aspect-video">
@@ -92,7 +97,7 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
           <input name="is_default" type="checkbox" className="h-4 w-4 rounded border-white/20 text-red-600" />
           Set as default film
         </label>
-        <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">Add film</button>
+        <FilmSubmitButton label="Add film" />
         </div>
       </form>
 
@@ -127,7 +132,7 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
                   <input name="is_default" type="checkbox" defaultChecked={film.is_default} className="h-4 w-4 rounded border-white/20 text-red-600" />
                   Set as default film
                 </label>
-                <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">Save changes</button>
+        <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700">Save changes</button>
               </form>
             </details>
           </div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { removeFromWatchlistAction, updateWatchlistItemNotesAction, updateWatchlistItemRecruitmentStatusAction } from "@/app/actions/watchlist";
 import PlayerSpiderChart, { type SpiderPlayer } from "@/components/watchlist/PlayerSpiderChart";
+import PlayerBarChart from "@/components/watchlist/PlayerBarChart";
 
 interface WatchlistItemRow {
   id: string;
@@ -89,6 +90,7 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [showComparison, setShowComparison] = useState(false);
   const [showSpiderChart, setShowSpiderChart] = useState(false);
+  const [chartType, setChartType] = useState<"radar" | "bar">("radar");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -169,9 +171,9 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                 } ${mounted ? "animate-in fade-in slide-in-from-bottom-2" : ""}`}
                 style={{ animationDelay: `${items.indexOf(item) * 50}ms`, animationFillMode: "backwards" }}
               >
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-                  <div className="flex min-w-0 gap-4">
-                    <label className="flex cursor-pointer items-start gap-4">
+                <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+                  <div className="flex min-w-0 gap-3 sm:gap-4">
+                    <label className="flex cursor-pointer items-start gap-3 sm:gap-4">
                       <div className="relative pt-1">
                         <input
                           type="checkbox"
@@ -187,14 +189,14 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                         )}
                       </div>
                       <div
-                        className="flex h-16 w-16 shrink-0 items-center justify-center border border-red-500 bg-slate-100 bg-cover bg-center text-lg font-black text-slate-900 transition dark:bg-[#202020] dark:text-white"
+                        className="flex h-12 w-12 shrink-0 items-center justify-center border border-red-500 bg-slate-100 bg-cover bg-center text-base font-black text-slate-900 transition dark:bg-[#202020] dark:text-white sm:h-16 sm:w-16 sm:text-lg"
                         style={publicProfile?.avatar_url ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.58)), url(${publicProfile.avatar_url})` } : undefined}
                       >
                         {publicProfile?.avatar_url ? "" : initials(publicProfile?.display_name ?? "Player")}
                       </div>
                     </label>
                     <div className="min-w-0 flex-1">
-                      <Link href={`/players/${player?.profile_id}`} className="text-xl font-black text-slate-950 hover:text-red-600 dark:text-white dark:hover:text-red-400">
+                      <Link href={`/players/${player?.profile_id}`} className="text-base font-black text-slate-950 hover:text-red-600 dark:text-white dark:hover:text-red-400 sm:text-xl">
                         {publicProfile?.display_name ?? "Unknown Player"}
                       </Link>
                       <p className="mt-1 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-white/35">
@@ -237,12 +239,12 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                   </div>
                 </div>
 
-                <form action={updateWatchlistItemNotesAction} className="mt-4">
+                <form action={updateWatchlistItemNotesAction} className="mt-3 sm:mt-4">
                   <input type="hidden" name="watchlist_item_id" value={item.id} />
                   <input type="hidden" name="watchlist_id" value={watchlistId} />
                   <input type="hidden" name="return_path" value={`/watchlists?watchlist=${watchlistId}`} />
                   <label className="block text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/35">Notes</label>
-                  <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_90px]">
+                  <div className="mt-2 grid gap-2 sm:mt-4 md:grid-cols-[minmax(0,1fr)_90px]">
                     <textarea
                       name="notes"
                       defaultValue={item.notes ?? ""}
@@ -264,8 +266,8 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
 
       {/* Floating comparison action bar */}
       {selectedPlayers.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className="flex items-center gap-3 border border-red-500 bg-red-600 px-6 py-4 shadow-2xl">
+        <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="flex items-center gap-2 border border-red-500 bg-red-600 px-4 py-3 shadow-2xl sm:gap-3 sm:px-6 sm:py-4">
             <div className="flex items-center gap-2">
               <div className="flex -space-x-2">
                 {Array.from(selectedPlayers).slice(0, 4).map((itemId) => {
@@ -323,13 +325,30 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
                   Side-by-side comparison of {compareItems.length} selected player{compareItems.length !== 1 ? "s" : ""}.
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                 <button
                   onClick={() => setShowSpiderChart((prev) => !prev)}
                   className="text-xs font-black uppercase tracking-wide text-red-600 transition hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
                 >
                   {showSpiderChart ? "Hide graphic report" : "View graphic report"}
                 </button>
+                {showSpiderChart && (
+                  <div className="flex gap-1 rounded border border-slate-200 p-0.5 dark:border-white/10">
+                    {(["radar", "bar"] as const).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setChartType(type)}
+                        className={`px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                          chartType === type
+                            ? "bg-red-600 text-white"
+                            : "text-slate-500 hover:text-red-600 dark:text-white/40 dark:hover:text-red-300"
+                        }`}
+                      >
+                        {type === "radar" ? "Radar" : "Bar"}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <button
                   onClick={clearComparison}
                   className="text-xs font-black uppercase tracking-wide text-slate-400 transition hover:text-red-600 dark:hover:text-red-300"
@@ -339,8 +358,8 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
               </div>
             </div>
           </div>
-          <div className="overflow-x-auto p-5">
-            <div className="grid min-w-[900px] gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(compareItems.length, 4)}, minmax(220px, 1fr))` }}>
+          <div className="overflow-x-auto p-3 sm:p-5">
+            <div className="grid gap-3 sm:gap-4" style={{ minWidth: `${Math.min(compareItems.length, 4) * 200}px`, gridTemplateColumns: `repeat(${Math.min(compareItems.length, 4)}, minmax(190px, 1fr))` }}>
               {compareItems.map((item, index) => {
                 const player = item.player_profiles!;
                 const publicProfile = player.profiles!;
@@ -421,7 +440,11 @@ export default function InteractiveWatchlist({ items, watchlistId }: Interactive
             return (
               <div className="animate-in fade-in slide-in-from-bottom-4 border-t border-slate-200 p-5 duration-300 dark:border-white/10">
                 <p className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-red-600 dark:text-red-400">Graphic report</p>
-                <PlayerSpiderChart players={spiderPlayers} />
+                {chartType === "radar" ? (
+                  <PlayerSpiderChart players={spiderPlayers} />
+                ) : (
+                  <PlayerBarChart players={spiderPlayers} />
+                )}
               </div>
             );
           })()}

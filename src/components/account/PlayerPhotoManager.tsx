@@ -11,6 +11,8 @@ export default function PlayerPhotoManager({ photoUrls }: { photoUrls: string[] 
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Ref-based lock prevents race conditions when state updates are batched.
+  const busyRef = useRef(false);
   const router = useRouter();
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -20,10 +22,14 @@ export default function PlayerPhotoManager({ photoUrls }: { photoUrls: string[] 
   }
 
   function uploadFile(file: File) {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setProgress(0);
     setError(null);
+
+    // Clear the input immediately so a re-render never re-triggers onChange.
+    if (fileInputRef.current) fileInputRef.current.value = "";
 
     const formData = new FormData();
     formData.append("photo", file);
@@ -40,13 +46,14 @@ export default function PlayerPhotoManager({ photoUrls }: { photoUrls: string[] 
         setError(decodeURIComponent(err));
       } else {
         router.refresh();
-        if (fileInputRef.current) fileInputRef.current.value = "";
       }
+      busyRef.current = false;
       setBusy(false);
       setProgress(0);
     };
     xhr.onerror = () => {
       setError("Upload failed. Please check your connection and try again.");
+      busyRef.current = false;
       setBusy(false);
       setProgress(0);
     };

@@ -231,3 +231,33 @@ export async function sendCallReminderEmail(params: CallReminderEmailParams) {
     text: `Hi ${recipientName},\n\nYour video call with ${counterpartName} starts in approximately 15 minutes at ${scheduledTime}.\n\nJoin call: ${roomUrl}`
   });
 }
+
+export interface IncompleteSignupNudgeParams {
+  to: string;
+  recipientName: string;
+  setupUrl: string;
+  optOutUrl: string;
+}
+
+export async function sendIncompleteSignupNudgeEmail(params: IncompleteSignupNudgeParams) {
+  const { to, recipientName, setupUrl, optOutUrl } = params;
+  const safeName = escapeHtml(recipientName);
+  const html = wrap(
+    "Finish setting up your EuroScout Pro profile",
+    `<p>Hi ${safeName},</p>
+<p>Your EuroScout Pro account was created but your profile is still incomplete. Clubs and scouts discover players with complete profiles — including a photo, position, and team details.</p>
+<div class="note"><p>A complete profile gets <strong>3× more views</strong> from club staff and scouts actively recruiting.</p></div>
+<p>It only takes a few minutes. Finish your setup now so you can be found by the right clubs.</p>
+<a class="cta" href="${setupUrl}">Complete my profile</a>
+<p style="margin-top:24px;font-size:12px;color:#94a3b8;">
+  Don't want these reminders? <a href="${optOutUrl}" style="color:#94a3b8;">Unsubscribe from setup nudges</a>.
+</p>`
+  );
+  await sendEmail({
+    to,
+    tag: "incomplete-signup-nudge",
+    subject: `${recipientName}, your EuroScout profile needs finishing`,
+    html,
+    text: `Hi ${recipientName},\n\nYour EuroScout Pro profile is incomplete. Complete it now to be found by clubs and scouts.\n\nFinish setup: ${setupUrl}\n\nTo stop these reminders: ${optOutUrl}`
+  });
+}

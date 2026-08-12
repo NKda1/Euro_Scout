@@ -58,10 +58,20 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
       : query.eq("current_team_id", "no-match");
   }
 
-  const [{ data: players, error }, { data: nationalities }] = await Promise.all([
+  const [{ data: rawPlayers, error }, { data: nationalities }] = await Promise.all([
     query.order("updated_at", { ascending: false }),
     supabase.from("player_profiles").select("nationality").not("nationality", "is", null).returns<{ nationality: string }[]>()
   ]);
+
+  // Sort: claimed/complete accounts first (avatar + bio + position + team = more complete)
+  const players = (rawPlayers ?? []).sort((a, b) => {
+    const score = (p: typeof a) =>
+      (p.profiles?.avatar_url ? 3 : 0) +
+      (p.profiles?.bio ? 2 : 0) +
+      (p.position ? 1 : 0) +
+      (p.current_team_id ? 1 : 0);
+    return score(b) - score(a);
+  });
 
   const distinctNationalities = Array.from(new Set((nationalities ?? []).map((n: { nationality: string }) => n.nationality))).sort() as string[];
 

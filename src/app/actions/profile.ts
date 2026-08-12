@@ -393,6 +393,7 @@ export async function completeOnboardingAction(formData: FormData) {
       headline: roleValue === "player" || roleValue === "club" ? null : text(formData, "headline"),
       bio: text(formData, "bio"),
       location: text(formData, "location"),
+      avatar_url: text(formData, "avatar_url") || undefined,
       is_public: boolValue(formData, "is_public"),
       onboarding_complete: true,
       updated_at: new Date().toISOString()

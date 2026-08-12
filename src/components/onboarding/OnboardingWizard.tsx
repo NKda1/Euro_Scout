@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useTransition, useState, useMemo } from "react";
+import { useEffect, useTransition, useState, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import CareerTimelineBuilder, { type CareerTimelineDraft } from "@/components/account/CareerTimelineBuilder";
 import { leagues as seededLeagues, teams } from "@/lib/data";
@@ -416,10 +416,72 @@ function RoleStep({ value, onChange, allowAdmin }: { value: UserRole; onChange: 
 
 // ─── Step 2: Identity ─────────────────────────────────────────────────────────
 
+function AvatarUploadControl({ avatarUrl, setAvatarUrl }: { avatarUrl: string; setAvatarUrl: (v: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const busyRef = useRef(false);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || busyRef.current) return;
+
+    busyRef.current = true;
+    setUploading(true);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    const fd = new FormData();
+    fd.append("avatar", file);
+
+    fetch("/api/onboarding/avatar", { method: "POST", body: fd })
+      .then((res) => res.json())
+      .then((data: { url?: string; error?: string }) => {
+        if (data.error) setUploadError(data.error);
+        else if (data.url) setAvatarUrl(data.url);
+      })
+      .catch(() => setUploadError("Upload failed. Check your connection."))
+      .finally(() => {
+        busyRef.current = false;
+        setUploading(false);
+      });
+  }
+
+  return (
+    <div className="flex items-center gap-4">
+      <div
+        className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-100 bg-cover bg-center text-2xl dark:border-white/15 dark:bg-white/5"
+        style={avatarUrl ? { backgroundImage: `url(${avatarUrl})` } : undefined}
+      >
+        {avatarUrl ? "" : "📷"}
+      </div>
+      <div className="min-w-0 flex-1">
+        <FieldLabel>Profile photo <span className="font-semibold text-red-500 normal-case">(required)</span></FieldLabel>
+        {uploadError && <p className="mb-2 text-xs font-semibold text-red-500">{uploadError}</p>}
+        <label className={`flex h-10 w-full cursor-pointer items-center justify-center gap-2 border text-xs font-black uppercase transition ${uploading ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-white/30" : avatarUrl ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/35 dark:bg-emerald-500/10 dark:text-emerald-200" : "border-red-300 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/35 dark:bg-red-500/10 dark:text-red-300"}`}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            disabled={uploading}
+            onChange={handleChange}
+            className="sr-only"
+          />
+          {uploading ? "Uploading…" : avatarUrl ? "✓ Photo uploaded — change" : "Upload photo"}
+        </label>
+        <p className="mt-1.5 text-[11px] font-semibold text-slate-400 dark:text-white/30">
+          JPG, PNG or WebP · max 7 MB · required to complete setup
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function IdentityStep(props: {
   displayName: string; setDisplayName: (v: string) => void;
   location:    string; setLocation:    (v: string) => void;
   bio:         string; setBio:         (v: string) => void;
+  avatarUrl:   string; setAvatarUrl:   (v: string) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -427,6 +489,7 @@ function IdentityStep(props: {
         <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">Your identity.</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Keep it simple: who you are, where you fit in football, and what people should remember.</p>
       </div>
+      <AvatarUploadControl avatarUrl={props.avatarUrl} setAvatarUrl={props.setAvatarUrl} />
       <label className="block">
         <FieldLabel required>Display name</FieldLabel>
         <input value={props.displayName} onChange={(e) => props.setDisplayName(e.target.value)} placeholder="e.g. Jonas Weber" className={inputClass} />
@@ -1124,6 +1187,7 @@ export default function OnboardingWizard({
   const [displayName, setDisplayName] = useState("");
   const [location, setLocation]       = useState("");
   const [bio, setBio]                 = useState("");
+  const [avatarUrl, setAvatarUrl]     = useState("");
 
   // Step 3 – player
   const [dob,                  setDob]                  = useState("");
@@ -1186,7 +1250,7 @@ export default function OnboardingWizard({
   ];
 
   const canAdvance = step === 2
-    ? displayName.trim().length > 0
+    ? displayName.trim().length > 0 && avatarUrl.length > 0
     : step === roleStepNum && role === "player" && !previewMode
       ? Boolean(position)
       : true;
@@ -1200,6 +1264,7 @@ export default function OnboardingWizard({
     fd.append("location",     location.trim());
     fd.append("headline",     "");
     fd.append("bio",          bio.trim());
+    fd.append("avatar_url",   avatarUrl);
     fd.append("is_public",    isPublic ? "on" : "");
 
     // Player fields
@@ -1285,6 +1350,7 @@ export default function OnboardingWizard({
               displayName={displayName} setDisplayName={setDisplayName}
               location={location}       setLocation={setLocation}
               bio={bio}                 setBio={setBio}
+              avatarUrl={avatarUrl}     setAvatarUrl={setAvatarUrl}
             />
           )}
           {step === roleStepNum && role === "player" && !previewMode && (
