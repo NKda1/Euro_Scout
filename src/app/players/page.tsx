@@ -64,8 +64,9 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
   ]);
 
   // Sort: claimed/complete accounts first (avatar + bio + position + team = more complete)
-  const players = (rawPlayers ?? []).sort((a, b) => {
-    const score = (p: typeof a) =>
+  type PlayerRow = NonNullable<typeof rawPlayers>[number];
+  const players = (rawPlayers ?? []).sort((a: PlayerRow, b: PlayerRow) => {
+    const score = (p: PlayerRow) =>
       (p.profiles?.avatar_url ? 3 : 0) +
       (p.profiles?.bio ? 2 : 0) +
       (p.position ? 1 : 0) +
