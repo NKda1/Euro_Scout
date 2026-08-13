@@ -377,7 +377,6 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     : { data: [] as ConversationPipelineRow[] };
 
   const isVerified = team?.claim_status === "verified";
-  const pipelineNamesPublic = team?.pipeline_names_public ?? false;
   const isAuthenticated = Boolean(user);
   const staff = staffRows ?? [];
   const hasClubInbox = staff.length > 0;
@@ -505,15 +504,17 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                 <div className="mt-7 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
                   {[
                     ["Region", team?.country ?? "Europe"],
-                    ["Type", campusPipeline?.label ?? league?.tier ?? "Club"],
-                    ["Market", league?.marketTier ?? "—"],
-                    ["Pipeline", pipelineNamesPublic ? "Public" : "Open"]
                   ].map(([label, value]) => (
                     <div key={label} className="min-h-9 min-w-0 break-words border border-slate-200 bg-white px-4 py-2 text-sm dark:border-white/20 dark:bg-black/20">
                       <span className="mr-1.5 uppercase text-slate-500 dark:text-white/35">{label}</span>
                       <span className="font-bold capitalize text-slate-800 dark:text-white/75">{value}</span>
                     </div>
                   ))}
+                  {/* Recruiting status badge */}
+                  <div className={`min-h-9 flex items-center gap-1.5 border px-4 py-2 text-sm font-black ${team?.recruiting_active ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300" : "border-slate-200 bg-white text-slate-500 dark:border-white/20 dark:bg-black/20 dark:text-white/40"}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${team?.recruiting_active ? "bg-emerald-500" : "bg-slate-400 dark:bg-white/30"}`} />
+                    {team?.recruiting_active ? "Actively recruiting" : "Not currently recruiting"}
+                  </div>
                   <span className="min-h-9 px-2 py-2 text-sm font-black uppercase text-red-600 dark:text-red-400">
                     {resolvedProfile.is_public ? "Public Profile" : "Private Profile"}
                   </span>
@@ -523,13 +524,13 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
               <div className="grid grid-cols-1 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a] sm:grid-cols-2">
                 {([
                   ["League", leagueLabel],
-                  ["Pass Play", formatPercent(team?.pass_run_percentage)],
-                  ["Open Spots", String(openSpots || "—")],
-                  ["Staff", String(staff.length || "—")]
-                ] as [string, string][]).map(([label, value], index) => (
-                  <div key={label} className={`p-6 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
+                  team?.pass_run_percentage != null ? ["Pass / Run", formatPercent(team.pass_run_percentage)] : null,
+                  team?.passing_yards != null ? ["Passing yards", `${team.passing_yards.toLocaleString("en-GB")} yds`] : null,
+                  team?.touchdowns_scored != null ? ["Touchdowns", String(team.touchdowns_scored)] : null,
+                ].filter(Boolean) as [string, string][]).map(([label, value], index, arr) => (
+                  <div key={label} className={`p-4 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < arr.length - 2 || arr.length <= 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
                     <p className="text-xs font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
-                    <p className={`mt-2 text-2xl font-black ${label === "Open Spots" ? "text-green-600 dark:text-green-400" : "text-slate-950 dark:text-white"}`}>{value}</p>
+                    <p className="mt-1.5 text-xl font-black text-slate-950 dark:text-white">{value}</p>
                   </div>
                 ))}
               </div>
@@ -555,8 +556,9 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                     <div className="absolute inset-0 bg-gradient-to-br from-red-500/0 to-red-500/5 opacity-0 transition group-hover:opacity-100 dark:to-red-500/10" />
                     <div className="relative p-5">
                       <div className="mb-3 flex items-center gap-2">
+                        {/* Stadium arch silhouette */}
                         <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M5 21V10.5A9 9 0 0112 3a9 9 0 017 7.5V21M9 21v-5h6v5M7 13h2v3H7zm8 0h2v3h-2z" />
                         </svg>
                         <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Stadium</p>
                       </div>

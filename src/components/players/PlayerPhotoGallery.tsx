@@ -69,7 +69,7 @@ export default function PlayerPhotoGallery({ photoUrls, canRemove = false }: Pla
                     <form action="/api/account/player-photos/remove" method="post" className="absolute right-2 top-2 z-10">
                       <input type="hidden" name="photo_url" value={photo} />
                       <button
-                        className="flex h-7 w-7 items-center justify-center bg-black/70 text-xs font-black text-white transition hover:bg-red-600"
+                        className="flex h-7 w-7 items-center justify-center bg-slate-900/75 text-xs font-black text-white transition hover:bg-red-600 dark:bg-black/70"
                         title="Remove photo"
                         aria-label="Remove photo"
                       >

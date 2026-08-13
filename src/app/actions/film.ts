@@ -12,12 +12,17 @@ function text(formData: FormData, key: string) {
 
 type FilmProvider = "youtube" | "vimeo" | "hudl" | "external";
 const allowedFilmTypes = new Set(["highlights", "game_film", "combine"]);
+const HUDL_PLACEHOLDER = "/images/film-placeholder.svg";
 
 function normalizeFilmUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return "";
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   return `https://${trimmed.replace(/^\/+/, "")}`;
+}
+
+function normalizeThumbnailUrl(value: string) {
+  return value === HUDL_PLACEHOLDER ? value : normalizeFilmUrl(value);
 }
 
 function detectFilmProvider(url: string): FilmProvider {
@@ -60,7 +65,7 @@ export async function saveFilmLinkAction(formData: FormData) {
   const rawUrl = text(formData, "url");
   const url = normalizeFilmUrl(rawUrl);
   const rawThumbnailUrl = text(formData, "thumbnail_url");
-  const thumbnailUrl = rawThumbnailUrl ? normalizeFilmUrl(rawThumbnailUrl) : null;
+  const thumbnailUrl = rawThumbnailUrl ? normalizeThumbnailUrl(rawThumbnailUrl) : null;
   const requestedFilmType = text(formData, "film_type") || "highlights";
   const filmType = allowedFilmTypes.has(requestedFilmType) ? requestedFilmType : "highlights";
   const isDefault = formData.get("is_default") === "on";
@@ -79,7 +84,7 @@ export async function saveFilmLinkAction(formData: FormData) {
     redirect("/account?error=Film URL must start with http or https.");
   }
 
-  if (thumbnailUrl) {
+  if (thumbnailUrl && thumbnailUrl !== HUDL_PLACEHOLDER) {
     let parsedThumbnailUrl: URL;
     try {
       parsedThumbnailUrl = new URL(thumbnailUrl);

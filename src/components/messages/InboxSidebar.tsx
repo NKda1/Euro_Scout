@@ -405,9 +405,7 @@ export default function InboxSidebar({
                         <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-black text-white">
                           {item.unreadCount > 99 ? "99+" : item.unreadCount}
                         </span>
-                      ) : (
-                        <span className="mt-1.5 block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </Link>

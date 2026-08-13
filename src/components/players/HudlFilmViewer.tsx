@@ -16,13 +16,20 @@ export interface FilmLink {
 
 const filmTabs = [
   { value: "highlights", label: "Highlights" },
-  { value: "game_film", label: "Game Film" },
-  { value: "combine", label: "Combine" }
+  { value: "game_film", label: "Game Film" }
 ];
 const filmTypeValues = new Set(filmTabs.map((tab) => tab.value));
+const HUDL_PLACEHOLDER = "/images/film-placeholder.svg";
 
 function normaliseFilmType(value: string | null | undefined) {
   return value && filmTypeValues.has(value) ? value : "highlights";
+}
+
+function getFilmThumbnailUrl(film: FilmLink | null | undefined) {
+  if (!film) return null;
+  return film.thumbnail_url
+    ?? getVideoThumbnailUrl(film.url)
+    ?? (detectVideoProvider(film.url) === "hudl" ? HUDL_PLACEHOLDER : null);
 }
 
 export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] }) {
@@ -38,13 +45,13 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
   const activeProvider = activeFilm ? detectVideoProvider(activeFilm.url) : "hudl";
   const embedUrl = activeFilm ? getEmbeddableVideoUrl(activeFilm.url) : null;
   const previewEmbedUrl = activeFilm ? getPreviewEmbedUrl(activeFilm.url) : null;
-  const activeThumbnailUrl = activeFilm ? activeFilm.thumbnail_url ?? getVideoThumbnailUrl(activeFilm.url) : null;
+  const activeThumbnailUrl = getFilmThumbnailUrl(activeFilm);
   const providerLabel = getVideoProviderLabel(activeProvider);
   const fullscreenFilm = fullscreenFilmId ? filmLinks.find((film) => film.id === fullscreenFilmId) ?? null : null;
   const fullscreenProvider = fullscreenFilm ? detectVideoProvider(fullscreenFilm.url) : "external";
   const fullscreenProviderLabel = getVideoProviderLabel(fullscreenProvider);
   const fullscreenEmbedUrl = fullscreenFilm ? getEmbeddableVideoUrl(fullscreenFilm.url) : null;
-  const fullscreenThumbnailUrl = fullscreenFilm ? fullscreenFilm.thumbnail_url ?? getVideoThumbnailUrl(fullscreenFilm.url) : null;
+  const fullscreenThumbnailUrl = getFilmThumbnailUrl(fullscreenFilm);
 
   function trackFilmEvent(film: FilmLink, eventType: "open" | "hover_preview") {
     return fetch("/api/analytics/film-click", {
@@ -118,13 +125,13 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
             ) : activeThumbnailUrl ? (
               <button
                 type="button"
-                onClick={() => startHoverPreview(activeFilm)}
+                onClick={() => previewEmbedUrl ? startHoverPreview(activeFilm) : openTrackedFilm(activeFilm)}
                 className="group flex h-full w-full items-end bg-cover bg-center text-left"
                 style={{ backgroundImage: `linear-gradient(180deg, rgba(2,6,23,.08), rgba(2,6,23,.86)), url(${activeThumbnailUrl})` }}
-                aria-label={`Preview ${activeFilm.label ?? providerLabel}`}
+                aria-label={`${previewEmbedUrl ? "Preview" : "Open"} ${activeFilm.label ?? providerLabel}`}
               >
                 <span className="m-5 inline-flex h-10 items-center gap-2 border border-white/20 bg-white px-5 text-xs font-black uppercase tracking-wide text-slate-950 shadow-xl transition group-hover:bg-red-50">
-                  Hover preview
+                  {previewEmbedUrl ? "Hover preview" : `Open on ${providerLabel}`}
                 </span>
               </button>
             ) : (
@@ -141,7 +148,11 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
         ) : activeFilm ? (
           <div
             className="flex h-full items-center justify-center bg-cover bg-center p-8 text-center"
-            style={activeThumbnailUrl ? { backgroundImage: `linear-gradient(180deg, rgba(2,6,23,.18), rgba(2,6,23,.9)), url(${activeThumbnailUrl})` } : undefined}
+            style={{
+              backgroundImage: activeThumbnailUrl
+                ? `linear-gradient(180deg, rgba(2,6,23,.18), rgba(2,6,23,.9)), url(${activeThumbnailUrl})`
+                : undefined
+            }}
             onMouseEnter={() => startHoverPreview(activeFilm)}
             onFocus={() => startHoverPreview(activeFilm)}
           >

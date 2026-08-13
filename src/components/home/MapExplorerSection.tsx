@@ -46,24 +46,24 @@ export default function MapExplorerSection({ regions, leagues, teams }: MapExplo
   return (
     <section id="map-explorer" className="border-y border-slate-200 bg-white py-10 text-slate-950 dark:border-white/10 dark:bg-[#090909] dark:text-white">
       <div className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8">
-        <div className="mb-6 flex flex-col gap-5 border-b border-slate-200 pb-6 dark:border-white/10 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mb-4 flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-white/10 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-red-500">Interactive Market Map</p>
-            <h2 className="mt-3 max-w-3xl text-lg font-black tracking-tight text-slate-950 dark:text-white sm:text-2xl lg:text-3xl">
+            <h2 className="mt-1.5 max-w-2xl text-base font-black text-slate-950 dark:text-white sm:text-lg">
               Click a country and open its leagues, teams and regional footprint.
             </h2>
           </div>
-          <div className="grid grid-cols-3 gap-2 lg:w-[28rem]">
+          <div className="grid grid-cols-3 gap-1.5 sm:w-56">
             {[
               { label: "Countries", value: regions.length, href: "" },
               { label: "Leagues", value: totalLeagues, href: "/leagues" },
               { label: "Teams", value: totalTeams, href: "/teams" }
             ].map((item) => {
-              const cardClass = "border border-slate-200 bg-white p-4 text-center transition dark:border-white/10 dark:bg-[#111]";
+              const cardClass = "border border-slate-200 bg-white px-3 py-2.5 text-center transition dark:border-white/10 dark:bg-[#111]";
               const content = (
                 <>
-                <p className="text-2xl font-black text-slate-950 dark:text-white">{item.value}</p>
-                <p className="mt-1 text-[10px] font-black uppercase text-slate-500 dark:text-white/45">{item.label}</p>
+                <p className="text-lg font-black text-slate-950 dark:text-white">{item.value}</p>
+                <p className="text-[9px] font-black uppercase text-slate-500 dark:text-white/45">{item.label}</p>
                 </>
               );
 
