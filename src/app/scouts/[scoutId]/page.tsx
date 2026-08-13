@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Profile } from "@/lib/auth";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getLeagueByIdOrSlug } from "@/lib/data";
+import { getFlagForCountry } from "@/lib/data";
 import { campusPipelines, isCampusPipeline } from "@/lib/campus-to-pro";
 import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMediaSection";
 import ContactClubButton from "@/components/scouts/ContactClubButton";
@@ -109,6 +110,8 @@ interface ClubTeam {
   passing_yards: number | null;
   rushing_yards: number | null;
   touchdowns_scored: number | null;
+  stats_season: string | null;
+  facilities: string[] | null;
   league_position: number | null;
   website: string | null;
   contact_email: string | null;
@@ -191,6 +194,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     id, name, city, country, league_id, stadium, tier, claim_status,
     logo_url, recruiting_active, open_roster_spots, roster_needs,
     pass_run_percentage, passing_yards, rushing_yards, touchdowns_scored,
+    stats_season, facilities,
     league_position, website, contact_email, pipeline_names_public,
     direct_messaging_enabled,
     claimed_by, updated_at
@@ -378,7 +382,6 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     : { data: [] as ConversationPipelineRow[] };
 
   const isVerified = team?.claim_status === "verified";
-  const pipelineNamesPublic = team?.pipeline_names_public ?? false;
   const isAuthenticated = Boolean(user);
   const staff = staffRows ?? [];
   const hasClubInbox = staff.length > 0;
@@ -442,6 +445,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
   });
   const league = team?.league_id ? getLeagueByIdOrSlug(team.league_id) : null;
   const leagueLabel = campusPipeline?.shortLabel ?? league?.shortName ?? league?.name ?? "League";
+  const countryFlag = getFlagForCountry(team?.country ?? "");
   const teamName = team?.name ?? resolvedProfile.display_name;
   const location = [team?.city, team?.country].filter(Boolean).join(", ");
   const profileText =
@@ -495,7 +499,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                         {isVerified ? "Verified" : "Pending"}
                       </span>
                       <span className="border border-blue-400 bg-blue-100 px-3 py-1 text-xs font-black uppercase text-blue-950 shadow-sm dark:border-blue-500/60 dark:bg-blue-500/15 dark:text-blue-100">
-                        {leagueLabel} {team?.tier ? `- Tier ${team.tier}` : ""}
+                        {countryFlag ? `${countryFlag} ` : ""}{leagueLabel} {team?.tier ? `- Tier ${team.tier}` : ""}
                       </span>
                     </div>
                     <h1 className="mt-3 break-words text-2xl font-black leading-none text-slate-950 dark:text-white sm:text-4xl">{teamName}</h1>
@@ -503,24 +507,37 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                   </div>
                 </div>
 
-                <CompactFactGrid className="mt-5" columns={4} facts={[
-                  { label: "Region", value: team?.country ?? "Europe" },
-                  { label: "Type", value: campusPipeline?.label ?? league?.tier ?? "Club" },
-                  { label: "Market", value: league?.marketTier ?? "—" },
-                  { label: "Pipeline", value: pipelineNamesPublic ? "Public" : "Open" }
-                ]} />
+                <div className="mt-7 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
+                  {[
+                    ["Region", team?.country ?? "Europe"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-h-9 min-w-0 break-words border border-slate-200 bg-white px-4 py-2 text-sm dark:border-white/20 dark:bg-black/20">
+                      <span className="mr-1.5 uppercase text-slate-500 dark:text-white/35">{label}</span>
+                      <span className="font-bold capitalize text-slate-800 dark:text-white/75">{value}</span>
+                    </div>
+                  ))}
+                  {/* Recruiting status badge */}
+                  <div className={`min-h-9 flex items-center gap-1.5 border px-4 py-2 text-sm font-black ${team?.recruiting_active ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300" : "border-slate-200 bg-white text-slate-500 dark:border-white/20 dark:bg-black/20 dark:text-white/40"}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${team?.recruiting_active ? "bg-emerald-500" : "bg-slate-400 dark:bg-white/30"}`} />
+                    {team?.recruiting_active ? "Actively recruiting" : "Not currently recruiting"}
+                  </div>
+                  <span className="min-h-9 px-2 py-2 text-sm font-black uppercase text-red-600 dark:text-red-400">
+                    {resolvedProfile.is_public ? "Public Profile" : "Private Profile"}
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a]">
                 {([
-                  ["League", leagueLabel],
-                  ["Pass Play", formatPercent(team?.pass_run_percentage)],
-                  ["Open Spots", String(openSpots || "—")],
-                  ["Staff", String(staff.length || "—")]
-                ] as [string, string][]).map(([label, value], index) => (
-                  <div key={label} className={`px-3 py-2.5 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
-                    <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
-                    <p className={`mt-1 text-lg font-black ${label === "Open Spots" ? "text-green-600 dark:text-green-400" : "text-slate-950 dark:text-white"}`}>{value}</p>
+                  ["League", `${countryFlag ? `${countryFlag} ` : ""}${leagueLabel}`],
+                  team?.stats_season ? ["Statistics season", team.stats_season] : null,
+                  team?.pass_run_percentage != null ? ["Pass / Run", formatPercent(team.pass_run_percentage)] : null,
+                  team?.passing_yards != null ? ["Passing yards", `${team.passing_yards.toLocaleString("en-GB")} yds`] : null,
+                  team?.touchdowns_scored != null ? ["Touchdowns", String(team.touchdowns_scored)] : null,
+                ].filter(Boolean) as [string, string][]).map(([label, value], index, arr) => (
+                  <div key={label} className={`p-4 ${index % 2 === 0 ? "border-r border-slate-200 dark:border-white/10" : ""} ${index < arr.length - 2 || arr.length <= 2 ? "border-b border-slate-200 dark:border-white/10" : ""}`}>
+                    <p className="text-xs font-bold uppercase text-slate-500 dark:text-white/35">{label}</p>
+                    <p className="mt-1.5 text-xl font-black text-slate-950 dark:text-white">{value}</p>
                   </div>
                 ))}
               </div>
@@ -540,10 +557,56 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                   <p className="break-words text-base font-semibold leading-7 text-slate-600 dark:text-white/65">{profileText}</p>
                 </div>
 
-                <CompactFactGrid columns={2} facts={[
-                  { label: "Stadium", value: team?.stadium ?? "Not listed" },
-                  { label: "Website", value: team?.website?.replace(/^https?:\/\//, "") ?? "Not listed", href: team?.website ? (team.website.startsWith("http") ? team.website : `https://${team.website}`) : null, external: true }
-                ]} />
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {/* Stadium Card */}
+                  <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-red-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-red-500/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-red-500/0 to-red-500/5 opacity-0 transition group-hover:opacity-100 dark:to-red-500/10" />
+                    <div className="relative p-5">
+                      <div className="mb-3 flex items-center gap-2">
+                        {/* Stadium arch silhouette */}
+                        <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M5 21V10.5A9 9 0 0112 3a9 9 0 017 7.5V21M9 21v-5h6v5M7 13h2v3H7zm8 0h2v3h-2z" />
+                        </svg>
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Stadium</p>
+                      </div>
+                      <p className="text-lg font-black leading-tight text-slate-950 dark:text-white">{team?.stadium ?? "Not listed"}</p>
+                    </div>
+                  </div>
+
+                  {/* Website Card */}
+                  <div className="group relative overflow-hidden border border-slate-200 bg-white transition hover:border-blue-300 hover:shadow-md dark:border-white/15 dark:bg-[#1a1a1a] dark:hover:border-blue-500/40">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 transition group-hover:opacity-100 dark:to-blue-500/10" />
+                    <div className="relative p-5">
+                      <div className="mb-3 flex items-center gap-2">
+                        <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Website</p>
+                      </div>
+                      {team?.website ? (
+                        <a
+                          href={team.website.startsWith('http') ? team.website : `https://${team.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block truncate text-lg font-black leading-tight text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          {team.website.replace(/^https?:\/\//, "")}
+                        </a>
+                      ) : (
+                        <p className="text-lg font-black leading-tight text-slate-400 dark:text-white/30">Not listed</p>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+                {team?.facilities?.length ? (
+                  <div className="mt-5 border border-slate-200 bg-white p-5 dark:border-white/15 dark:bg-[#1a1a1a]">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-red-500">Benefits & facilities</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {team.facilities.map((facility) => <span key={facility} className="border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 dark:border-white/10 dark:bg-black/25 dark:text-white/75">{facility}</span>)}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </section>
 

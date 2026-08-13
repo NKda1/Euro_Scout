@@ -385,6 +385,8 @@ export async function updateClubProfileFromAccountAction(formData: FormData) {
       rushing_yards: formNumber(formData, "rushing_yards", { min: 0, integer: true }),
       touchdowns_scored: formNumber(formData, "touchdowns_scored", { min: 0, integer: true }),
       league_position: leaguePosition,
+      stats_season: formText(formData, "stats_season", 5) || null,
+      facilities: formList(formData, "facilities").slice(0, 12),
       recruiting_active: formData.get("recruiting_active") === "on",
       direct_messaging_enabled: formData.get("direct_messaging_enabled") === "true",
       pipeline_names_public: formData.get("pipeline_names_public") === "on",

@@ -90,6 +90,8 @@ interface ClubMembership {
     passing_yards: number | null;
     rushing_yards: number | null;
     touchdowns_scored: number | null;
+    stats_season: string | null;
+    facilities: string[] | null;
     league_position: number | null;
   } | null;
 }
@@ -548,6 +550,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               passing_yards,
               rushing_yards,
               touchdowns_scored,
+              stats_season,
+              facilities,
               league_position
             )
           `
@@ -1849,6 +1853,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <MetricNumberControl name="passing_yards" label="Passing yards" defaultValue={team.passing_yards ?? ""} min={0} max={7000} step={50} unit="yds" />
                 <MetricNumberControl name="rushing_yards" label="Rushing yards" defaultValue={team.rushing_yards ?? ""} min={0} max={7000} step={50} unit="yds" />
                 <MetricNumberControl name="touchdowns_scored" label="Touchdowns scored" defaultValue={team.touchdowns_scored ?? ""} min={0} max={100} step={1} unit="TD" />
+                <Field label="Statistics season">
+                  <input name="stats_season" pattern="[0-9]{2}/[0-9]{2}" placeholder="25/26" defaultValue={team.stats_season ?? ""} className={inputClass} />
+                </Field>
                 <MetricNumberControl name="league_position" label="League position" defaultValue={team.league_position ?? ""} min={1} max={32} step={1} unit="#" />
                 <label className="flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-black/35 px-3 text-sm font-bold text-white/70">
                   <input name="recruiting_active" type="checkbox" defaultChecked={Boolean(team.recruiting_active)} className="h-4 w-4 rounded border-white/20 text-red-600" />
@@ -1862,6 +1869,18 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <div className="md:col-span-2">
                   <Field label="Roster needs">
                     <RosterNeedsBuilder name="roster_needs" defaultValue={Array.isArray(team.roster_needs) ? team.roster_needs : []} />
+                  </Field>
+                </div>
+                <div className="md:col-span-2">
+                  <Field label="Benefits and facilities">
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {["Gym access", "Housing", "Car support", "Scholarship opportunities", "Medical support", "Nutrition support", "Equipment", "Travel support", "Education support"].map((facility) => (
+                        <label key={facility} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-bold text-white/70">
+                          <input name="facilities" type="checkbox" value={facility} defaultChecked={team.facilities?.includes(facility)} className="h-4 w-4 rounded border-white/20 text-red-600" />
+                          {facility}
+                        </label>
+                      ))}
+                    </div>
                   </Field>
                 </div>
                 <button className="h-11 rounded-lg bg-red-600 px-5 text-sm font-black text-white transition hover:bg-red-700 md:w-fit">

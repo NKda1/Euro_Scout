@@ -36,45 +36,39 @@ export default function MobileMenu({ isSignedIn, isAdmin, notificationCount = 0 
 
       {open && (
         <div className="animate-slide-down absolute inset-x-0 top-16 z-50 border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#090909] lg:hidden">
-          <nav className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4 sm:px-6">
-            <Link href={routes.home} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-              Home
-            </Link>
-            <Link href={routes.leagues} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-              League directories
-            </Link>
-            <Link href={routes.teams} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-              Club directory
-            </Link>
-            <Link href={routes.players} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-              Players
-            </Link>
-            <Link href={routes.campusToPro} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-              Campus to Pro
-            </Link>
-            <Link href={routes.news} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
-              News
-            </Link>
+          <nav className="mx-auto flex max-w-7xl flex-col px-4 py-2 sm:px-6">
+            {[
+              { href: routes.home, label: "Home" },
+              { href: routes.leagues, label: "League directories" },
+              { href: routes.teams, label: "Club directory" },
+              { href: routes.players, label: "Players" },
+              { href: routes.campusToPro, label: "Campus to Pro" },
+              { href: routes.news, label: "News" },
+            ].map(({ href, label }) => (
+              <Link key={href} href={href} onClick={close} className="border-b border-slate-100 px-2 py-2.5 text-sm font-bold text-slate-700 transition hover:text-red-700 dark:border-white/5 dark:text-slate-200 dark:hover:text-red-300">
+                {label}
+              </Link>
+            ))}
             {isSignedIn && (
               <>
-                <Link href={routes.messages} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
+                <Link href={routes.messages} onClick={close} className="border-b border-slate-100 px-2 py-2.5 text-sm font-bold text-slate-700 transition hover:text-red-700 dark:border-white/5 dark:text-slate-200 dark:hover:text-red-300">
                   Messages
                 </Link>
-                <Link href={routes.notifications} onClick={close} className="flex items-center justify-between px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
+                <Link href={routes.notifications} onClick={close} className="flex items-center justify-between border-b border-slate-100 px-2 py-2.5 text-sm font-bold text-slate-700 transition hover:text-red-700 dark:border-white/5 dark:text-slate-200 dark:hover:text-red-300">
                   <span>Notifications</span>
                   {notificationCount ? (
-                    <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-black text-white">
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-black text-white">
                       {notificationCount > 9 ? "9+" : notificationCount}
                     </span>
                   ) : null}
                 </Link>
                 {isAdmin && (
-                  <Link href={routes.admin} onClick={close} className="px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-200 dark:hover:bg-red-500/10 dark:hover:text-red-300">
+                  <Link href={routes.admin} onClick={close} className="border-b border-slate-100 px-2 py-2.5 text-sm font-bold text-slate-700 transition hover:text-red-700 dark:border-white/5 dark:text-slate-200 dark:hover:text-red-300">
                     Admin
                   </Link>
                 )}
-                <div className="mt-1 border-t border-slate-100 pt-2 dark:border-white/10">
-                  <Link href={routes.account} onClick={close} className="block bg-red-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-red-700">
+                <div className="pt-2">
+                  <Link href={routes.account} onClick={close} className="block bg-red-600 px-4 py-2.5 text-center text-sm font-black text-white transition hover:bg-red-700">
                     Account
                   </Link>
                 </div>

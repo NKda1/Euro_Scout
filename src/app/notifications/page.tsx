@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BarChart3, Bell, Eye, Inbox, PhoneCall, ShieldAlert, Star, UserPlus, Users } from "lucide-react";
+import { BarChart3, Bell, Eye, Inbox, PhoneCall, Settings, ShieldAlert, Star, UserPlus, Users } from "lucide-react";
 import { requireOnboardedProfile } from "@/lib/auth";
 import { getNotificationSummary } from "@/lib/notifications";
 import { EmptyState } from "@/components/ui/StateDisplay";
@@ -160,6 +160,44 @@ export default async function NotificationsPage() {
             />
           </div>
         )}
+
+        {/* Email notification preferences */}
+        <div className="mt-10 border-t border-slate-200 pt-8 dark:border-white/10">
+          <div className="mb-5">
+            <p className="eyebrow-red">Manage notifications</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">Email preferences</h2>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
+              Choose which activity you want delivered directly to your email inbox.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { icon: PhoneCall, title: "Call requests", description: "Get emailed when a club or player requests a video call.", key: "calls" },
+              { icon: Eye, title: "Profile views", description: "Weekly digest of who viewed your player or club profile.", key: "views" },
+              { icon: Inbox, title: "New messages", description: "Receive an email when you have an unread message.", key: "messages" },
+              { icon: Star, title: "Club interest", description: "Notify club staff when a player expresses interest.", key: "interest" },
+              { icon: Users, title: "Watchlist activity", description: "Updates when players on your watchlists change status.", key: "watchlist" },
+              { icon: Bell, title: "Platform updates", description: "Product news, new features and EuroScout announcements.", key: "platform" },
+            ].map(({ icon: Icon, title, description }) => (
+              <div key={title} className="flex items-start gap-3 border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#111]">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center border border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                  <Icon className="h-4 w-4" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-slate-950 dark:text-white">{title}</p>
+                  <p className="mt-0.5 text-xs font-semibold leading-5 text-slate-500 dark:text-white/45">{description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-400 dark:text-slate-500">
+            <Settings className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            To update email preferences, contact us at{" "}
+            <a href="mailto:info@euroscoutpro.com?subject=Email notification preferences" className="font-bold text-red-600 hover:underline dark:text-red-400">
+              info@euroscoutpro.com
+            </a>
+          </p>
+        </div>
       </section>
     </main>
   );

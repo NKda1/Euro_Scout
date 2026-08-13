@@ -107,7 +107,7 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="call-launcher-title">
-          <div className="w-full max-w-md rounded-t-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111] sm:rounded-2xl">
+          <div className="w-full max-w-lg overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#111] sm:rounded-2xl">
 
             {/* Header */}
             <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10">
@@ -129,15 +129,14 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
             </div>
 
             <div className="p-5 space-y-4">
-              {activeInstantCallId ? (
-                <Link href={`/meetings/${activeInstantCallId}/room`} className="flex w-full items-center justify-between border border-red-300 bg-red-600 p-3 text-xs font-black text-white transition hover:bg-red-700">
-                  <span className="flex items-center gap-2"><PhoneCall className="h-4 w-4" aria-hidden />Reopen live call</span>
-                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" aria-hidden />
-                </Link>
+              {hasOpenCall ? (
+                <button type="button" onClick={() => { setOpen(false); document.querySelector('[aria-label="Video calls in this conversation"]')?.scrollIntoView({ behavior: "smooth", block: "center" }); }} className="w-full border border-amber-300 bg-amber-50 p-3 text-left text-xs font-black text-amber-900 transition hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
+                  An active call already exists — open its card to join, reschedule, or cancel.
+                </button>
               ) : (
                 <>
                   {/* ── Call now ── */}
-                  <div>
+                  <div className="border border-red-200 bg-gradient-to-br from-red-50 to-white p-4 dark:border-red-500/25 dark:from-red-500/10 dark:to-white/[0.02]">
                     <p className="mb-2.5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/30">Live call</p>
                     {callState?.error ? (
                       <p className="mb-2.5 border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-300">
@@ -166,37 +165,31 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
                   </div>
 
                   {/* ── Schedule ── */}
-                  {hasScheduledCall ? (
-                    <button type="button" onClick={() => { setOpen(false); document.querySelector('[aria-label="Video calls in this conversation"]')?.scrollIntoView({ behavior: "smooth", block: "center" }); }} className="w-full border border-amber-300 bg-amber-50 p-3 text-left text-xs font-black text-amber-900 transition hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
-                      A scheduled call is already on the activity card. You can still call now above.
-                    </button>
-                  ) : (
-                    <div>
-                      <p className="mb-2.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/30">
-                        <CalendarClock className="h-3 w-3 text-red-500" aria-hidden />
-                        Schedule for later
-                      </p>
-                      <form action={scheduleAction} className="space-y-2.5">
-                        <input type="hidden" name="team_id" value={teamId} />
-                        <input type="hidden" name="target_profile_id" value={targetPlayerId} />
-                        <input type="hidden" name="return_to" value={returnTo} />
-                        <input type="hidden" name="timezone" value={Intl.DateTimeFormat().resolvedOptions().timeZone} />
-                        <input type="hidden" name="request_reason" value="Conversation call" />
-                        <div className="grid gap-2.5 sm:grid-cols-2">
-                          <label className="block">
-                            <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Preferred time</span>
-                            <input name="proposed_start_at" type="datetime-local" required value={preferred} onChange={(e) => setPreferred(e.target.value)} className="h-10 w-full border border-slate-300 bg-white px-3 text-xs font-bold text-slate-950 outline-none focus:border-red-500 dark:border-white/15 dark:bg-black/30 dark:text-white" />
-                          </label>
-                          <label className="block">
-                            <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Alternative <span className="font-medium opacity-60">(opt.)</span></span>
-                            <input name="proposed_alternative_at" type="datetime-local" className="h-10 w-full border border-slate-300 bg-white px-3 text-xs font-bold text-slate-950 outline-none focus:border-red-500 dark:border-white/15 dark:bg-black/30 dark:text-white" />
-                          </label>
-                        </div>
-                        <textarea name="request_note" maxLength={500} rows={2} placeholder="Add context for the call…" className="w-full resize-none border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-950 outline-none placeholder:text-slate-400 focus:border-red-500 dark:border-white/15 dark:bg-black/30 dark:text-white" />
-                        <button className="h-10 w-full bg-red-600 px-4 text-xs font-black text-white transition hover:bg-red-700">Send call proposal</button>
-                      </form>
-                    </div>
-                  )}
+                  <div>
+                    <p className="mb-2.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/30">
+                      <CalendarClock className="h-3 w-3 text-red-500" aria-hidden />
+                      Schedule for later
+                    </p>
+                    <form action={scheduleAction} className="space-y-2.5">
+                      <input type="hidden" name="team_id" value={teamId} />
+                      <input type="hidden" name="target_profile_id" value={targetPlayerId} />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <input type="hidden" name="timezone" value={Intl.DateTimeFormat().resolvedOptions().timeZone} />
+                      <input type="hidden" name="request_reason" value="Conversation call" />
+                      <div className="grid gap-2.5 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Preferred time</span>
+                          <input name="proposed_start_at" type="datetime-local" required value={preferred} onChange={(e) => setPreferred(e.target.value)} className="h-10 w-full border border-slate-300 bg-white px-3 text-xs font-bold text-slate-950 outline-none focus:border-red-500 dark:border-white/15 dark:bg-black/30 dark:text-white" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-white/40">Alternative <span className="font-medium opacity-60">(opt.)</span></span>
+                          <input name="proposed_alternative_at" type="datetime-local" className="h-10 w-full border border-slate-300 bg-white px-3 text-xs font-bold text-slate-950 outline-none focus:border-red-500 dark:border-white/15 dark:bg-black/30 dark:text-white" />
+                        </label>
+                      </div>
+                      <textarea name="request_note" maxLength={500} rows={2} placeholder="Add context for the call…" className="w-full resize-none border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-950 outline-none placeholder:text-slate-400 focus:border-red-500 dark:border-white/15 dark:bg-black/30 dark:text-white" />
+                      <button className="h-10 w-full bg-red-600 px-4 text-xs font-black text-white transition hover:bg-red-700">Send call proposal</button>
+                    </form>
+                  </div>
                 </>
               )}
             </div>
@@ -206,4 +199,3 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
     </>
   );
 }
-

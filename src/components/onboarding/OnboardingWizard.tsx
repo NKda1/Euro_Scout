@@ -58,7 +58,7 @@ const LANGUAGES = [
 ] as const;
 
 const ROLE_CONFIG: Record<string, { label: string; description: string; icon: string; hasRoleStep: boolean }> = {
-  player:     { label: "Player",     description: "I play American football in Europe",   icon: "🏈", hasRoleStep: true },
+  player:     { label: "Player",     description: "I play American football",         icon: "🏈", hasRoleStep: true },
   club:       { label: "Club",       description: "I manage or represent a club",         icon: "🏟", hasRoleStep: true },
   journalist: { label: "Journalist", description: "I cover European football",            icon: "✍️", hasRoleStep: false },
   fan:        { label: "Fan",        description: "I follow the sport",                   icon: "👀", hasRoleStep: false },
@@ -495,8 +495,11 @@ function IdentityStep(props: {
         <input value={props.displayName} onChange={(e) => props.setDisplayName(e.target.value)} placeholder="e.g. Jonas Weber" className={inputClass} />
       </label>
       <label className="block">
-        <FieldLabel>Location</FieldLabel>
-        <input value={props.location} onChange={(e) => props.setLocation(e.target.value)} placeholder="e.g. Berlin, Germany" className={inputClass} />
+        <FieldLabel>Country</FieldLabel>
+        <select value={props.location} onChange={(e) => props.setLocation(e.target.value)} className={selectClass}>
+          <option value="">Select country</option>
+          {countries.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
+        </select>
       </label>
       <label className="block">
         <FieldLabel>Short bio</FieldLabel>

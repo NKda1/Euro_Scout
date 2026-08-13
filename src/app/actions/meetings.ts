@@ -715,8 +715,56 @@ export async function startInstantCallReturnAction(
     return { error: error?.message ?? "Could not start the call. Please try again." };
   }
 
+  let room: Awaited<ReturnType<typeof createDailyRoom>>;
+  try {
+    room = await createDailyRoom({
+      meetingId: meeting.id,
+      scheduledAt: now,
+      durationMinutes: 30
+    });
+  } catch (dailyError) {
+    await serviceClient.from("meeting_requests").delete().eq("id", meeting.id);
+    return { error: dailyError instanceof Error ? dailyError.message : "Could not create the Daily room." };
+  }
+
+  const { error: roomError } = await serviceClient
+    .from("meeting_requests")
+    .update({
+      daily_provider: "daily",
+      daily_room_id: room.room.id,
+      daily_room_name: room.room.name,
+      daily_room_url: room.room.url,
+      daily_room_expires_at: room.roomExpiresAt,
+      daily_sfu_enabled: true,
+      daily_room_config: room.room.config ?? {},
+      room_opened_at: now,
+      updated_at: now
+    })
+    .eq("id", meeting.id);
+  if (roomError) return { error: roomError.message };
+
+  let joinToken: Awaited<ReturnType<typeof createDailyMeetingToken>>;
+  try {
+    joinToken = await createDailyMeetingToken({
+      roomName: room.room.name,
+      user: profile,
+      isOwner: profile.role !== "player",
+      expiresAt: room.roomExpiresAt
+    });
+  } catch (dailyError) {
+    return { error: dailyError instanceof Error ? dailyError.message : "Could not create a Daily join token." };
+  }
+
+  await serviceClient.from("meeting_join_tokens").insert({
+    meeting_request_id: meeting.id,
+    profile_id: profile.id,
+    daily_room_name: room.room.name,
+    token_fingerprint: createHash("sha256").update(joinToken.token).digest("hex").slice(0, 48),
+    expires_at: joinToken.expiresAt,
+    is_owner: profile.role !== "player"
+  });
   revalidateMeetingPaths(meeting);
-  redirect(`${returnPath}?notice=${encodeURIComponent("Live call created. Open the call card to join.")}`);
+  redirect(buildDailyJoinUrl(`/meetings/${meeting.id}/room`, joinToken.token));
 }
 
 export async function requestClubCallAction(formData: FormData) {

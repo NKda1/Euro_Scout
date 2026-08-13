@@ -190,7 +190,7 @@ export default async function AdminClubVerificationPage({ searchParams }: AdminC
                         <input
                           name="confirmation"
                           placeholder="DELETE CLUB"
-                          className="h-10 w-full border border-red-200 bg-red-50/50 px-3 text-xs font-black text-slate-900 outline-none transition placeholder:text-red-300 focus:border-red-400 dark:border-red-500/30 dark:bg-red-500/10 dark:text-white"
+                          className="h-10 w-full border border-red-300 bg-red-50 px-3 text-xs font-black text-red-900 outline-none transition placeholder:text-red-400/70 focus:border-red-500 dark:border-red-500/30 dark:bg-red-500/10 dark:text-white dark:placeholder:text-red-400/50"
                         />
                         <button className="h-11 w-full border border-red-500 bg-transparent px-4 text-sm font-black text-red-600 transition hover:bg-red-600 hover:text-white dark:text-red-300">
                           Decline and delete
@@ -266,7 +266,7 @@ export default async function AdminClubVerificationPage({ searchParams }: AdminC
                         <input
                           name="confirmation"
                           placeholder="DELETE CLUB"
-                          className="h-10 w-full border border-red-200 bg-red-50/50 px-3 text-xs font-black text-slate-900 outline-none transition placeholder:text-red-300 focus:border-red-400 dark:border-red-500/30 dark:bg-red-500/10 dark:text-white"
+                          className="h-10 w-full border border-red-300 bg-red-50 px-3 text-xs font-black text-red-900 outline-none transition placeholder:text-red-400/70 focus:border-red-500 dark:border-red-500/30 dark:bg-red-500/10 dark:text-white dark:placeholder:text-red-400/50"
                         />
                         <button className="h-11 w-full border border-red-500 bg-transparent px-4 text-sm font-black text-red-600 transition hover:bg-red-600 hover:text-white dark:text-red-300">
                           Delete seeded club
