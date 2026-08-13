@@ -76,7 +76,7 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="call-launcher-title">
-          <div className="w-full max-w-md rounded-t-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#111] sm:rounded-2xl">
+          <div className="w-full max-w-lg overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#111] sm:rounded-2xl">
 
             {/* Header */}
             <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10">
@@ -97,7 +97,7 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="space-y-5 p-5 sm:p-6">
               {hasOpenCall ? (
                 <button type="button" onClick={() => { setOpen(false); document.querySelector('[aria-label="Video calls in this conversation"]')?.scrollIntoView({ behavior: "smooth", block: "center" }); }} className="w-full border border-amber-300 bg-amber-50 p-3 text-left text-xs font-black text-amber-900 transition hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
                   An active call already exists — open its card to join, reschedule, or cancel.
@@ -105,7 +105,7 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
               ) : (
                 <>
                   {/* ── Call now ── */}
-                  <div>
+                  <div className="border border-red-200 bg-gradient-to-br from-red-50 to-white p-4 dark:border-red-500/25 dark:from-red-500/10 dark:to-white/[0.02]">
                     <p className="mb-2.5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/30">Live call</p>
                     {callState?.error ? (
                       <p className="mb-2.5 border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-300">
@@ -134,7 +134,7 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
                   </div>
 
                   {/* ── Schedule ── */}
-                  <div>
+                  <div className="border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">
                     <p className="mb-2.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/30">
                       <CalendarClock className="h-3 w-3 text-red-500" aria-hidden />
                       Schedule for later
@@ -168,4 +168,3 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
     </>
   );
 }
-

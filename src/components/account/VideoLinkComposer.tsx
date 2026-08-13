@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Clapperboard, ImagePlus, Play, Zap } from "lucide-react";
 import { detectVideoProvider, getVideoProviderLabel, getVideoThumbnailUrl } from "@/lib/video";
 
-const HUDL_PLACEHOLDER = "/images/film-placeholder.svg";
+const HUDL_PLACEHOLDER = "/images/PlaceHolder.PNG";
 
 interface VideoLinkComposerProps {
   defaultUrl?: string;
@@ -173,4 +173,3 @@ export default function VideoLinkComposer({
     </div>
   );
 }
-

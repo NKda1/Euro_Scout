@@ -12,6 +12,8 @@ const filmTypeLabels: Record<string, string> = {
   game_film: "Game Film",
   combine: "Combine"
 };
+const HUDL_DEFAULT_THUMBNAIL = "/images/PlaceHolder.PNG";
+const LEGACY_HUDL_THUMBNAIL = "/images/film-placeholder.svg";
 
 function normaliseFilmType(value: string) {
   return filmTypeLabels[value] ? value : "highlights";
@@ -23,7 +25,13 @@ export default function FilmLinksManager({ filmLinks }: { filmLinks: FilmLink[] 
   const defaultProvider = defaultFilm ? detectVideoProvider(defaultFilm.url) : "hudl";
   const defaultProviderLabel = getVideoProviderLabel(defaultProvider);
   const defaultEmbedUrl = defaultFilm ? getEmbeddableVideoUrl(defaultFilm.url) : null;
-  const defaultThumbnailUrl = defaultFilm ? defaultFilm.thumbnail_url ?? getVideoThumbnailUrl(defaultFilm.url) : null;
+  const defaultThumbnailUrl = defaultFilm
+    ? defaultFilm.thumbnail_url
+      && defaultFilm.thumbnail_url !== LEGACY_HUDL_THUMBNAIL
+      ? defaultFilm.thumbnail_url
+      : getVideoThumbnailUrl(defaultFilm.url)
+        ?? (defaultProvider === "hudl" ? HUDL_DEFAULT_THUMBNAIL : null)
+    : null;
 
   return (
     <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-black/20">

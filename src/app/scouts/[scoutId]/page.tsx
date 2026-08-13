@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Profile } from "@/lib/auth";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getLeagueByIdOrSlug } from "@/lib/data";
+import { getFlagForCountry } from "@/lib/data";
 import { campusPipelines, isCampusPipeline } from "@/lib/campus-to-pro";
 import ClubMediaSection, { type ClubMediaRow } from "@/components/scouts/ClubMediaSection";
 import ContactClubButton from "@/components/scouts/ContactClubButton";
@@ -108,6 +109,8 @@ interface ClubTeam {
   passing_yards: number | null;
   rushing_yards: number | null;
   touchdowns_scored: number | null;
+  stats_season: string | null;
+  facilities: string[] | null;
   league_position: number | null;
   website: string | null;
   contact_email: string | null;
@@ -190,6 +193,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
     id, name, city, country, league_id, stadium, tier, claim_status,
     logo_url, recruiting_active, open_roster_spots, roster_needs,
     pass_run_percentage, passing_yards, rushing_yards, touchdowns_scored,
+    stats_season, facilities,
     league_position, website, contact_email, pipeline_names_public,
     direct_messaging_enabled,
     claimed_by, updated_at
@@ -440,6 +444,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
   });
   const league = team?.league_id ? getLeagueByIdOrSlug(team.league_id) : null;
   const leagueLabel = campusPipeline?.shortLabel ?? league?.shortName ?? league?.name ?? "League";
+  const countryFlag = getFlagForCountry(team?.country ?? "");
   const teamName = team?.name ?? resolvedProfile.display_name;
   const location = [team?.city, team?.country].filter(Boolean).join(", ");
   const profileText =
@@ -493,7 +498,7 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                         {isVerified ? "Verified" : "Pending"}
                       </span>
                       <span className="border border-blue-400 bg-blue-100 px-3 py-1 text-xs font-black uppercase text-blue-950 shadow-sm dark:border-blue-500/60 dark:bg-blue-500/15 dark:text-blue-100">
-                        {leagueLabel} {team?.tier ? `- Tier ${team.tier}` : ""}
+                        {countryFlag ? `${countryFlag} ` : ""}{leagueLabel} {team?.tier ? `- Tier ${team.tier}` : ""}
                       </span>
                     </div>
                     <h1 className="mt-4 break-words text-3xl font-black leading-none text-slate-950 dark:text-white sm:text-5xl">{teamName}</h1>
@@ -523,7 +528,8 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
 
               <div className="grid grid-cols-1 overflow-hidden border border-slate-200 bg-white dark:border-white/15 dark:bg-[#1a1a1a] sm:grid-cols-2">
                 {([
-                  ["League", leagueLabel],
+                  ["League", `${countryFlag ? `${countryFlag} ` : ""}${leagueLabel}`],
+                  team?.stats_season ? ["Statistics season", team.stats_season] : null,
                   team?.pass_run_percentage != null ? ["Pass / Run", formatPercent(team.pass_run_percentage)] : null,
                   team?.passing_yards != null ? ["Passing yards", `${team.passing_yards.toLocaleString("en-GB")} yds`] : null,
                   team?.touchdowns_scored != null ? ["Touchdowns", String(team.touchdowns_scored)] : null,
@@ -592,6 +598,14 @@ export default async function ClubProfilePage({ params, searchParams }: ClubProf
                   </div>
 
                 </div>
+                {team?.facilities?.length ? (
+                  <div className="mt-5 border border-slate-200 bg-white p-5 dark:border-white/15 dark:bg-[#1a1a1a]">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-red-500">Benefits & facilities</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {team.facilities.map((facility) => <span key={facility} className="border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 dark:border-white/10 dark:bg-black/25 dark:text-white/75">{facility}</span>)}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </section>
 

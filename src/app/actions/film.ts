@@ -12,7 +12,8 @@ function text(formData: FormData, key: string) {
 
 type FilmProvider = "youtube" | "vimeo" | "hudl" | "external";
 const allowedFilmTypes = new Set(["highlights", "game_film", "combine"]);
-const HUDL_PLACEHOLDER = "/images/film-placeholder.svg";
+const HUDL_PLACEHOLDER = "/images/PlaceHolder.PNG";
+const LEGACY_HUDL_PLACEHOLDER = "/images/film-placeholder.svg";
 
 function normalizeFilmUrl(value: string) {
   const trimmed = value.trim();
@@ -22,7 +23,8 @@ function normalizeFilmUrl(value: string) {
 }
 
 function normalizeThumbnailUrl(value: string) {
-  return value === HUDL_PLACEHOLDER ? value : normalizeFilmUrl(value);
+  if (value === HUDL_PLACEHOLDER || value === LEGACY_HUDL_PLACEHOLDER) return HUDL_PLACEHOLDER;
+  return normalizeFilmUrl(value);
 }
 
 function detectFilmProvider(url: string): FilmProvider {

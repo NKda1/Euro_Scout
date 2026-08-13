@@ -19,7 +19,8 @@ const filmTabs = [
   { value: "game_film", label: "Game Film" }
 ];
 const filmTypeValues = new Set(filmTabs.map((tab) => tab.value));
-const HUDL_PLACEHOLDER = "/images/film-placeholder.svg";
+const HUDL_PLACEHOLDER = "/images/PlaceHolder.PNG";
+const LEGACY_HUDL_PLACEHOLDER = "/images/film-placeholder.svg";
 
 function normaliseFilmType(value: string | null | undefined) {
   return value && filmTypeValues.has(value) ? value : "highlights";
@@ -27,7 +28,7 @@ function normaliseFilmType(value: string | null | undefined) {
 
 function getFilmThumbnailUrl(film: FilmLink | null | undefined) {
   if (!film) return null;
-  return film.thumbnail_url
+  return (film.thumbnail_url && film.thumbnail_url !== LEGACY_HUDL_PLACEHOLDER ? film.thumbnail_url : null)
     ?? getVideoThumbnailUrl(film.url)
     ?? (detectVideoProvider(film.url) === "hudl" ? HUDL_PLACEHOLDER : null);
 }
@@ -46,6 +47,7 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
   const embedUrl = activeFilm ? getEmbeddableVideoUrl(activeFilm.url) : null;
   const previewEmbedUrl = activeFilm ? getPreviewEmbedUrl(activeFilm.url) : null;
   const activeThumbnailUrl = getFilmThumbnailUrl(activeFilm);
+  const usingDefaultHudlThumbnail = activeThumbnailUrl === HUDL_PLACEHOLDER;
   const providerLabel = getVideoProviderLabel(activeProvider);
   const fullscreenFilm = fullscreenFilmId ? filmLinks.find((film) => film.id === fullscreenFilmId) ?? null : null;
   const fullscreenProvider = fullscreenFilm ? detectVideoProvider(fullscreenFilm.url) : "external";
@@ -97,7 +99,7 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
         ))}
       </div>
 
-      <div className="aspect-video bg-[radial-gradient(circle_at_50%_35%,rgba(239,68,68,.22),transparent_34%),linear-gradient(135deg,#020617,#111827)]">
+      <div className="relative aspect-video bg-[radial-gradient(circle_at_50%_35%,rgba(239,68,68,.22),transparent_34%),linear-gradient(135deg,#020617,#111827)]">
         {activeFilm && embedUrl ? (
           <div
             className="h-full w-full"
@@ -190,6 +192,25 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
             </div>
           </div>
         )}
+        {activeFilm && usingDefaultHudlThumbnail ? (
+          <div className="absolute bottom-3 right-3 z-10 flex gap-2 sm:bottom-5 sm:right-5" aria-label="Film actions">
+            <button
+              type="button"
+              onClick={() => setFullscreenFilmId(activeFilm.id)}
+              className="inline-flex h-10 items-center gap-2 border border-white/40 bg-slate-950/95 px-3 text-[10px] font-black uppercase tracking-wide text-white shadow-xl transition hover:border-red-400 hover:text-red-200 sm:h-11 sm:px-5 sm:text-xs"
+            >
+              <Maximize2 className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">Full screen</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openTrackedFilm(activeFilm)}
+              className="inline-flex h-10 items-center border border-white bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-950 shadow-xl transition hover:bg-red-50 sm:h-11 sm:px-5 sm:text-xs"
+            >
+              Open on {providerLabel}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-3 border-t border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -197,7 +218,7 @@ export default function HudlFilmViewer({ filmLinks }: { filmLinks: FilmLink[] })
           <p className="text-xs font-black uppercase tracking-[0.2em] text-red-300">Film Viewer</p>
           <p className="mt-1 text-lg font-black text-white">{activeFilm?.label ?? "Hudl film placeholder"}</p>
         </div>
-        {activeFilm ? (
+        {activeFilm && !usingDefaultHudlThumbnail ? (
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
