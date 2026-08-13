@@ -48,7 +48,7 @@ export default function ConversationCallLauncher({ conversationId, teamId, targe
   const [preferred, setPreferred] = useState(() => localTime(24 * 60));
   const [recipientOnline, setRecipientOnline] = useState(false);
   const [presenceStatus, setPresenceStatus] = useState<"connecting" | "live" | "recovering">("connecting");
-  const returnTo = `/messages/${conversationId}`;
+  const hasOpenCall = Boolean(activeInstantCallId) || hasScheduledCall;
   const [presenceRetryKey, setPresenceRetryKey] = useState(0);
   const [callState, callAction] = useFormState(startInstantCallReturnAction, null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
